@@ -14,6 +14,9 @@ Yet another serial plotting app focusing particularly on the needs of power elec
   - Std. deviation
 - Cross platform based on .net 8
 
+![image](https://github.com/mwattenberg/SerialPlotPlus/assets/73757865/bfca3453-1911-4dd6-9af2-43abebac63d1)
+
+
 # Motivation
 There are many tools for plotting serial data publically available such as
 - SerialPlot
