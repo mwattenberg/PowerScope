@@ -3,11 +3,13 @@ Yet another serial plotting app focusing particularly on the needs of power elec
 
 # Features
 - Designed from the ground up for fast data visualization
-  - Binary data format
-  - ASCII format
   - GPU accelerated visualization based on ScottPlot
-- Hardware agnostic
-  - Data can be parsed from any embedded
+  - Binary data format (ASCII also supported)
+  - Connect to multiple devicews / data streams simultaneous  
+- Hardware agnostic, data can be parsed from any embedded system via
+  - UART through USB-to-UART converter (FTDI / Infineon / Cypress)
+  - USB CDC
+  - BLE
 - Virtual channels derived from real-time data steams
 - Data analysis
   - Min / Max / Top / Bottom
