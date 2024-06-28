@@ -1,4 +1,4 @@
-# SerialPlotPlus
+# SerialPlotAnalyzer
 Yet another serial plotting app focusing particularly on the needs of power electronics and control engineers.
 
 # Features
@@ -25,11 +25,13 @@ There are many tools for plotting serial data publically available such as
 - Serial Port Plotter
 - SerialLab
 - Adriuno serial plotter
+- Better Serial Plotter
+- Serial Studio
 
 Additionally, commercial products such as
-- Saleae Logic (analog data)
-- Electric UI
 - MPLAB® Data Visualizer
+- Micriµm Probe / µC/Probe
+- Saleae Logic (analog data) 
 
 However, these tools each lack a set of features that SerialPlotPlus tries to combine.
 
