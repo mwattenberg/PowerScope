@@ -1,0 +1,36 @@
+﻿<UserControl x:Class="SerialPlotDN_WPF.View.UserControls.MeasurementBox"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:SerialPlotDN_WPF.View.UserControls"
+             mc:Ignorable="d" 
+             d:DesignHeight="100" d:DesignWidth="200">
+    <Grid Background="Gray">
+        
+        <Grid.RowDefinitions>
+            <RowDefinition Height="20"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="0" Background="Black">
+            <!--<Grid.ColumnDefinitions>
+                <ColumnDefinition = "*"/>
+                <ColumnDefinition = "20"/>
+            </Grid.ColumnDefinitions>-->
+            <Label Name="MeasurementNumber" Content="Measurement 1" Foreground="White" HorizontalAlignment="Left" FontSize="9" VerticalAlignment="Top"/>
+            <Label Name="Channel" Content="Channel" Foreground="Black" HorizontalAlignment="Right" Background="Yellow" FontSize="8" VerticalAlignment="Top"/>
+        </Grid>
+
+        <!--<Label Content="Hello&#10;Test&#10;lala" Grid.Row="1">-->
+        <Label Grid.Row="1">
+            <TextBlock> Hello <LineBreak/> World </TextBlock>
+            
+        </Label>
+
+        <Grid Grid.Row="1">
+
+        </Grid>
+
+    </Grid>
+</UserControl>

@@ -1,0 +1,38 @@
+﻿<UserControl x:Class="SerialPlotDN_WPF.View.UserControls.StreamInfoPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:SerialPlotDN_WPF.View.UserControls"
+             mc:Ignorable="d" 
+             d:DesignHeight="80" d:DesignWidth="100">
+    <Grid MinWidth="100">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="8*"/>
+            <ColumnDefinition Width="2*"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- Display selected COM port and baud rate -->
+        <TextBlock Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2"
+                   Text="{Binding PortAndBaudDisplay}" 
+                   VerticalAlignment="Center" 
+                   FontWeight="Bold"
+                   Foreground="White"
+                   FontSize="12"
+                   TextWrapping="Wrap"
+                   Margin="4,0,0,0"/>
+
+        <!-- Keep Connect and Config buttons at the bottom -->
+        <Button x:Name="Button_Connect" Grid.Row="2" Content="Connect" Grid.ColumnSpan="2" Height="20" VerticalAlignment="Top" Click="Button_Connect_Click" Background="LightGreen"/>
+        <Button x:Name="Button_Configure" Grid.Row="3" Content="Config" Click="Button_Configure_Click" Grid.ColumnSpan="2" />
+    </Grid>
+</UserControl>
+
+

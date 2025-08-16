@@ -1,0 +1,54 @@
+﻿<UserControl x:Class="SerialPlotDN_WPF.View.UserControls.ChannelControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Width="100" Height="110">
+    <UserControl.Resources>
+        <Style TargetType="Button">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+    <Grid x:Name="RootGrid">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="20"/>
+            <RowDefinition Height="20"/>
+            <RowDefinition Height="40"/>
+            <RowDefinition Height="30"/>
+        </Grid.RowDefinitions>
+        <!-- Top color bar with channel label -->
+        <Border x:Name="TopColorBar" Grid.Row="0" Background="Gray" CornerRadius="2" Height="20" MouseLeftButtonDown="TopColorBar_MouseLeftButtonDown">
+            <TextBlock x:Name="ChannelLabel" Text="CH1" Foreground="White" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+        </Border>
+        <!-- Gain control buttons -->
+        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+            <Button x:Name="ButtonGainUp" Width="40" Height="18" Margin="1" Click="ButtonGainUp_Click" 
+                   FontSize="12" Content="▲"/>
+            <Button x:Name="ButtonGainDown" Width="40" Height="18" Margin="1" Click="ButtonGainDown_Click" 
+                   FontSize="12" Content="▼" ClickMode="Press"/>
+        </StackPanel>
+        <!-- Middle: Gain and offset display -->
+        <Border Grid.Row="2" Background="#FFD3D3D3" CornerRadius="2" Margin="4">
+            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                <TextBlock x:Name="GainOffsetText" Text="x0.127 + 412" Foreground="Black" FontWeight="SemiBold" FontSize="13" HorizontalAlignment="Center"/>
+            </StackPanel>
+        </Border>
+        <!-- Bottom: Math function textbox -->
+        <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="2" VerticalAlignment="Center" HorizontalAlignment="Left">
+            <Button x:Name="DC"  Width="20" Height="20" Margin="2" Content="DC" FontSize="8" FontWeight="bold" Click="ChannelMode_Click"/>
+            <Button x:Name="AC" Width="20" Height="20" Margin="2" Content="AC" FontSize="8" FontWeight="bold" Click="ChannelMode_Click"/>
+            <Button x:Name="ABS" Width="20" Height="20" Margin="2" Content="ABS" FontSize="8" FontWeight="bold" Click="ChannelMode_Click"/>
+            <Button x:Name="Squared" Width="20" Height="20" Margin="2" Content="x²" FontSize="8" FontWeight="bold" BorderThickness="1,1,1,1" Click="ChannelMode_Click"/>
+            <!--<TextBox x:Name="MathFunctionTextBox" Width="70" Height="18" FontSize="12" VerticalAlignment="Center" HorizontalAlignment="Left" Text="AC-coupling"/>-->
+        </StackPanel>
+    </Grid>
+</UserControl>

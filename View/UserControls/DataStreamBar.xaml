@@ -1,0 +1,52 @@
+﻿<UserControl x:Class="SerialPlotDN_WPF.View.UserControls.DataStreamBar"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:SerialPlotDN_WPF.View.UserControls"
+             mc:Ignorable="d" 
+             d:DesignHeight="600" d:DesignWidth="120">
+    <Grid Background="DarkGray" MinWidth="120">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>      <!-- Add stream button -->
+            <RowDefinition Height="*"/>         <!-- ItemsControl area grows/shrinks -->
+            <RowDefinition Height="Auto"/>      <!-- Info text -->
+            <RowDefinition Height="Auto"/>      <!-- Running button -->
+            <RowDefinition Height="Auto"/>      <!-- Clear button -->
+            <RowDefinition Height="Auto"/>      <!-- Record button -->
+        </Grid.RowDefinitions>
+
+        <!-- Borderless, full-width Add Stream button -->
+        <Button Content="Add data stream"
+                Click="Button_AddStream_Click"
+                x:Name="Button_AddStream"
+                Height="32"
+                BorderThickness="0"
+                Background="Transparent"
+                HorizontalAlignment="Stretch"
+                VerticalAlignment="Top"
+                Grid.Row="0"
+                Margin="0,0,0,10"/>
+
+        <!-- List of streams -->
+        <StackPanel x:Name="Panel_Streams" Grid.Row="1"/>
+        <!--<ItemsControl x:Name="ItemsControl_Streams" Grid.Row="1">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <local:StreamInfoPanel />
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>-->
+
+        <TextBlock x:Name="TextBlock_Info" Text="Info" Grid.Row="2" Background="{x:Null}" VerticalAlignment="Center"/>
+        <Button Content="Running" Name="Button_IsRunning" Grid.Row="3" Background="LawnGreen" Height="32" Click="Button_IsRunning_Click"/>
+        <Button Content="Clear" Name="Button_ClearGraph" Grid.Row="4" Background="Gold" Height="32"/>
+        <Button Content="Record" Name="Button_Record" Grid.Row="5" Background="LightSalmon" BorderThickness="2" BorderBrush="{x:Null}"  Height="32">
+            <Button.Resources>
+                <Style TargetType="Border">
+                    <Setter Property="CornerRadius" Value="5"/>
+                </Style>
+            </Button.Resources>
+        </Button>
+    </Grid>
+</UserControl>
