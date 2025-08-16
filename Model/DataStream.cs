@@ -39,7 +39,7 @@ namespace SerialPlotDN_WPF.Model
             _port.Open();
     
             // Initialize ring buffers with appropriate capacity
-            int bufferSize = Math.Max(10000, source.BaudRate / 10); // At least 10k samples or 0.1 seconds of data
+            int bufferSize = Math.Max(200000, source.BaudRate / 10); // At least 10k samples or 0.1 seconds of data
             
             ReceivedData = new RingBuffer<double>[dataParser.NumberOfChannels];
             _lastReadPositions = new int[dataParser.NumberOfChannels];
@@ -78,6 +78,22 @@ namespace SerialPlotDN_WPF.Model
                 return Enumerable.Empty<double>();
 
             return ReceivedData[channel].GetLatest(sampleCount);
+        }
+
+        /// <summary>
+        /// Efficiently copies the latest data to a pre-allocated array for the specified channel.
+        /// This method is optimized for plotting scenarios to avoid memory allocations.
+        /// </summary>
+        /// <param name="channel">Channel number</param>
+        /// <param name="destination">Pre-allocated array to copy data into</param>
+        /// <param name="sampleCount">Number of latest samples to copy</param>
+        /// <returns>Actual number of samples copied</returns>
+        public int CopyLatestDataTo(int channel, double[] destination, int sampleCount)
+        {
+            if (channel < 0 || channel >= ReceivedData.Length)
+                return 0;
+
+            return ReceivedData[channel].CopyLatestTo(destination, sampleCount);
         }
 
         private void SimulateDataThread()

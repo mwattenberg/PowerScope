@@ -17,8 +17,12 @@ namespace SerialPlotDN_WPF
         readonly private System.Timers.Timer UpdatePlotTimer = new() { Interval = 33, Enabled = true, AutoReset = true }; // ~30 FPS
         
         // Configurable display settings - use DataStream's ring buffer capacity
-        public int DisplayElements { get; set; } = 2000; // Number of elements to display
+        public int DisplayElements { get; set; } = 50000; // Number of elements to display
         private readonly int channelCount = 8;
+
+        // Pre-allocated arrays for linearized data - avoid memory allocations during plotting
+        private readonly double[][] _linearizedDataArrays = new double[8][];
+        private bool _signalPlotsInitialized = false;
 
         //Debug just data parsing and plotting
         private DataStream dataStream;
@@ -26,6 +30,13 @@ namespace SerialPlotDN_WPF
         public MainWindow()
         {
             InitializeComponent();
+            
+            // Initialize pre-allocated arrays for efficient data copying
+            for (int i = 0; i < channelCount; i++)
+            {
+                _linearizedDataArrays[i] = new double[DisplayElements];
+            }
+            
             InitializePlot();
             InitializeDataStream();
             InitTimer();
@@ -36,19 +47,21 @@ namespace SerialPlotDN_WPF
         {
             WpfPlot1.Plot.Clear();
 
-            // Initialize Signal plottables
+            // Initialize Signal plottables with pre-allocated arrays
             for (int i = 0; i < channelCount; i++)
             {
-                // Create Signal plottables - initially empty, will be updated with data
-                SignalPlottables[i] = WpfPlot1.Plot.Add.Signal(new double[0]);
-                SignalPlottables[i].LineWidth = 4; // Thinner lines = better performance
+                // Create Signal plottables with pre-allocated arrays - these will be reused
+                SignalPlottables[i] = WpfPlot1.Plot.Add.Signal(_linearizedDataArrays[i]);
+                SignalPlottables[i].LineWidth = 1; // Thinner lines = better performance
 
                 // Use ScottPlot's default palette for automatic color selection
                 SignalPlottables[i].Color = ScottPlot.Palette.Default.GetColor(i);
                 
                 // Disable anti-aliasing for better performance
-                SignalPlottables[i].LineStyle.AntiAlias = true;
+                SignalPlottables[i].LineStyle.AntiAlias = false;
             }
+
+            _signalPlotsInitialized = true;
 
             // Optimize plot settings for performance
             WpfPlot1.Plot.Axes.ContinuouslyAutoscale = false; // Manual scaling is faster
@@ -136,24 +149,18 @@ namespace SerialPlotDN_WPF
 
         private void UpdateSignalPlots()
         {
+            if (!_signalPlotsInitialized) return;
+
             for (int channel = 0; channel < channelCount; channel++)
             {
-                // Get the latest DisplayElements from DataStream's ring buffer directly
-                var displayData = dataStream.GetLatestData(channel, DisplayElements).ToArray();
+                // Efficiently copy data to pre-allocated array without memory allocation
+                int actualDataCount = dataStream.CopyLatestDataTo(channel, _linearizedDataArrays[channel], DisplayElements);
                 
-                if (displayData.Length > 0)
+                if (actualDataCount > 0)
                 {
-                    // Update the Signal plottable by replacing the data source
-                    // First remove the old signal
-                    WpfPlot1.Plot.Remove(SignalPlottables[channel]);
-                    
-                    // Create new signal with updated data
-                    SignalPlottables[channel] = WpfPlot1.Plot.Add.Signal(displayData);
-                    
-                    // Restore the appearance settings
-                    SignalPlottables[channel].LineWidth = 2;
-                    SignalPlottables[channel].Color = ScottPlot.Palette.Default.GetColor(channel);
-                    SignalPlottables[channel].LineStyle.AntiAlias = true;
+                    // Signal plots are already connected to the pre-allocated arrays
+                    // Since the array data has been updated in-place, the Signal will 
+                    // automatically use the updated data when rendered
                 }
             }
         }

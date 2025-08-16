@@ -69,6 +69,51 @@ namespace SerialPlotDN_WPF.Model
             }
         }
 
+        /// <summary>
+        /// Efficiently copies the latest data to a pre-allocated destination array.
+        /// This method avoids memory allocations and is optimized for plotting scenarios.
+        /// </summary>
+        /// <param name="destination">Pre-allocated array to copy data into</param>
+        /// <param name="requestedCount">Number of latest elements to copy</param>
+        /// <returns>Actual number of elements copied</returns>
+        public int CopyLatestTo(T[] destination, int requestedCount)
+        {
+            if (destination == null || requestedCount <= 0)
+                return 0;
+
+            lock (_lock)
+            {
+                int actualCount = Math.Min(Math.Min(requestedCount, _count), destination.Length);
+                
+                if (actualCount == 0)
+                    return 0;
+
+                // Calculate starting position for the latest data
+                int startIndex = (_head - actualCount + _capacity) % _capacity;
+                
+                // Handle the case where data wraps around the circular buffer
+                if (startIndex + actualCount <= _capacity)
+                {
+                    // Data is contiguous, single copy operation
+                    Array.Copy(_buffer, startIndex, destination, 0, actualCount);
+                }
+                else
+                {
+                    // Data wraps around, need two copy operations
+                    int firstPartLength = _capacity - startIndex;
+                    int secondPartLength = actualCount - firstPartLength;
+                    
+                    // Copy first part (from startIndex to end of buffer)
+                    Array.Copy(_buffer, startIndex, destination, 0, firstPartLength);
+                    
+                    // Copy second part (from beginning of buffer)
+                    Array.Copy(_buffer, 0, destination, firstPartLength, secondPartLength);
+                }
+                
+                return actualCount;
+            }
+        }
+
         public IEnumerable<T> GetNewData(ref int lastReadPosition)
         {
             var result = new List<T>();
