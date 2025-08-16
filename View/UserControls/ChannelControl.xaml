@@ -1,7 +1,7 @@
 ﻿<UserControl x:Class="SerialPlotDN_WPF.View.UserControls.ChannelControl"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             Width="100" Height="110">
+             Width="100" Height="140">
     <UserControl.Resources>
         <Style TargetType="Button">
             <Setter Property="Template">
@@ -24,10 +24,11 @@
             <RowDefinition Height="20"/>
             <RowDefinition Height="40"/>
             <RowDefinition Height="30"/>
+            <RowDefinition Height="30"/>
         </Grid.RowDefinitions>
         <!-- Top color bar with channel label -->
         <Border x:Name="TopColorBar" Grid.Row="0" Background="Gray" CornerRadius="2" Height="20" MouseLeftButtonDown="TopColorBar_MouseLeftButtonDown">
-            <TextBlock x:Name="ChannelLabel" Text="CH1" Foreground="White" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+            <TextBox x:Name="ChannelLabelTextBox" Text="CH1" Foreground="White" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" Background="Transparent" BorderThickness="0" TextAlignment="Center"/>
         </Border>
         <!-- Gain control buttons -->
         <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
@@ -43,11 +44,18 @@
             </StackPanel>
         </Border>
         <!-- Bottom: Math function textbox -->
-        <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="2" VerticalAlignment="Center" HorizontalAlignment="Left">
-            <Button x:Name="DC"  Width="20" Height="20" Margin="2" Content="DC" FontSize="8" FontWeight="bold" Click="ChannelMode_Click"/>
-            <Button x:Name="AC" Width="20" Height="20" Margin="2" Content="AC" FontSize="8" FontWeight="bold" Click="ChannelMode_Click"/>
-            <Button x:Name="ABS" Width="20" Height="20" Margin="2" Content="ABS" FontSize="8" FontWeight="bold" Click="ChannelMode_Click"/>
-            <Button x:Name="Squared" Width="20" Height="20" Margin="2" Content="x²" FontSize="8" FontWeight="bold" BorderThickness="1,1,1,1" Click="ChannelMode_Click"/>
+        <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="2" VerticalAlignment="Center" HorizontalAlignment="Center">
+            <Button x:Name="DC"  Width="40" Height="20" Margin="2" Content="DC" FontSize="8" FontWeight="bold" Click="CouplingMode_Click"/>
+            <Button x:Name="AC" Width="40" Height="20" Margin="2" Content="AC" FontSize="8" FontWeight="bold" Click="CouplingMode_Click"/>
+            
+            
+            <!--<TextBox x:Name="MathFunctionTextBox" Width="70" Height="18" FontSize="12" VerticalAlignment="Center" HorizontalAlignment="Left" Text="AC-coupling"/>-->
+        </StackPanel>
+        <StackPanel Grid.Row="4" Orientation="Horizontal" Margin="2" VerticalAlignment="Center" HorizontalAlignment="Left">
+            <Button x:Name="LPF"  Width="20" Height="20" Margin="2" Content="LPF" FontSize="8" FontWeight="bold" Click="FilterMode_Click"/>
+            <Button x:Name="HPF" Width="20" Height="20" Margin="2" Content="HPF" FontSize="8" FontWeight="bold" Click="FilterMode_Click"/>
+            <Button x:Name="ABS" Width="20" Height="20" Margin="2" Content="ABS" FontSize="8" FontWeight="bold" Click="FilterMode_Click"/>
+            <Button x:Name="Squared" Width="20" Height="20" Margin="2" Content="x²" FontSize="8" FontWeight="bold" BorderThickness="1,1,1,1" Click="FilterMode_Click"/>
             <!--<TextBox x:Name="MathFunctionTextBox" Width="70" Height="18" FontSize="12" VerticalAlignment="Center" HorizontalAlignment="Left" Text="AC-coupling"/>-->
         </StackPanel>
     </Grid>

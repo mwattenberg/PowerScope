@@ -12,11 +12,12 @@ namespace SerialPlotDN_WPF
     /// </summary> 　
     public partial class MainWindow : Window
     {
-        private readonly ScottPlot.Plottables.DataStreamer[] StreamerPlottables = new ScottPlot.Plottables.DataStreamer[8]; // 8 channels   
+        // Signal plottables for plotting
+        private readonly ScottPlot.Plottables.Signal[] SignalPlottables = new ScottPlot.Plottables.Signal[8]; // 8 channels   
         readonly private System.Timers.Timer UpdatePlotTimer = new() { Interval = 33, Enabled = true, AutoReset = true }; // ~30 FPS
-        private readonly int streamerBufferSize = 5000; // Buffer size for DataStreamer
-
-        // Data management for high-performance plotting
+        
+        // Configurable display settings - use DataStream's ring buffer capacity
+        public int DisplayElements { get; set; } = 2000; // Number of elements to display
         private readonly int channelCount = 8;
 
         //Debug just data parsing and plotting
@@ -35,28 +36,26 @@ namespace SerialPlotDN_WPF
         {
             WpfPlot1.Plot.Clear();
 
-            // Initialize DataStreamer plottables for real-time performance
+            // Initialize Signal plottables
             for (int i = 0; i < channelCount; i++)
             {
-                // Create DataStreamer plottables for maximum real-time performance
-                StreamerPlottables[i] = WpfPlot1.Plot.Add.DataStreamer(streamerBufferSize);
-                StreamerPlottables[i].LineWidth = 1; // Thinner lines = better performance
+                // Create Signal plottables - initially empty, will be updated with data
+                SignalPlottables[i] = WpfPlot1.Plot.Add.Signal(new double[0]);
+                SignalPlottables[i].LineWidth = 4; // Thinner lines = better performance
 
                 // Use ScottPlot's default palette for automatic color selection
-                StreamerPlottables[i].Color = ScottPlot.Palette.Default.GetColor(i);
-
-                // REMOVED: StreamerPlottables[i].ViewScrollLeft(); - This causes auto X-axis scrolling
-
+                SignalPlottables[i].Color = ScottPlot.Palette.Default.GetColor(i);
+                
                 // Disable anti-aliasing for better performance
-                StreamerPlottables[i].LineStyle.AntiAlias = false;
+                SignalPlottables[i].LineStyle.AntiAlias = true;
             }
 
             // Optimize plot settings for performance
             WpfPlot1.Plot.Axes.ContinuouslyAutoscale = false; // Manual scaling is faster
             WpfPlot1.Plot.RenderManager.ClearCanvasBeforeEachRender = true;
 
-            // Set fixed axis limits to prevent auto scaling
-            WpfPlot1.Plot.Axes.SetLimitsX(0, streamerBufferSize);
+            // Set fixed axis limits to prevent auto scaling - show display window
+            WpfPlot1.Plot.Axes.SetLimitsX(0, DisplayElements);
             WpfPlot1.Plot.Axes.SetLimitsY(-200, 4000); // Adjust Y range based on your data
 
             // Style settings
@@ -64,7 +63,9 @@ namespace SerialPlotDN_WPF
             WpfPlot1.Plot.FigureBackground.Color = ScottPlot.Color.FromHex("#07263b");
             WpfPlot1.Plot.DataBackground.Color = ScottPlot.Color.FromHex("#0b3049");
             WpfPlot1.Plot.Axes.Color(ScottPlot.Color.FromHex("#a0acb5"));
+            WpfPlot1.Plot.Axes.Bottom.IsVisible = false;
         }
+
         private void InitializeChannelControlBar()
         {
             // Clear any existing channels
@@ -82,20 +83,10 @@ namespace SerialPlotDN_WPF
                                             (byte)(channelColor.B * 255));
 
                 // Configure the channel
-                channelControl.SetChannelColorAndLabel(wpfColor, $"CH{i + 1}");
-                channelControl.SetGainOffset(1.0, 0.0);
-                channelControl.MathFunction = "Raw";
-
-                //// Subscribe to button events (optional)
-                //channelControl.ButtonUpClicked += (sender, e) => {
-                //    // Handle channel up button click
-                //    System.Diagnostics.Debug.WriteLine($"Channel {i + 1} Up clicked");
-                //};
-
-                //channelControl.ButtonDownClicked += (sender, e) => {
-                //    // Handle channel down button click
-                //    System.Diagnostics.Debug.WriteLine($"Channel {i + 1} Down clicked");
-                //};
+                channelControl.Color = wpfColor;
+                channelControl.SetChannelLabel($"CH{i + 1}");
+                channelControl.Gain = 1.0; // Default gain
+                channelControl.Offset = 0.0; // Default offset
 
                 // Add to the control bar
                 ChannelControlBar.AddChannel(channelControl);
@@ -120,14 +111,14 @@ namespace SerialPlotDN_WPF
         {
             bool hasNewData = false;
 
-            // Get new data for all channels
+            // Check if any channel has new data
             for (int channel = 0; channel < channelCount; channel++)
             {
                 var newData = dataStream.GetNewData(channel);
                 if (newData.Any())
                 {
                     hasNewData = true;
-                    AddDataToBuffer(channel, newData);
+                    break; // No need to check other channels if we found new data
                 }
             }
 
@@ -137,28 +128,41 @@ namespace SerialPlotDN_WPF
                 // Use Dispatcher.BeginInvoke for better performance
                 Application.Current.Dispatcher.BeginInvoke(() =>
                 {
-                    // Update axis limits manually for better control
-                    
+                    UpdateSignalPlots();
                     WpfPlot1.Refresh();
-                    UpdateAxisLimits();
                 }, System.Windows.Threading.DispatcherPriority.Background);
             }
         }
 
-        private void AddDataToBuffer(int channel, IEnumerable<double> newData)
+        private void UpdateSignalPlots()
         {
-            foreach (double value in newData)
+            for (int channel = 0; channel < channelCount; channel++)
             {
-                StreamerPlottables[channel].Add(value);
+                // Get the latest DisplayElements from DataStream's ring buffer directly
+                var displayData = dataStream.GetLatestData(channel, DisplayElements).ToArray();
+                
+                if (displayData.Length > 0)
+                {
+                    // Update the Signal plottable by replacing the data source
+                    // First remove the old signal
+                    WpfPlot1.Plot.Remove(SignalPlottables[channel]);
+                    
+                    // Create new signal with updated data
+                    SignalPlottables[channel] = WpfPlot1.Plot.Add.Signal(displayData);
+                    
+                    // Restore the appearance settings
+                    SignalPlottables[channel].LineWidth = 2;
+                    SignalPlottables[channel].Color = ScottPlot.Palette.Default.GetColor(channel);
+                    SignalPlottables[channel].LineStyle.AntiAlias = true;
+                }
             }
         }
 
         private void UpdateAxisLimits()
         {
             WpfPlot1.Plot.Axes.SetLimitsY(-200, 200);
-
-            // Set X limits to show the streamer buffer size
-            WpfPlot1.Plot.Axes.SetLimitsX(0, streamerBufferSize);
+            // Set X limits to show the display window
+            WpfPlot1.Plot.Axes.SetLimitsX(0, DisplayElements);
         }
 
         protected override void OnClosed(EventArgs e)

@@ -2,31 +2,39 @@
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Xml.Linq;
+using NAudio.Wave;
 
 namespace SerialPlotDN_WPF.View.UserControls
 {
     public partial class ChannelControl : UserControl
     {
         // ChannelMode enum for channel processing modes
-        public enum ChannelMode
+        public enum FilterMode
         {
-            DC,
-            AC,
+            LPF,
+            HPF,
             ABS,
-            Squared
+            Squared,
+            None
         }
 
+        public enum CouplingMode
+        {
+            DC,
+            AC
+        }
 
-
-        private Color _assignedColor = Colors.Gray;
         private static readonly Color DisabledColor = Colors.Gray;
         private static readonly Brush SelectedBrush = new SolidColorBrush(Colors.LimeGreen);
         private static readonly Brush DefaultBrush = new SolidColorBrush(DisabledColor);
         private bool _isEnabled = true;
         
-        private double _gain = 1.0;
-        private double _offset = 0.0;
-        private ChannelMode _mode;
+        public double _gain = 1.0;
+        public double _offset = 0.0;
+        private CouplingMode _coupling;
+        private FilterMode _filter;
+        private Color _color;
 
         // Events
         public event RoutedEventHandler? ChannelEnabledChanged;
@@ -36,27 +44,82 @@ namespace SerialPlotDN_WPF.View.UserControls
         {
             InitializeComponent();
             UpdateGainOffsetDisplay();
-            _mode = ChannelMode.DC; // Default mode
+            this.Coupling = CouplingMode.DC; // Default mode
+            this.Filter = FilterMode.None; // Default filter mode
+            this.Color = Colors.Gray; // Default color
         }
 
-        // Set the top color bar and channel label
-        public void SetChannelColorAndLabel(Color color, string label)
+        public CouplingMode Coupling
         {
-            _assignedColor = color;
-            ChannelLabel.Text = label;
-            UpdateColorBarBackground();
+            get => _coupling;
+            set
+            {
+                _coupling = value;
+                // Reset all button backgrounds to default
+                DC.Background = DefaultBrush;
+                AC.Background = DefaultBrush;
+                // Set selected button background
+                switch (_coupling)
+                {
+                    case CouplingMode.DC:
+                        DC.Background = SelectedBrush;
+                        break;
+                    case CouplingMode.AC:
+                        AC.Background = SelectedBrush;
+                        break;
+                }
+            }
         }
 
-        // Set gain and offset display
-        public void SetGainOffset(double gain, double offset)
+        public FilterMode Filter
         {
-            _gain = gain;
-            _offset = offset;
-            UpdateGainOffsetDisplay();
+            get => _filter;
+            set
+            {
+                _filter = value;
+                // Reset all button backgrounds to default
+                LPF.Background = DefaultBrush;
+                HPF.Background = DefaultBrush;
+                ABS.Background = DefaultBrush;
+                Squared.Background = DefaultBrush;
+                // Set selected button background
+                switch (_filter)
+                {
+                    case FilterMode.LPF:
+                        LPF.Background = SelectedBrush;
+                        break;
+                    case FilterMode.HPF:
+                        HPF.Background = SelectedBrush;
+                        break;
+                    case FilterMode.ABS:
+                        ABS.Background = SelectedBrush;
+                        break;
+                    case FilterMode.Squared:
+                        Squared.Background = SelectedBrush;
+                        break;
+                    case FilterMode.None: //nothing for this mode
+                    default:
+                        break;
+                }
+            }
         }
 
-        // Get/set math function (keeping for backward compatibility)
-        public string MathFunction { get; set; } = "Raw";
+        // Set the top color bar
+        public Color Color
+        {
+            get => _color;
+            set
+            {
+                _color = value;
+                UpdateColorBarBackground();
+            }             
+        }
+
+        // Set the channel label
+        public void SetChannelLabel(string label)
+        {
+            ChannelLabelTextBox.Text = label;
+        }
 
         // Get/set channel enabled state
         public bool IsEnabled
@@ -93,45 +156,18 @@ namespace SerialPlotDN_WPF.View.UserControls
             }
         }
 
-        // Mode property
-        public ChannelMode Mode
-        {
-            get => _mode;
-            set
-            {
-                _mode = value;
-                // Reset all button backgrounds to default
-                DC.Background = DefaultBrush;
-                AC.Background = DefaultBrush;
-                ABS.Background = DefaultBrush;
-                Squared.Background = DefaultBrush;
-                // Set selected button background
-                switch (_mode)
-                {
-                    case ChannelMode.DC:
-                        DC.Background = SelectedBrush;
-                        break;
-                    case ChannelMode.AC:
-                        AC.Background = SelectedBrush;
-                        break;
-                    case ChannelMode.ABS:
-                        ABS.Background = SelectedBrush;
-                        break;
-                    case ChannelMode.Squared:
-                        Squared.Background = SelectedBrush;
-                        break;
-                }
-            }
-        }
-
         private void UpdateColorBarBackground()
         {
-            TopColorBar.Background = new SolidColorBrush(_isEnabled ? _assignedColor : DisabledColor);
+            TopColorBar.Background = new SolidColorBrush(_isEnabled ? _color : DisabledColor);
         }
 
         private void UpdateGainOffsetDisplay()
         {
-            GainOffsetText.Text = $"Gain: {_gain:F2}, Offset: {_offset:F2}";
+            if(_offset > 0)
+                GainOffsetText.Text = $"= y * {_gain:F2} + {_offset:F2}";
+            else
+                GainOffsetText.Text = $"= y *{_gain:F2} - {_offset:F2}";
+            
         }
 
         private void TopColorBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -153,18 +189,24 @@ namespace SerialPlotDN_WPF.View.UserControls
             Gain = Math.Max(0.1, Gain - 0.1); // Decrement gain by 0.1, minimum 0.1
         }
 
-
-
-        private void ChannelMode_Click(object sender, RoutedEventArgs e)
+        private void CouplingMode_Click(object sender, RoutedEventArgs e)
         {
             if (sender == DC)
-                Mode = ChannelMode.DC;
+                this.Coupling = CouplingMode.DC;
             else if (sender == AC)
-                Mode = ChannelMode.AC;
+                this.Coupling = CouplingMode.AC;
+        }
+
+        private void FilterMode_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender == LPF)
+                this.Filter = FilterMode.LPF;
+            else if (sender == HPF)
+                this.Filter = FilterMode.HPF;
             else if (sender == ABS)
-                Mode = ChannelMode.ABS;
+                this.Filter = FilterMode.ABS;
             else if (sender == Squared)
-                Mode = ChannelMode.Squared;
+                this.Filter = FilterMode.Squared;
         }
     }
 }
