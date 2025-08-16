@@ -17,7 +17,7 @@ namespace SerialPlotDN_WPF
         readonly private System.Timers.Timer UpdatePlotTimer = new() { Interval = 33, Enabled = true, AutoReset = true }; // ~30 FPS
         
         // Configurable display settings - use DataStream's ring buffer capacity
-        public int DisplayElements { get; set; } = 50000; // Number of elements to display
+        public int DisplayElements { get; set; } = 10000; // Number of elements to display
         private readonly int channelCount = 8;
 
         // Pre-allocated arrays for linearized data - avoid memory allocations during plotting
@@ -207,6 +207,44 @@ namespace SerialPlotDN_WPF
             {
                 WpfPlot1.Plot.Benchmark.IsVisible = true;
             }
+        }
+
+        private void Button_ConfigPlot_Click(object sender, RoutedEventArgs e)
+        {
+            // Create and show the PlotSettingsWindow
+            var settingsWindow = new View.UserForms.PlotSettingsWindow();
+            
+            // Initialize with current settings
+            double currentFPS = 1000.0 / UpdatePlotTimer.Interval; // Convert interval to FPS
+            double currentLineWidth = SignalPlottables[0]?.LineWidth ?? 1;
+            bool currentAntiAliasing = SignalPlottables[0]?.LineStyle.AntiAlias ?? false;
+            
+            settingsWindow.InitializeFromMainWindow(currentFPS, 1000, currentLineWidth, currentAntiAliasing);
+            
+            // Show dialog and apply settings if OK was clicked
+            if (settingsWindow.ShowDialog() == true && settingsWindow.DialogResult)
+            {
+                ApplyPlotSettings(settingsWindow);
+            }
+        }
+
+        private void ApplyPlotSettings(View.UserForms.PlotSettingsWindow settings)
+        {
+            // Apply Plot Update Rate (FPS)
+            UpdatePlotTimer.Interval = 1000.0 / settings.PlotUpdateRateFPS;
+            
+            // Apply Line Width and Anti-Aliasing to all signal plots
+            for (int i = 0; i < SignalPlottables.Length; i++)
+            {
+                if (SignalPlottables[i] != null)
+                {
+                    SignalPlottables[i].LineWidth = (float)settings.LineWidth;
+                    SignalPlottables[i].LineStyle.AntiAlias = settings.AntiAliasing;
+                }
+            }
+            
+            // Refresh the plot to apply changes
+            WpfPlot1.Refresh();
         }
     }
 }
