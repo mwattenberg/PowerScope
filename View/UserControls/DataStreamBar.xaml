@@ -6,14 +6,10 @@
              xmlns:local="clr-namespace:SerialPlotDN_WPF.View.UserControls"
              mc:Ignorable="d" 
              d:DesignHeight="600" d:DesignWidth="120">
-    <Grid Background="DarkGray" MinWidth="120">
+    <Grid Background="{DynamicResource PlotSettings_BackgroundBrush}" MinWidth="120">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>      <!-- Add stream button -->
             <RowDefinition Height="*"/>         <!-- ItemsControl area grows/shrinks -->
-            <RowDefinition Height="Auto"/>      <!-- Info text -->
-            <RowDefinition Height="Auto"/>      <!-- Running button -->
-            <RowDefinition Height="Auto"/>      <!-- Clear button -->
-            <RowDefinition Height="Auto"/>      <!-- Record button -->
         </Grid.RowDefinitions>
 
         <!-- Borderless, full-width Add Stream button -->
@@ -22,7 +18,8 @@
                 x:Name="Button_AddStream"
                 Height="32"
                 BorderThickness="0"
-                Background="Transparent"
+                Background="{DynamicResource PlotSettings_TextBoxBackgroundBrush}"
+                Foreground="{DynamicResource PlotSettings_ButtonForegroundBrush}"
                 HorizontalAlignment="Stretch"
                 VerticalAlignment="Top"
                 Grid.Row="0"
@@ -37,16 +34,5 @@
                 </DataTemplate>
             </ItemsControl.ItemTemplate>
         </ItemsControl>-->
-
-        <TextBlock x:Name="TextBlock_Info" Text="Info" Grid.Row="2" Background="{x:Null}" VerticalAlignment="Center"/>
-        <Button Content="Running" Name="Button_IsRunning" Grid.Row="3" Background="LawnGreen" Height="32" Click="Button_IsRunning_Click"/>
-        <Button Content="Clear" Name="Button_ClearGraph" Grid.Row="4" Background="Gold" Height="32"/>
-        <Button Content="Record" Name="Button_Record" Grid.Row="5" Background="LightSalmon" BorderThickness="2" BorderBrush="{x:Null}"  Height="32">
-            <Button.Resources>
-                <Style TargetType="Border">
-                    <Setter Property="CornerRadius" Value="5"/>
-                </Style>
-            </Button.Resources>
-        </Button>
     </Grid>
 </UserControl>

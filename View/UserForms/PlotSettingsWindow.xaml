@@ -11,32 +11,28 @@
         ResizeMode="NoResize" 
         WindowStartupLocation="CenterScreen"
         Background="Transparent">
-    
     <Window.Resources>
-        <!-- Dark theme styles -->
+        <!-- Dark theme styles using global resources -->
         <Style TargetType="Label">
-            <Setter Property="Foreground" Value="#FFA0ACB5"/>
+            <Setter Property="Foreground" Value="{DynamicResource PlotSettings_LabelForegroundBrush}"/>
             <Setter Property="FontSize" Value="12"/>
         </Style>
-        
         <Style TargetType="TextBox">
-            <Setter Property="Background" Value="#FF2D2D30"/>
-            <Setter Property="Foreground" Value="#FFA0ACB5"/>
-            <Setter Property="BorderBrush" Value="#FF3F3F46"/>
+            <Setter Property="Background" Value="{DynamicResource PlotSettings_TextBoxBackgroundBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource PlotSettings_LabelForegroundBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource PlotSettings_BorderBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Padding" Value="5,3"/>
             <Setter Property="FontSize" Value="12"/>
         </Style>
-        
         <Style TargetType="CheckBox">
-            <Setter Property="Foreground" Value="#FFA0ACB5"/>
+            <Setter Property="Foreground" Value="{DynamicResource PlotSettings_LabelForegroundBrush}"/>
             <Setter Property="FontSize" Value="12"/>
         </Style>
-        
         <Style TargetType="Button">
-            <Setter Property="Background" Value="#FF2D2D30"/>
-            <Setter Property="Foreground" Value="#FFA0ACB5"/>
-            <Setter Property="BorderBrush" Value="#FF3F3F46"/>
+            <Setter Property="Background" Value="{DynamicResource PlotSettings_TextBoxBackgroundBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource PlotSettings_ButtonForegroundBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource PlotSettings_BorderBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Padding" Value="10,5"/>
             <Setter Property="FontSize" Value="12"/>
@@ -50,21 +46,20 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Background" Value="#FF3E3E40"/>
+                                <Setter Property="Background" Value="{DynamicResource PlotSettings_ButtonHoverBrush}"/>
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
-                                <Setter Property="Background" Value="#FF4E4E50"/>
+                                <Setter Property="Background" Value="{DynamicResource PlotSettings_ButtonPressedBrush}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
         </Style>
-        
         <!-- Custom close button style -->
         <Style x:Key="CloseButtonStyle" TargetType="Button">
             <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Foreground" Value="{DynamicResource PlotSettings_CloseButtonForegroundBrush}"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="FontSize" Value="16"/>
             <Setter Property="FontWeight" Value="Bold"/>
@@ -79,10 +74,10 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Background" Value="#FFFF4444"/>
+                                <Setter Property="Background" Value="{DynamicResource PlotSettings_CloseButtonHoverBrush}"/>
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
-                                <Setter Property="Background" Value="#FFCC3333"/>
+                                <Setter Property="Background" Value="{DynamicResource PlotSettings_CloseButtonPressedBrush}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -90,16 +85,14 @@
             </Setter>
         </Style>
     </Window.Resources>
-    
     <!-- Main container with border and drop shadow -->
-    <Border Background="#FF1E1E1E" 
-            BorderBrush="#FF3F3F46" 
+    <Border Background="{DynamicResource PlotSettings_BackgroundBrush}" 
+            BorderBrush="{DynamicResource PlotSettings_BorderBrush}" 
             BorderThickness="1"
             CornerRadius="5">
         <Border.Effect>
-            <DropShadowEffect Color="Black" BlurRadius="10" ShadowDepth="3" Opacity="0.5"/>
+            <DropShadowEffect Color="{DynamicResource PlotSettings_ShadowColor}" BlurRadius="10" ShadowDepth="3" Opacity="0.5"/>
         </Border.Effect>
-        
         <Grid Margin="0">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
@@ -107,20 +100,17 @@
                 <RowDefinition Height="*"/>
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
-            
             <!-- Custom title bar -->
-            <Grid Grid.Row="0" Background="#FF2D2D30" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+            <Grid Grid.Row="0" Background="{DynamicResource PlotSettings_TitleBarBrush}" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                
                 <TextBlock Grid.Column="0" Text="Plot Settings" 
-                           Foreground="#FFA0ACB5" 
+                           Foreground="{DynamicResource PlotSettings_LabelForegroundBrush}" 
                            FontSize="14" FontWeight="SemiBold"
                            VerticalAlignment="Center" 
                            Margin="15,8"/>
-                
                 <!-- Close button -->
                 <Button Grid.Column="1" 
                         Style="{StaticResource CloseButtonStyle}"
@@ -128,13 +118,11 @@
                         Click="CloseButton_Click"
                         ToolTip="Close"/>
             </Grid>
-            
             <!-- Header -->
             <TextBlock Grid.Row="1" Text="Configure plot and rendering settings" 
                        FontSize="12" 
-                       Foreground="#FF888888" 
+                       Foreground="{DynamicResource PlotSettings_HeaderForegroundBrush}" 
                        Margin="20,15,20,5"/>
-            
             <!-- Settings Content -->
             <StackPanel Grid.Row="2" Margin="20,10,20,0">
                 <!-- Plot Update Rate (FPS) -->

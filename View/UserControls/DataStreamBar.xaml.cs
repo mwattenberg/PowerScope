@@ -45,23 +45,5 @@ namespace SerialPlotDN_WPF.View.UserControls
                 Panel_Streams.Children.Add(panel);
             }
         }
-
-        private void Button_IsRunning_Click(object sender, RoutedEventArgs e)
-        {
-            if(IsRunning == true)
-            {
-                //DataStream.Stop();
-                IsRunning = false;
-                Button_IsRunning.Content = "Stopped";
-                Button_IsRunning.Background = Brushes.LightGoldenrodYellow;
-            }
-            else
-            { 
-                IsRunning = true;
-                Button_IsRunning.Background = Brushes.LightGreen;
-                Button_IsRunning.Content = "Running";
-                //DataStream.Start();
-            }
-        }
     }
 }

@@ -3,7 +3,13 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              Width="100" Height="140">
     <UserControl.Resources>
+        <!-- Use global button style -->
         <Style TargetType="Button">
+            <Setter Property="Background" Value="{DynamicResource PlotSettings_TextBoxBackgroundBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource PlotSettings_ButtonForegroundBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource PlotSettings_BorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="FontSize" Value="12"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
@@ -13,9 +19,32 @@
                                 CornerRadius="4">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="{DynamicResource PlotSettings_ButtonHoverBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter Property="Background" Value="{DynamicResource PlotSettings_ButtonPressedBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
+        </Style>
+        <!-- TextBox style for channel label -->
+        <Style x:Key="ChannelLabelTextBoxStyle" TargetType="TextBox">
+            <Setter Property="Foreground" Value="{DynamicResource PlotSettings_LabelForegroundBrush}"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="TextAlignment" Value="Center"/>
+        </Style>
+        <!-- TextBlock style for gain/offset -->
+        <Style x:Key="GainOffsetTextStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource PlotSettings_LabelForegroundBrush}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
         </Style>
     </UserControl.Resources>
     <Grid x:Name="RootGrid">
@@ -28,35 +57,31 @@
         </Grid.RowDefinitions>
         <!-- Top color bar with channel label -->
         <Border x:Name="TopColorBar" Grid.Row="0" Background="Gray" CornerRadius="2" Height="20" MouseLeftButtonDown="TopColorBar_MouseLeftButtonDown">
-            <TextBox x:Name="ChannelLabelTextBox" Text="CH1" Foreground="White" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" Background="Transparent" BorderThickness="0" TextAlignment="Center"/>
+            <TextBox x:Name="ChannelLabelTextBox" Text="CH1" Style="{StaticResource ChannelLabelTextBoxStyle}"/>
         </Border>
         <!-- Gain control buttons -->
         <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
             <Button x:Name="ButtonGainUp" Width="40" Height="18" Margin="1" Click="ButtonGainUp_Click" 
-                   FontSize="12" Content="▲"/>
+                   Content="▲"/>
             <Button x:Name="ButtonGainDown" Width="40" Height="18" Margin="1" Click="ButtonGainDown_Click" 
-                   FontSize="12" Content="▼" ClickMode="Press"/>
+                   Content="▼" ClickMode="Press"/>
         </StackPanel>
         <!-- Middle: Gain and offset display -->
-        <Border Grid.Row="2" Background="#FFD3D3D3" CornerRadius="2" Margin="4">
+        <Border Grid.Row="2" Background="{DynamicResource PlotSettings_TextBoxBackgroundBrush}" CornerRadius="2" Margin="4">
             <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                <TextBlock x:Name="GainOffsetText" Text="x0.127 + 412" Foreground="Black" FontWeight="SemiBold" FontSize="13" HorizontalAlignment="Center"/>
+                <TextBlock x:Name="GainOffsetText" Text="x0.127 + 412" Style="{StaticResource GainOffsetTextStyle}"/>
             </StackPanel>
         </Border>
         <!-- Bottom: Math function textbox -->
         <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="2" VerticalAlignment="Center" HorizontalAlignment="Center">
-            <Button x:Name="DC"  Width="40" Height="20" Margin="2" Content="DC" FontSize="8" FontWeight="bold" Click="CouplingMode_Click"/>
-            <Button x:Name="AC" Width="40" Height="20" Margin="2" Content="AC" FontSize="8" FontWeight="bold" Click="CouplingMode_Click"/>
-            
-            
-            <!--<TextBox x:Name="MathFunctionTextBox" Width="70" Height="18" FontSize="12" VerticalAlignment="Center" HorizontalAlignment="Left" Text="AC-coupling"/>-->
+            <Button x:Name="DC"  Width="40" Height="20" Margin="2" Content="DC" FontSize="8" FontWeight="Bold" Click="CouplingMode_Click"/>
+            <Button x:Name="AC" Width="40" Height="20" Margin="2" Content="AC" FontSize="8" FontWeight="Bold" Click="CouplingMode_Click"/>
         </StackPanel>
         <StackPanel Grid.Row="4" Orientation="Horizontal" Margin="2" VerticalAlignment="Center" HorizontalAlignment="Left">
-            <Button x:Name="LPF"  Width="20" Height="20" Margin="2" Content="LPF" FontSize="8" FontWeight="bold" Click="FilterMode_Click"/>
-            <Button x:Name="HPF" Width="20" Height="20" Margin="2" Content="HPF" FontSize="8" FontWeight="bold" Click="FilterMode_Click"/>
-            <Button x:Name="ABS" Width="20" Height="20" Margin="2" Content="ABS" FontSize="8" FontWeight="bold" Click="FilterMode_Click"/>
-            <Button x:Name="Squared" Width="20" Height="20" Margin="2" Content="x²" FontSize="8" FontWeight="bold" BorderThickness="1,1,1,1" Click="FilterMode_Click"/>
-            <!--<TextBox x:Name="MathFunctionTextBox" Width="70" Height="18" FontSize="12" VerticalAlignment="Center" HorizontalAlignment="Left" Text="AC-coupling"/>-->
+            <Button x:Name="LPF"  Width="20" Height="20" Margin="2" Content="LPF" FontSize="8" FontWeight="Bold" Click="FilterMode_Click"/>
+            <Button x:Name="HPF" Width="20" Height="20" Margin="2" Content="HPF" FontSize="8" FontWeight="Bold" Click="FilterMode_Click"/>
+            <Button x:Name="ABS" Width="20" Height="20" Margin="2" Content="ABS" FontSize="8" FontWeight="Bold" Click="FilterMode_Click"/>
+            <Button x:Name="Squared" Width="20" Height="20" Margin="2" Content="x²" FontSize="8" FontWeight="Bold" BorderThickness="1,1,1,1" Click="FilterMode_Click"/>
         </StackPanel>
     </Grid>
 </UserControl>

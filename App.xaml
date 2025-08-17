@@ -5,6 +5,34 @@
              xmlns:local="clr-namespace:SerialPlotDN_WPF"
              StartupUri="MainWindow.xaml">
     <Application.Resources>
-         
+        <!-- General color resources for PlotSettingsWindow -->
+        <Color x:Key="PlotSettings_BackgroundColor">#FF1E1E1E</Color>
+        <Color x:Key="PlotSettings_TitleBarColor">#FF2D2D30</Color>
+        <Color x:Key="PlotSettings_ButtonHoverColor">#FF3E3E40</Color>
+        <Color x:Key="PlotSettings_ButtonPressedColor">#FF4E4E50</Color>
+        <Color x:Key="PlotSettings_TextBoxBackgroundColor">#FF2D2D30</Color>
+        <Color x:Key="PlotSettings_BorderColor">#FF3F3F46</Color>
+        <Color x:Key="PlotSettings_LabelForegroundColor">#FFA0ACB5</Color>
+        <Color x:Key="PlotSettings_ButtonForegroundColor">#FFA0ACB5</Color>
+        <Color x:Key="PlotSettings_CloseButtonForegroundColor">White</Color>
+        <Color x:Key="PlotSettings_HeaderForegroundColor">#FF888888</Color>
+        <Color x:Key="PlotSettings_CloseButtonHoverColor">#FFFF4444</Color>
+        <Color x:Key="PlotSettings_CloseButtonPressedColor">#FFCC3333</Color>
+        <Color x:Key="PlotSettings_ShadowColor">Black</Color>
+
+        <!-- Brushes for convenience -->
+        <SolidColorBrush x:Key="PlotSettings_BackgroundBrush" Color="{StaticResource PlotSettings_BackgroundColor}"/>
+        <SolidColorBrush x:Key="PlotSettings_TitleBarBrush" Color="{StaticResource PlotSettings_TitleBarColor}"/>
+        <SolidColorBrush x:Key="PlotSettings_ButtonHoverBrush" Color="{StaticResource PlotSettings_ButtonHoverColor}"/>
+        <SolidColorBrush x:Key="PlotSettings_ButtonPressedBrush" Color="{StaticResource PlotSettings_ButtonPressedColor}"/>
+        <SolidColorBrush x:Key="PlotSettings_TextBoxBackgroundBrush" Color="{StaticResource PlotSettings_TextBoxBackgroundColor}"/>
+        <SolidColorBrush x:Key="PlotSettings_BorderBrush" Color="{StaticResource PlotSettings_BorderColor}"/>
+        <SolidColorBrush x:Key="PlotSettings_LabelForegroundBrush" Color="{StaticResource PlotSettings_LabelForegroundColor}"/>
+        <SolidColorBrush x:Key="PlotSettings_ButtonForegroundBrush" Color="{StaticResource PlotSettings_ButtonForegroundColor}"/>
+        <SolidColorBrush x:Key="PlotSettings_CloseButtonForegroundBrush" Color="{StaticResource PlotSettings_CloseButtonForegroundColor}"/>
+        <SolidColorBrush x:Key="PlotSettings_HeaderForegroundBrush" Color="{StaticResource PlotSettings_HeaderForegroundColor}"/>
+        <SolidColorBrush x:Key="PlotSettings_CloseButtonHoverBrush" Color="{StaticResource PlotSettings_CloseButtonHoverColor}"/>
+        <SolidColorBrush x:Key="PlotSettings_CloseButtonPressedBrush" Color="{StaticResource PlotSettings_CloseButtonPressedColor}"/>
+        <SolidColorBrush x:Key="PlotSettings_ShadowBrush" Color="{StaticResource PlotSettings_ShadowColor}"/>
     </Application.Resources>
 </Application>

@@ -8,18 +8,16 @@
         ResizeMode="NoResize" 
         WindowStartupLocation="CenterScreen"
         Background="Transparent">
-
     <Window.Resources>
-        <!-- Dark theme styles -->
+        <!-- Dark theme styles using global resources -->
         <Style TargetType="Label">
-            <Setter Property="Foreground" Value="#FFA0ACB5"/>
+            <Setter Property="Foreground" Value="{DynamicResource PlotSettings_LabelForegroundBrush}"/>
             <Setter Property="FontSize" Value="12"/>
         </Style>
-
         <Style TargetType="ComboBox">
-            <Setter Property="Background" Value="#FF2D2D30"/>
-            <Setter Property="Foreground" Value="#FFA0ACB5"/>
-            <Setter Property="BorderBrush" Value="#FF3F3F46"/>
+            <Setter Property="Background" Value="{DynamicResource PlotSettings_TextBoxBackgroundBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource PlotSettings_LabelForegroundBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource PlotSettings_BorderBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="FontSize" Value="12"/>
             <Setter Property="Padding" Value="5,3"/>
@@ -45,7 +43,7 @@
                                                     <ColumnDefinition Width="20"/>
                                                 </Grid.ColumnDefinitions>
                                                 <Path x:Name="Arrow" Grid.Column="1" 
-                                                      Fill="#FFA0ACB5" 
+                                                      Fill="{DynamicResource PlotSettings_LabelForegroundBrush}" 
                                                       HorizontalAlignment="Center" 
                                                       VerticalAlignment="Center" 
                                                       Data="M 0 0 L 4 4 L 8 0 Z"/>
@@ -53,10 +51,10 @@
                                         </Border>
                                         <ControlTemplate.Triggers>
                                             <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter Property="Background" Value="#FF3E3E40"/>
+                                                <Setter Property="Background" Value="{DynamicResource PlotSettings_ButtonHoverBrush}"/>
                                             </Trigger>
                                             <Trigger Property="IsPressed" Value="True">
-                                                <Setter Property="Background" Value="#FF4E4E50"/>
+                                                <Setter Property="Background" Value="{DynamicResource PlotSettings_ButtonPressedBrush}"/>
                                             </Trigger>
                                         </ControlTemplate.Triggers>
                                     </ControlTemplate>
@@ -91,11 +89,11 @@
                                     MinWidth="{TemplateBinding ActualWidth}"
                                     MaxHeight="{TemplateBinding MaxDropDownHeight}">
                                     <Border x:Name="DropDownBorder" 
-                                          Background="#FF2D2D30" 
+                                          Background="{DynamicResource PlotSettings_TextBoxBackgroundBrush}" 
                                           BorderThickness="1"
-                                          BorderBrush="#FF3F3F46">
+                                          BorderBrush="{DynamicResource PlotSettings_BorderBrush}">
                                         <Border.Effect>
-                                            <DropShadowEffect Color="Black" BlurRadius="5" ShadowDepth="2" Opacity="0.3"/>
+                                            <DropShadowEffect Color="{DynamicResource PlotSettings_ShadowColor}" BlurRadius="5" ShadowDepth="2" Opacity="0.3"/>
                                         </Border.Effect>
                                         <ScrollViewer Margin="4,6,4,6" SnapsToDevicePixels="True">
                                             <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Contained"/>
@@ -121,11 +119,9 @@
                 </Setter.Value>
             </Setter>
         </Style>
-        
-        <!-- ComboBoxItem style for dropdown items -->
         <Style TargetType="ComboBoxItem">
             <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="Foreground" Value="#FFA0ACB5"/>
+            <Setter Property="Foreground" Value="{DynamicResource PlotSettings_LabelForegroundBrush}"/>
             <Setter Property="Padding" Value="8,4"/>
             <Setter Property="FontSize" Value="12"/>
             <Setter Property="Template">
@@ -139,41 +135,37 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsHighlighted" Value="True">
-                                <Setter TargetName="Border" Property="Background" Value="#FF3E3E40"/>
+                                <Setter TargetName="Border" Property="Background" Value="{DynamicResource PlotSettings_ButtonHoverBrush}"/>
                             </Trigger>
                             <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="Border" Property="Background" Value="#FF4E4E50"/>
+                                <Setter TargetName="Border" Property="Background" Value="{DynamicResource PlotSettings_ButtonPressedBrush}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
         </Style>
-
         <Style TargetType="TextBox">
-            <Setter Property="Background" Value="#FF2D2D30"/>
-            <Setter Property="Foreground" Value="#FFA0ACB5"/>
-            <Setter Property="BorderBrush" Value="#FF3F3F46"/>
+            <Setter Property="Background" Value="{DynamicResource PlotSettings_TextBoxBackgroundBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource PlotSettings_LabelForegroundBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource PlotSettings_BorderBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Padding" Value="5,3"/>
             <Setter Property="FontSize" Value="12"/>
         </Style>
-
         <Style TargetType="RadioButton">
-            <Setter Property="Foreground" Value="#FFA0ACB5"/>
+            <Setter Property="Foreground" Value="{DynamicResource PlotSettings_LabelForegroundBrush}"/>
             <Setter Property="FontSize" Value="12"/>
         </Style>
-
         <Style TargetType="TabControl">
-            <Setter Property="Background" Value="#FF1E1E1E"/>
-            <Setter Property="BorderBrush" Value="#FF3F3F46"/>
+            <Setter Property="Background" Value="{DynamicResource PlotSettings_BackgroundBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource PlotSettings_BorderBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
         </Style>
-
         <Style TargetType="TabItem">
-            <Setter Property="Background" Value="#FF2D2D30"/>
-            <Setter Property="Foreground" Value="#FFA0ACB5"/>
-            <Setter Property="BorderBrush" Value="#FF3F3F46"/>
+            <Setter Property="Background" Value="{DynamicResource PlotSettings_TextBoxBackgroundBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource PlotSettings_LabelForegroundBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource PlotSettings_BorderBrush}"/>
             <Setter Property="FontSize" Value="12"/>
             <Setter Property="Template">
                 <Setter.Value>
@@ -191,7 +183,7 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="Border" Property="Background" Value="#FF3E3E40"/>
+                                <Setter TargetName="Border" Property="Background" Value="{DynamicResource PlotSettings_ButtonHoverBrush}"/>
                             </Trigger>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="Border" Property="Background" Value="#FF383838"/>
@@ -201,11 +193,10 @@
                 </Setter.Value>
             </Setter>
         </Style>
-
         <Style TargetType="Button">
-            <Setter Property="Background" Value="#FF2D2D30"/>
-            <Setter Property="Foreground" Value="#FFA0ACB5"/>
-            <Setter Property="BorderBrush" Value="#FF3F3F46"/>
+            <Setter Property="Background" Value="{DynamicResource PlotSettings_TextBoxBackgroundBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource PlotSettings_ButtonForegroundBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource PlotSettings_BorderBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Padding" Value="10,5"/>
             <Setter Property="FontSize" Value="12"/>
@@ -219,21 +210,20 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Background" Value="#FF3E3E40"/>
+                                <Setter Property="Background" Value="{DynamicResource PlotSettings_ButtonHoverBrush}"/>
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
-                                <Setter Property="Background" Value="#FF4E4E50"/>
+                                <Setter Property="Background" Value="{DynamicResource PlotSettings_ButtonPressedBrush}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
         </Style>
-
         <!-- Custom close button style -->
         <Style x:Key="CloseButtonStyle" TargetType="Button">
             <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Foreground" Value="{DynamicResource PlotSettings_CloseButtonForegroundBrush}"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="FontSize" Value="16"/>
             <Setter Property="FontWeight" Value="Bold"/>
@@ -248,10 +238,10 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Background" Value="#FFFF4444"/>
+                                <Setter Property="Background" Value="{DynamicResource PlotSettings_CloseButtonHoverBrush}"/>
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
-                                <Setter Property="Background" Value="#FFCC3333"/>
+                                <Setter Property="Background" Value="{DynamicResource PlotSettings_CloseButtonPressedBrush}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -259,16 +249,14 @@
             </Setter>
         </Style>
     </Window.Resources>
-
     <!-- Main container with border and drop shadow -->
-    <Border Background="#FF1E1E1E" 
-            BorderBrush="#FF3F3F46" 
+    <Border Background="{DynamicResource PlotSettings_BackgroundBrush}" 
+            BorderBrush="{DynamicResource PlotSettings_BorderBrush}" 
             BorderThickness="1"
             CornerRadius="5">
         <Border.Effect>
-            <DropShadowEffect Color="Black" BlurRadius="10" ShadowDepth="3" Opacity="0.5"/>
+            <DropShadowEffect Color="{DynamicResource PlotSettings_ShadowColor}" BlurRadius="10" ShadowDepth="3" Opacity="0.5"/>
         </Border.Effect>
-
         <Grid Margin="0">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
@@ -276,20 +264,17 @@
                 <RowDefinition Height="*"/>
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
-
             <!-- Custom title bar -->
-            <Grid Grid.Row="0" Background="#FF2D2D30" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+            <Grid Grid.Row="0" Background="{DynamicResource PlotSettings_TitleBarBrush}" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-
                 <TextBlock Grid.Column="0" Text="Serial Configuration" 
-                           Foreground="#FFA0ACB5" 
+                           Foreground="{DynamicResource PlotSettings_LabelForegroundBrush}" 
                            FontSize="14" FontWeight="SemiBold"
                            VerticalAlignment="Center" 
                            Margin="15,8"/>
-
                 <!-- Close button -->
                 <Button Grid.Column="1" 
                         Style="{StaticResource CloseButtonStyle}"
@@ -297,12 +282,11 @@
                         Click="CloseButton_Click"
                         ToolTip="Close"/>
             </Grid>
-
             <!-- Header -->
             <TextBlock Grid.Row="1" Text="Configure serial port settings and data format" 
                        FontSize="12" 
+                       Foreground="{DynamicResource PlotSettings_HeaderForegroundBrush}" 
                        Margin="20,15,20,5"/>
-
             <!-- Content Area -->
             <DockPanel Grid.Row="2" Margin="10,10,10,0">
                 <!-- Tab Control -->
@@ -444,7 +428,6 @@
                     </TabItem>
                 </TabControl>
             </DockPanel>
-
             <!-- Buttons -->
             <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="20,10,20,20">
                 <Button Content="Connect" Width="75" Margin="0,0,10,0" Click="Button_OK_Click"/>
