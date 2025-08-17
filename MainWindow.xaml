@@ -5,60 +5,40 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:ScottPlot="clr-namespace:ScottPlot.WPF;assembly=ScottPlot.WPF"
         xmlns:UserControls="clr-namespace:SerialPlotDN_WPF.View.UserControls"
-        
         xmlns:UserForms="clr-namespace:SerialPlotDN_WPF.View.UserForms"
         xmlns:local="clr-namespace:SerialPlotDN_WPF"
         mc:Ignorable="d"
         Title="MainWindow" Height="450" Width="800"
-        Loaded="MainWindow_Loaded" Closing="closing">
-    
-    <Grid>
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition/>
-            <ColumnDefinition Width="0*"/>
-        </Grid.ColumnDefinitions>
+        Loaded="MainWindow_Loaded" Closing="closing"
+        Background="{DynamicResource PlotSettings_BackgroundBrush}">
+    <Grid Background="{DynamicResource PlotSettings_BackgroundBrush}">
         <Grid.RowDefinitions>
             <RowDefinition Height="18"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
-        
         <UserControls:MenuBar Grid.Row="0"/>
-
-        <Grid Grid.Row="1">
+        <!-- Main content area -->
+        <Grid Grid.Row="1" Background="{DynamicResource PlotSettings_BackgroundBrush}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*"/> <!-- DataStreamBar + Plot -->
+                <RowDefinition Height="Auto"/> <!-- ChannelControlBar -->
+            </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="150" MinWidth="150"/>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="200" MinWidth="200"/>
+                <ColumnDefinition Width="150" MinWidth="150"/> <!-- DataStreamBar -->
+                <ColumnDefinition Width="*"/> <!-- Plot -->
+                <ColumnDefinition Width="200" MinWidth="200"/> <!-- PlotAndMeasurementBar -->
             </Grid.ColumnDefinitions>
-
-            <!-- Left Column: DataStreamBar -->
-            <UserControls:DataStreamBar Grid.Column="0" x:Name="StreamBar"/>
-
-            <!-- Center Column: Split into Plot and ChannelControlBar -->
-            <Grid Grid.Column="1">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="*"/>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
-
-                <!-- Plot area -->
-                <ScottPlot:WpfPlotGL x:Name="WpfPlot1" Grid.Row="0" MouseLeftButtonDown="WpfPlot1_MouseLeftButtonDown" MouseRightButtonDown="WpfPlot1_MouseRightButtonDown"/>
-
-                <!-- Config button overlay -->
-                <Button x:Name="Button_ConfigPlot" Grid.Row="0" Panel.ZIndex="1" Height="20" Width="20" HorizontalAlignment="Right" VerticalAlignment="Top" Content="🔨" Margin="5,5,5,5" Click="Button_ConfigPlot_Click"/>
-
-                <!-- Channel Control Bar -->
-                <UserControls:ChannelControlBar Grid.Row="1" Panel.ZIndex="2" x:Name="ChannelControlBar" MinHeight="110"/>
+            <!-- DataStreamBar (left) -->
+            <UserControls:DataStreamBar Grid.Row="0" Grid.Column="0" x:Name="StreamBar"/>
+            <!-- Plot area (center) -->
+            <Grid Grid.Row="0" Grid.Column="1" Background="{DynamicResource PlotSettings_BackgroundBrush}">
+                <ScottPlot:WpfPlotGL x:Name="WpfPlot1" MouseLeftButtonDown="WpfPlot1_MouseLeftButtonDown" MouseRightButtonDown="WpfPlot1_MouseRightButtonDown"/>
+                <Button x:Name="Button_ConfigPlot" Panel.ZIndex="1" Height="20" Width="20" HorizontalAlignment="Right" VerticalAlignment="Top" Content="🔨" Margin="5,5,5,5" Click="Button_ConfigPlot_Click"/>
             </Grid>
-
-            <!-- Right Column: PlotAndMeasurementBar -->
-            <UserControls:PlotAndMeasurementBar Grid.Column="2"/>
-
+            <!-- PlotAndMeasurementBar (right, full height) -->
+            <UserControls:PlotAndMeasurementBar Grid.Row="0" Grid.Column="2" Grid.RowSpan="2"/>
+            <!-- ChannelControlBar below both, with margin above -->
+            <UserControls:ChannelControlBar Grid.Row="1" Grid.ColumnSpan="2" Panel.ZIndex="2" x:Name="ChannelControlBar" MinHeight="110" Margin="10,5,0,0"/>
         </Grid>
-
-
-
-
-
     </Grid>
 </Window>
