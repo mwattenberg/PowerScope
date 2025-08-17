@@ -12,12 +12,12 @@ namespace SerialPlotDN_WPF.View.UserForms
     public partial class PlotSettingsWindow : Window, INotifyPropertyChanged
     {
         // Settings properties that can be set from MainWindow
-        private double _plotUpdateRateFPS = 30;
-        private double _serialPortUpdateRateHz = 1000;
-        private double _lineWidth = 1;
+        private int _plotUpdateRateFPS = 30;
+        private int _serialPortUpdateRateHz = 1000;
+        private int _lineWidth = 1;
         private bool _antiAliasing = false;
 
-        public double PlotUpdateRateFPS 
+        public int PlotUpdateRateFPS 
         { 
             get => _plotUpdateRateFPS; 
             set 
@@ -30,7 +30,7 @@ namespace SerialPlotDN_WPF.View.UserForms
             } 
         }
 
-        public double SerialPortUpdateRateHz 
+        public int SerialPortUpdateRateHz 
         { 
             get => _serialPortUpdateRateHz; 
             set 
@@ -43,14 +43,14 @@ namespace SerialPlotDN_WPF.View.UserForms
             } 
         }
 
-        public double LineWidth 
+        public int LineWidth 
         { 
             get => _lineWidth; 
             set 
             { 
                 if (_lineWidth != value)
                 {
-                    _lineWidth = Math.Max(0.1, Math.Min(10, value)); // Clamp between 0.1-10
+                    _lineWidth = Math.Max(1, Math.Min(10, value)); // Clamp between 1-10 (integer values)
                     OnPropertyChanged(nameof(LineWidth));
                 }
             } 
@@ -72,6 +72,9 @@ namespace SerialPlotDN_WPF.View.UserForms
         public bool DialogResult { get; private set; }
 
         public event PropertyChangedEventHandler PropertyChanged;
+        
+        // Event for when settings are applied
+        public event Action<PlotSettingsWindow> OnSettingsApplied;
 
         public PlotSettingsWindow()
         {
@@ -85,7 +88,17 @@ namespace SerialPlotDN_WPF.View.UserForms
             Close();
         }
 
-        private void ButtonCancel_Click(object sender, RoutedEventArgs e)
+        private void ButtonApply_Click(object sender, RoutedEventArgs e)
+        {
+            // Validate inputs first
+            if (ValidateInputs())
+            {
+                // Trigger the apply event for MainWindow to handle
+                OnSettingsApplied?.Invoke(this);
+            }
+        }
+
+        private void ButtonClose_Click(object sender, RoutedEventArgs e)
         {
             DialogResult = false;
             Close();
@@ -131,16 +144,16 @@ namespace SerialPlotDN_WPF.View.UserForms
         // Line Width Up/Down button handlers
         private void ButtonLineWidthUp_Click(object sender, RoutedEventArgs e)
         {
-            LineWidth = Math.Min(10, LineWidth + 0.1);
+            LineWidth = Math.Min(10, LineWidth + 1);
         }
 
         private void ButtonLineWidthDown_Click(object sender, RoutedEventArgs e)
         {
-            LineWidth = Math.Max(0.1, LineWidth - 0.1);
+            LineWidth = Math.Max(1, LineWidth - 1);
         }
 
         // Method to initialize values from MainWindow
-        public void InitializeFromMainWindow(double plotFPS, double serialHz, double lineWidth, bool antiAliasing)
+        public void InitializeFromMainWindow(int plotFPS, int serialHz, int lineWidth, bool antiAliasing)
         {
             PlotUpdateRateFPS = plotFPS;
             SerialPortUpdateRateHz = serialHz;
@@ -158,7 +171,7 @@ namespace SerialPlotDN_WPF.View.UserForms
             try
             {
                 // Parse and validate PlotFPS
-                if (double.TryParse(TextBoxPlotFPS.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out double fps))
+                if (int.TryParse(TextBoxPlotFPS.Text, out int fps))
                 {
                     PlotUpdateRateFPS = fps;
                 }
@@ -169,7 +182,7 @@ namespace SerialPlotDN_WPF.View.UserForms
                 }
 
                 // Parse and validate SerialHz
-                if (double.TryParse(TextBoxSerialHz.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out double hz))
+                if (int.TryParse(TextBoxSerialHz.Text, out int hz))
                 {
                     SerialPortUpdateRateHz = hz;
                 }
@@ -180,7 +193,7 @@ namespace SerialPlotDN_WPF.View.UserForms
                 }
 
                 // Parse and validate LineWidth
-                if (double.TryParse(TextBoxLineWidth.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out double width))
+                if (int.TryParse(TextBoxLineWidth.Text, out int width))
                 {
                     LineWidth = width;
                 }

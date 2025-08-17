@@ -6,6 +6,7 @@ using System.IO.Ports;
 using NAudio.Wave;
 using System.Management;
 using System.Collections.Generic;
+using System.Windows.Input;
 
 namespace SerialPlotDN_WPF.View.UserForms
 {
@@ -22,6 +23,21 @@ namespace SerialPlotDN_WPF.View.UserForms
             InitializeComponent();
             Loaded += SerialConfigWindow_Loaded;
             Loaded += SerialConfigWindow_Loaded_AudioDevices;
+        }
+
+        // Custom window event handlers
+        private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.ButtonState == MouseButtonState.Pressed)
+            {
+                this.DragMove();
+            }
+        }
+
+        private void CloseButton_Click(object sender, RoutedEventArgs e)
+        {
+            DialogResult = false;
+            Close();
         }
 
         private void SerialConfigWindow_Loaded(object sender, RoutedEventArgs e)

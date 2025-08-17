@@ -4,6 +4,8 @@ using System.Timers;
 using System.Windows;
 using System.Windows.Input;
 using SerialPlotDN_WPF.Model;
+using System.Xml.Linq;
+using System.IO;
 
 namespace SerialPlotDN_WPF
 {
@@ -12,17 +14,15 @@ namespace SerialPlotDN_WPF
     /// </summary> 　
     public partial class MainWindow : Window
     {
-        // Signal plottables for plotting
-        private readonly ScottPlot.Plottables.Signal[] SignalPlottables = new ScottPlot.Plottables.Signal[8]; // 8 channels   
-        readonly private System.Timers.Timer UpdatePlotTimer = new() { Interval = 33, Enabled = true, AutoReset = true }; // ~30 FPS
+        private readonly ScottPlot.Plottables.Signal[] _signals = new ScottPlot.Plottables.Signal[8]; // 8 channels   
+        // Pre-allocated arrays for linearized data - avoid memory allocations during plotting
+        private readonly double[][] _linearizedDataArrays = new double[8][];
+        // Timer for updating the plot at a fixed rate
+        readonly private System.Timers.Timer _updatePlotTimer = new() { Interval = 33, Enabled = true, AutoReset = true }; // ~30 FPS
         
         // Configurable display settings - use DataStream's ring buffer capacity
         public int DisplayElements { get; set; } = 10000; // Number of elements to display
-        private readonly int channelCount = 8;
-
-        // Pre-allocated arrays for linearized data - avoid memory allocations during plotting
-        private readonly double[][] _linearizedDataArrays = new double[8][];
-        private bool _signalPlotsInitialized = false;
+        private readonly int _channelCount = 8;
 
         //Debug just data parsing and plotting
         private DataStream dataStream;
@@ -30,9 +30,11 @@ namespace SerialPlotDN_WPF
         public MainWindow()
         {
             InitializeComponent();
+
+            
             
             // Initialize pre-allocated arrays for efficient data copying
-            for (int i = 0; i < channelCount; i++)
+            for (int i = 0; i < _channelCount; i++)
             {
                 _linearizedDataArrays[i] = new double[DisplayElements];
             }
@@ -41,6 +43,8 @@ namespace SerialPlotDN_WPF
             InitializeDataStream();
             InitTimer();
             InitializeChannelControlBar();
+
+            readSettingsXML(); // Load settings at startup
         }
 
         private void InitializePlot()
@@ -48,20 +52,20 @@ namespace SerialPlotDN_WPF
             WpfPlot1.Plot.Clear();
 
             // Initialize Signal plottables with pre-allocated arrays
-            for (int i = 0; i < channelCount; i++)
+            for (int i = 0; i < _channelCount; i++)
             {
                 // Create Signal plottables with pre-allocated arrays - these will be reused
-                SignalPlottables[i] = WpfPlot1.Plot.Add.Signal(_linearizedDataArrays[i]);
-                SignalPlottables[i].LineWidth = 1; // Thinner lines = better performance
+                _signals[i] = WpfPlot1.Plot.Add.Signal(_linearizedDataArrays[i]);
+                _signals[i].LineWidth = 1; // Thinner lines = better performance
 
                 // Use ScottPlot's default palette for automatic color selection
-                SignalPlottables[i].Color = ScottPlot.Palette.Default.GetColor(i);
+                _signals[i].Color = ScottPlot.Palette.Default.GetColor(i);
                 
                 // Disable anti-aliasing for better performance
-                SignalPlottables[i].LineStyle.AntiAlias = false;
+                _signals[i].LineStyle.AntiAlias = false;
             }
 
-            _signalPlotsInitialized = true;
+
 
             // Optimize plot settings for performance
             WpfPlot1.Plot.Axes.ContinuouslyAutoscale = false; // Manual scaling is faster
@@ -110,14 +114,14 @@ namespace SerialPlotDN_WPF
         {
             SourceSetting sourceSetting = new SourceSetting("COM22", 1000000, 9);
             byte[] startbytes = new byte[] { 0xAA, 0xAA };
-            dataStream = new DataStream(sourceSetting, new DataParser(DataParser.BinaryFormat.uint16_t, channelCount, startbytes));
+            dataStream = new DataStream(sourceSetting, new DataParser(DataParser.BinaryFormat.uint16_t, _channelCount, startbytes));
             dataStream.Start();
         }
 
         private void InitTimer()
         {
-            UpdatePlotTimer.Elapsed += UpdatePlot;
-            UpdatePlotTimer.Start();
+            _updatePlotTimer.Elapsed += UpdatePlot;
+            _updatePlotTimer.Start();
         }
 
         private void UpdatePlot(object source, ElapsedEventArgs e)
@@ -125,7 +129,7 @@ namespace SerialPlotDN_WPF
             bool hasNewData = false;
 
             // Check if any channel has new data
-            for (int channel = 0; channel < channelCount; channel++)
+            for (int channel = 0; channel < _channelCount; channel++)
             {
                 var newData = dataStream.GetNewData(channel);
                 if (newData.Any())
@@ -149,9 +153,9 @@ namespace SerialPlotDN_WPF
 
         private void UpdateSignalPlots()
         {
-            if (!_signalPlotsInitialized) return;
 
-            for (int channel = 0; channel < channelCount; channel++)
+
+            for (int channel = 0; channel < _channelCount; channel++)
             {
                 // Efficiently copy data to pre-allocated array without memory allocation
                 int actualDataCount = dataStream.CopyLatestDataTo(channel, _linearizedDataArrays[channel], DisplayElements);
@@ -165,16 +169,68 @@ namespace SerialPlotDN_WPF
             }
         }
 
-        private void UpdateAxisLimits()
+        /// <summary>
+        /// Writes current plot settings to an XML file in the application directory.
+        /// </summary>
+        private void writeSettingToXML()
         {
-            WpfPlot1.Plot.Axes.SetLimitsY(-200, 200);
-            // Set X limits to show the display window
-            WpfPlot1.Plot.Axes.SetLimitsX(0, DisplayElements);
+            // Gather current settings
+            int plotUpdateRateFPS = (int)(1000.0 / _updatePlotTimer.Interval);
+            int serialPortUpdateRateHz = dataStream?.SerialPortUpdateRateHz ?? 1000;
+            int lineWidth = (int)(_signals[0]?.LineWidth ?? 1);
+            bool antiAliasing = _signals[0]?.LineStyle.AntiAlias ?? false;
+
+            // Create XML structure
+            var settingsXml = new XElement("PlotSettings",
+                new XElement("PlotUpdateRateFPS", plotUpdateRateFPS),
+                new XElement("SerialPortUpdateRateHz", serialPortUpdateRateHz),
+                new XElement("LineWidth", lineWidth),
+                new XElement("AntiAliasing", antiAliasing)
+            );
+
+            // Save to file in application directory
+            string filePath = Path.Combine(Directory.GetCurrentDirectory(), "Settings.xml");
+            settingsXml.Save(filePath);
+        }
+
+        /// <summary>
+        /// Reads plot settings from an XML file in the application directory and applies them.
+        /// </summary>
+        private void readSettingsXML()
+        {
+            string filePath = Path.Combine(Directory.GetCurrentDirectory(), "Settings.xml");
+            if (!File.Exists(filePath)) return;
+
+            try
+            {
+                var settingsXml = XElement.Load(filePath);
+                int plotUpdateRateFPS = int.Parse(settingsXml.Element("PlotUpdateRateFPS")?.Value ?? "30");
+                int serialPortUpdateRateHz = int.Parse(settingsXml.Element("SerialPortUpdateRateHz")?.Value ?? "1000");
+                int lineWidth = int.Parse(settingsXml.Element("LineWidth")?.Value ?? "1");
+                bool antiAliasing = bool.Parse(settingsXml.Element("AntiAliasing")?.Value ?? "false");
+
+                // Apply settings
+                _updatePlotTimer.Interval = 1000.0 / plotUpdateRateFPS;
+
+                if (dataStream != null)
+                    dataStream.SerialPortUpdateRateHz = serialPortUpdateRateHz;
+
+                for (int i = 0; i < _signals.Length; i++)
+                {
+                    if (_signals[i] != null)
+                    {
+                        _signals[i].LineWidth = lineWidth;
+                        _signals[i].LineStyle.AntiAlias = antiAliasing;
+                    }
+                }
+            }
+            catch { /* Ignore errors and use defaults */ }
         }
 
         protected override void OnClosed(EventArgs e)
         {
-            UpdatePlotTimer?.Stop();
+            writeSettingToXML(); // Save settings on exit
+            _updatePlotTimer?.Stop();
             dataStream?.Dispose();
             base.OnClosed(e);
         }
@@ -187,7 +243,7 @@ namespace SerialPlotDN_WPF
 
         private void closing(object sender, CancelEventArgs e)
         {
-            UpdatePlotTimer?.Stop();
+            _updatePlotTimer?.Stop();
             dataStream?.Dispose();
         }
 
@@ -215,31 +271,33 @@ namespace SerialPlotDN_WPF
             var settingsWindow = new View.UserForms.PlotSettingsWindow();
             
             // Initialize with current settings
-            double currentFPS = 1000.0 / UpdatePlotTimer.Interval; // Convert interval to FPS
-            double currentLineWidth = SignalPlottables[0]?.LineWidth ?? 1;
-            bool currentAntiAliasing = SignalPlottables[0]?.LineStyle.AntiAlias ?? false;
+            int currentFPS = (int)(1000.0 / _updatePlotTimer.Interval); // Convert interval to FPS
+            int currentLineWidth = (int)(_signals[0]?.LineWidth ?? 1);
+            bool currentAntiAliasing = _signals[0]?.LineStyle.AntiAlias ?? false;
             
-            settingsWindow.InitializeFromMainWindow(currentFPS, 1000, currentLineWidth, currentAntiAliasing);
+            settingsWindow.InitializeFromMainWindow(currentFPS, dataStream.SerialPortUpdateRateHz, currentLineWidth, currentAntiAliasing);
             
-            // Show dialog and apply settings if OK was clicked
-            if (settingsWindow.ShowDialog() == true && settingsWindow.DialogResult)
-            {
-                ApplyPlotSettings(settingsWindow);
-            }
+            // Subscribe to the apply event for real-time settings application
+            settingsWindow.OnSettingsApplied += (settings) => ApplyPlotSettings(settings);
+            
+            // Show the window (non-modal so user can interact with both windows)
+            settingsWindow.Show();
         }
 
         private void ApplyPlotSettings(View.UserForms.PlotSettingsWindow settings)
         {
             // Apply Plot Update Rate (FPS)
-            UpdatePlotTimer.Interval = 1000.0 / settings.PlotUpdateRateFPS;
-            
+            _updatePlotTimer.Interval = 1000.0 / settings.PlotUpdateRateFPS;
+
+            dataStream.SerialPortUpdateRateHz = settings.SerialPortUpdateRateHz;
+
             // Apply Line Width and Anti-Aliasing to all signal plots
-            for (int i = 0; i < SignalPlottables.Length; i++)
+            for (int i = 0; i < _signals.Length; i++)
             {
-                if (SignalPlottables[i] != null)
+                if (_signals[i] != null)
                 {
-                    SignalPlottables[i].LineWidth = (float)settings.LineWidth;
-                    SignalPlottables[i].LineStyle.AntiAlias = settings.AntiAliasing;
+                    _signals[i].LineWidth = (float)settings.LineWidth;
+                    _signals[i].LineStyle.AntiAlias = settings.AntiAliasing;
                 }
             }
             

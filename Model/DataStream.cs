@@ -20,6 +20,8 @@ namespace SerialPlotDN_WPF.Model
         private int[] _lastReadPositions;
         public bool IsRunning { get; private set; }
         public DataParser Parser { get; init; }
+        public int ReadBufferSize { get; private set; }
+        public int SerialPortUpdateRateHz { get; set; } = 1000; // Default update rate in Hz
 
 
         public DataStream(SourceSetting source, DataParser dataParser) 
@@ -32,12 +34,14 @@ namespace SerialPlotDN_WPF.Model
             _port.Encoding = Encoding.ASCII;
             
             //port.Encoding = Encoding.UTF8;
-            _port.ReadTimeout = 500;
-            _port.WriteTimeout = 500;
-            _port.ReceivedBytesThreshold = 2000;
+            _port.ReadTimeout = 100;
+            _port.WriteTimeout = 100;
+            _port.ReceivedBytesThreshold = 2048;
             _port.ReadBufferSize = 4096;
             _port.Open();
-    
+            
+            this.ReadBufferSize = _port.ReadBufferSize;
+
             // Initialize ring buffers with appropriate capacity
             int bufferSize = Math.Max(200000, source.BaudRate / 10); // At least 10k samples or 0.1 seconds of data
             
@@ -95,47 +99,15 @@ namespace SerialPlotDN_WPF.Model
 
             return ReceivedData[channel].CopyLatestTo(destination, sampleCount);
         }
-
-        private void SimulateDataThread()
-        {
-            int sampleCount = 100;
-            int channelCount = 8;
-
-            while (IsRunning)
-            {
-                // Generate sine wave data with noise
-                List<ushort> data = new List<ushort>((channelCount+1)*sampleCount);
-
-                for (int i = 0; i < sampleCount; i++)
-                {
-                    data.AddRange(DataGenerator.GenerateSineWaveData(channelCount, true));
-                }
-
-                // Parse the data
-                Span<byte> dataSpan = MemoryMarshal.AsBytes<ushort>(data.ToArray().AsSpan());
-                ParsedData parsedData = Parser.ParseData(dataSpan);
-                
-                _residue = parsedData.Residue;
-
-                // Add to ring buffers instead of growing lists
-                for (int i = 0; i < Parser.NumberOfChannels; i++)
-                {
-                    ReceivedData[i].AddRange(parsedData.Data[i]);
-                }
-
-                Thread.Sleep(5);
-            }
-        }
-
         private void readSerialData()
         {
-            const int MinBytesThreshold = 200; // Minimum bytes before processing
-            const int MaxReadSize = 8192; // Maximum bytes to read at once
-            const int SleepIntervalMs = 1; // Reduced sleep for better responsiveness
+            int MinBytesThreshold = 200; // Minimum bytes before processing
+            int MaxReadSize = this.ReadBufferSize*2; // Maximum bytes to read at once
+            
             
             // Pre-allocate buffer with some extra space for residue handling
             byte[] readBuffer = new byte[MaxReadSize];
-            byte[] workingBuffer = new byte[MaxReadSize * 2]; // Double size for residue handling
+            byte[] workingBuffer = new byte[MaxReadSize]; // Double size for residue handling
             
             if (!_port.IsOpen)
             {
@@ -162,10 +134,10 @@ namespace SerialPlotDN_WPF.Model
                                 ProcessReceivedData(readBuffer, bytesRead, workingBuffer);
                             }
                         }
-                        else
+                        //else
                         {
                             // Short sleep when no data available
-                            Thread.Sleep(SleepIntervalMs);
+                            Thread.Sleep(1 / this.SerialPortUpdateRateHz);
                         }
                     }
                     catch (TimeoutException)
