@@ -1,11 +1,14 @@
 ﻿using System.ComponentModel;
-using System.Windows.Media;
+using System.IO;
 using System.Timers;
 using System.Windows;
 using System.Windows.Input;
-using SerialPlotDN_WPF.Model;
+using System.Windows.Media;
 using System.Xml.Linq;
-using System.IO;
+using SerialPlotDN_WPF.Model;
+using SerialPlotDN_WPF.View.UserControls;
+
+
 
 namespace SerialPlotDN_WPF
 {
@@ -50,22 +53,39 @@ namespace SerialPlotDN_WPF
         private void InitializePlot()
         {
             WpfPlot1.Plot.Clear();
+            WpfPlot1.Plot.Add.Palette = new ScottPlot.Palettes.Category10();
+
+            
 
             // Initialize Signal plottables with pre-allocated arrays
             for (int i = 0; i < _channelCount; i++)
             {
                 // Create Signal plottables with pre-allocated arrays - these will be reused
                 _signals[i] = WpfPlot1.Plot.Add.Signal(_linearizedDataArrays[i]);
+                _signals[i].Color = _signals[i].Color.Lighten(0.2); // Lighten the color for better 
+                _signals[i].Color = _signals[i].Color.WithOpacity(1.0); // Ensure full opacity
                 _signals[i].LineWidth = 1; // Thinner lines = better performance
-
-                // Use ScottPlot's default palette for automatic color selection
-                _signals[i].Color = ScottPlot.Palette.Default.GetColor(i);
                 
                 // Disable anti-aliasing for better performance
                 _signals[i].LineStyle.AntiAlias = false;
             }
 
+            
+            WpfPlot1.Plot.ShowLegend();
 
+            // change figure colors
+            WpfPlot1.Plot.FigureBackground.Color = ScottPlot.Color.FromHex("#181818");
+            WpfPlot1.Plot.DataBackground.Color = ScottPlot.Color.FromHex("#1f1f1f");
+
+            // change axis and grid colors
+            WpfPlot1.Plot.Axes.Color(ScottPlot.Color.FromHex("#d7d7d7"));
+            WpfPlot1.Plot.Grid.LineWidth = 1.0f; // Thinner grid lines for better 
+            WpfPlot1.Plot.Grid.MajorLineColor = ScottPlot.Color.FromHex("#404040");
+
+            // change legend colors
+            WpfPlot1.Plot.Legend.BackgroundColor = ScottPlot.Color.FromHex("#404040");
+            WpfPlot1.Plot.Legend.FontColor = ScottPlot.Color.FromHex("#d7d7d7");
+            WpfPlot1.Plot.Legend.OutlineColor = ScottPlot.Color.FromHex("#d7d7d7");
 
             // Optimize plot settings for performance
             WpfPlot1.Plot.Axes.ContinuouslyAutoscale = false; // Manual scaling is faster
@@ -74,12 +94,6 @@ namespace SerialPlotDN_WPF
             // Set fixed axis limits to prevent auto scaling - show display window
             WpfPlot1.Plot.Axes.SetLimitsX(0, DisplayElements);
             WpfPlot1.Plot.Axes.SetLimitsY(-200, 4000); // Adjust Y range based on your data
-
-            // Style settings
-            WpfPlot1.Plot.Grid.MajorLineColor = ScottPlot.Color.FromHex("#0e3d54");
-            WpfPlot1.Plot.FigureBackground.Color = ScottPlot.Color.FromHex("#07263b");
-            WpfPlot1.Plot.DataBackground.Color = ScottPlot.Color.FromHex("#0b3049");
-            WpfPlot1.Plot.Axes.Color(ScottPlot.Color.FromHex("#a0acb5"));
             WpfPlot1.Plot.Axes.Bottom.IsVisible = false;
         }
 
@@ -91,22 +105,27 @@ namespace SerialPlotDN_WPF
             // Create 8 channels with different colors
             for (int i = 0; i < 8; i++)
             {
-                var channelControl = new View.UserControls.ChannelControl();
 
+                // Ensure palette is initialized
+                ChannelControl  channel = new ChannelControl();
+
+                
                 // Set channel color using ScottPlot's default palette (same as plot)
-                var channelColor = ScottPlot.Palette.Default.GetColor(i);
-                var wpfColor = Color.FromRgb((byte)(channelColor.R * 255),
-                                            (byte)(channelColor.G * 255),
-                                            (byte)(channelColor.B * 255));
+                var channelColor = _signals[i].Color;
+
+                var wpfColor = Color.FromArgb(channelColor.A,
+                                            channelColor.R,
+                                            channelColor.G,
+                                            channelColor.B);
 
                 // Configure the channel
-                channelControl.Color = wpfColor;
-                channelControl.SetChannelLabel($"CH{i + 1}");
-                channelControl.Gain = 1.0; // Default gain
-                channelControl.Offset = 0.0; // Default offset
+                channel.Color = wpfColor;
+                channel.SetChannelLabel($"CH{i + 1}");
+                channel.Gain = 1.0; // Default gain
+                channel.Offset = 0.0; // Default offset
 
                 // Add to the control bar
-                ChannelControlBar.AddChannel(channelControl);
+                ChannelControlBar.AddChannel(channel);
             }
         }
 
@@ -147,7 +166,7 @@ namespace SerialPlotDN_WPF
                 {
                     UpdateSignalPlots();
                     WpfPlot1.Refresh();
-                }, System.Windows.Threading.DispatcherPriority.Background);
+                }, System.Windows.Threading.DispatcherPriority.Render);
             }
         }
 
@@ -174,21 +193,18 @@ namespace SerialPlotDN_WPF
         /// </summary>
         private void writeSettingToXML()
         {
-            // Gather current settings
             int plotUpdateRateFPS = (int)(1000.0 / _updatePlotTimer.Interval);
             int serialPortUpdateRateHz = dataStream?.SerialPortUpdateRateHz ?? 1000;
             int lineWidth = (int)(_signals[0]?.LineWidth ?? 1);
             bool antiAliasing = _signals[0]?.LineStyle.AntiAlias ?? false;
-
-            // Create XML structure
+            bool showRenderTime = WpfPlot1.Plot.Benchmark.IsVisible;
             var settingsXml = new XElement("PlotSettings",
                 new XElement("PlotUpdateRateFPS", plotUpdateRateFPS),
                 new XElement("SerialPortUpdateRateHz", serialPortUpdateRateHz),
                 new XElement("LineWidth", lineWidth),
-                new XElement("AntiAliasing", antiAliasing)
+                new XElement("AntiAliasing", antiAliasing),
+                new XElement("ShowRenderTime", showRenderTime)
             );
-
-            // Save to file in application directory
             string filePath = Path.Combine(Directory.GetCurrentDirectory(), "Settings.xml");
             settingsXml.Save(filePath);
         }
@@ -200,7 +216,6 @@ namespace SerialPlotDN_WPF
         {
             string filePath = Path.Combine(Directory.GetCurrentDirectory(), "Settings.xml");
             if (!File.Exists(filePath)) return;
-
             try
             {
                 var settingsXml = XElement.Load(filePath);
@@ -208,13 +223,10 @@ namespace SerialPlotDN_WPF
                 int serialPortUpdateRateHz = int.Parse(settingsXml.Element("SerialPortUpdateRateHz")?.Value ?? "1000");
                 int lineWidth = int.Parse(settingsXml.Element("LineWidth")?.Value ?? "1");
                 bool antiAliasing = bool.Parse(settingsXml.Element("AntiAliasing")?.Value ?? "false");
-
-                // Apply settings
+                bool showRenderTime = bool.Parse(settingsXml.Element("ShowRenderTime")?.Value ?? "false");
                 _updatePlotTimer.Interval = 1000.0 / plotUpdateRateFPS;
-
                 if (dataStream != null)
                     dataStream.SerialPortUpdateRateHz = serialPortUpdateRateHz;
-
                 for (int i = 0; i < _signals.Length; i++)
                 {
                     if (_signals[i] != null)
@@ -223,6 +235,7 @@ namespace SerialPlotDN_WPF
                         _signals[i].LineStyle.AntiAlias = antiAliasing;
                     }
                 }
+                WpfPlot1.Plot.Benchmark.IsVisible = showRenderTime;
             }
             catch { /* Ignore errors and use defaults */ }
         }
@@ -254,44 +267,27 @@ namespace SerialPlotDN_WPF
 
         private void WpfPlot1_MouseRightButtonDown(object sender, MouseButtonEventArgs e)
         {
-            // Toggle benchmark visibility
-            if (WpfPlot1.Plot.Benchmark.IsVisible)
-            {
-                WpfPlot1.Plot.Benchmark.IsVisible = false;
-            }
-            else
-            {
-                WpfPlot1.Plot.Benchmark.IsVisible = true;
-            }
+            // Restore default axis limits as in initialization
+            WpfPlot1.Plot.Axes.SetLimitsX(0, DisplayElements);
+            WpfPlot1.Plot.Axes.SetLimitsY(-200, 4000);
         }
 
         private void Button_ConfigPlot_Click(object sender, RoutedEventArgs e)
         {
-            // Create and show the PlotSettingsWindow
             var settingsWindow = new View.UserForms.PlotSettingsWindow();
-            
-            // Initialize with current settings
-            int currentFPS = (int)(1000.0 / _updatePlotTimer.Interval); // Convert interval to FPS
+            int currentFPS = (int)(1000.0 / _updatePlotTimer.Interval);
             int currentLineWidth = (int)(_signals[0]?.LineWidth ?? 1);
             bool currentAntiAliasing = _signals[0]?.LineStyle.AntiAlias ?? false;
-            
-            settingsWindow.InitializeFromMainWindow(currentFPS, dataStream.SerialPortUpdateRateHz, currentLineWidth, currentAntiAliasing);
-            
-            // Subscribe to the apply event for real-time settings application
+            settingsWindow.InitializeFromMainWindow(currentFPS, dataStream.SerialPortUpdateRateHz, currentLineWidth, currentAntiAliasing, WpfPlot1.Plot.Benchmark.IsVisible);
             settingsWindow.OnSettingsApplied += (settings) => ApplyPlotSettings(settings);
-            
-            // Show the window (non-modal so user can interact with both windows)
             settingsWindow.Show();
         }
 
         private void ApplyPlotSettings(View.UserForms.PlotSettingsWindow settings)
         {
-            // Apply Plot Update Rate (FPS)
             _updatePlotTimer.Interval = 1000.0 / settings.PlotUpdateRateFPS;
-
             dataStream.SerialPortUpdateRateHz = settings.SerialPortUpdateRateHz;
-
-            // Apply Line Width and Anti-Aliasing to all signal plots
+            WpfPlot1.Plot.Grid.LineWidth = (float)settings.LineWidth / 2;
             for (int i = 0; i < _signals.Length; i++)
             {
                 if (_signals[i] != null)
@@ -300,8 +296,7 @@ namespace SerialPlotDN_WPF
                     _signals[i].LineStyle.AntiAlias = settings.AntiAliasing;
                 }
             }
-            
-            // Refresh the plot to apply changes
+            WpfPlot1.Plot.Benchmark.IsVisible = settings.ShowRenderTime;
             WpfPlot1.Refresh();
         }
     }

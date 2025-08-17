@@ -16,6 +16,7 @@ namespace SerialPlotDN_WPF.View.UserForms
         private int _serialPortUpdateRateHz = 1000;
         private int _lineWidth = 1;
         private bool _antiAliasing = false;
+        private bool _showRenderTime = false;
 
         public int PlotUpdateRateFPS 
         { 
@@ -67,6 +68,19 @@ namespace SerialPlotDN_WPF.View.UserForms
                     OnPropertyChanged(nameof(AntiAliasing));
                 }
             } 
+        }
+
+        public bool ShowRenderTime
+        {
+            get => _showRenderTime;
+            set
+            {
+                if (_showRenderTime != value)
+                {
+                    _showRenderTime = value;
+                    OnPropertyChanged(nameof(ShowRenderTime));
+                }
+            }
         }
 
         public bool DialogResult { get; private set; }
@@ -153,12 +167,13 @@ namespace SerialPlotDN_WPF.View.UserForms
         }
 
         // Method to initialize values from MainWindow
-        public void InitializeFromMainWindow(int plotFPS, int serialHz, int lineWidth, bool antiAliasing)
+        public void InitializeFromMainWindow(int plotFPS, int serialHz, int lineWidth, bool antiAliasing, bool showRenderTime = false)
         {
             PlotUpdateRateFPS = plotFPS;
             SerialPortUpdateRateHz = serialHz;
             LineWidth = lineWidth;
             AntiAliasing = antiAliasing;
+            ShowRenderTime = showRenderTime;
         }
 
         protected virtual void OnPropertyChanged(string propertyName)

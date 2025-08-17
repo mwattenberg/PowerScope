@@ -2,8 +2,7 @@
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
-using System.Xml.Linq;
-using NAudio.Wave;
+
 
 namespace SerialPlotDN_WPF.View.UserControls
 {

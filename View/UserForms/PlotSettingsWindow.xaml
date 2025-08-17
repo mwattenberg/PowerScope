@@ -205,6 +205,18 @@
                     <CheckBox x:Name="CheckBoxAntiAliasing" Grid.Column="1" VerticalAlignment="Center" 
                               IsChecked="{Binding AntiAliasing, RelativeSource={RelativeSource AncestorType=Window}}"/>
                 </Grid>
+                
+                <!-- Show Render Time -->
+                <Grid Margin="0,0,0,15">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="150"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    
+                    <Label Grid.Column="0" Content="Show Render Time:" VerticalAlignment="Center"/>
+                    <CheckBox x:Name="CheckBoxShowRenderTime" Grid.Column="1" VerticalAlignment="Center" 
+                              IsChecked="{Binding ShowRenderTime, RelativeSource={RelativeSource AncestorType=Window}}"/>
+                </Grid>
             </StackPanel>
             
             <!-- Buttons -->
