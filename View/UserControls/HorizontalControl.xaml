@@ -88,8 +88,8 @@
             
             <!-- Two wider buttons with "~~" and "~" text -->
             <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="2">
-                <Button x:Name="ButtonGrow" VerticalAlignment="Center" Width="120" Height="25" Margin="5" Content="~~" FontSize="18" FontWeight="Bold"/>
-                <Button x:Name="ButtonShrink" VerticalAlignment="Center" Width="120" Height="25" Margin="5" Content="~" FontSize="18" FontWeight="Bold"/>
+                <Button x:Name="ButtonGrow" VerticalAlignment="Center" Width="120" Height="25" Margin="5" Content="~~" FontSize="18" FontWeight="Bold" Click="ButtonGrow_Click"/>
+                <Button x:Name="ButtonShrink" VerticalAlignment="Center" Width="120" Height="25" Margin="5" Content="~" FontSize="18" FontWeight="Bold" Click="ButtonShrink_Click"/>
             </StackPanel>
             
             <!-- Window Size row with label on left and textbox on right -->
@@ -113,7 +113,7 @@
                 
                 <TextBlock Grid.Column="0" Text="Buffer Size:" Style="{StaticResource LabelTextStyle}"/>
                 <TextBox Grid.Column="1" x:Name="BufferSizeTextBox" Style="{StaticResource InputTextBoxStyle}" 
-                         Text="1000" Width="160" HorizontalAlignment="Right" Margin="5,0,0,0"/>
+                         Text="1000" Width="160" HorizontalAlignment="Right" Margin="5,0,0,0" TextChanged="BufferSizeTextBox_TextChanged"/>
             </Grid>
         </Grid>
     </Border>

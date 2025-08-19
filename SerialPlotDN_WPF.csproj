@@ -9,10 +9,6 @@
 	<PublishAot>false</PublishAot>
 	<Platforms>AnyCPU;x64</Platforms>
 	<Configurations>Debug;Release;Performance</Configurations>
-	<Optimize>true</Optimize>
-	<DebugType>none</DebugType>
-	<TieredCompilation>true</TieredCompilation>
-	<PublishReadyToRun>true</PublishReadyToRun>
   </PropertyGroup>
 
   <ItemGroup>

@@ -29,7 +29,8 @@ namespace SerialPlotDN_WPF.Model
             _port.WriteTimeout = 100;
             _port.ReadBufferSize = 8192; // Set buffer size directly
             _port.Open();
-            int ringBufferSize = Math.Max(200000, source.BaudRate / 10);
+            int ringBufferSize = Math.Max(500000, source.BaudRate / 10);
+            
             ReceivedData = new RingBuffer<double>[dataParser.NumberOfChannels];
             _lastReadPositions = new int[dataParser.NumberOfChannels];
             for (int i = 0; i < dataParser.NumberOfChannels; i++)

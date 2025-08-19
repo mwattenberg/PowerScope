@@ -20,11 +20,10 @@
                     </ControlTemplate>
                 </Button.Template>
             </Button>
-            <Button x:Name="RecordButton" Height="36" Width="90" Background="#FFCC0000" Foreground="White" FontWeight="Bold" Click="RecordButton_Click" Margin="0">
+            <Button x:Name="RecordButton" Height="36" Width="90" Background="Red" Foreground="White" FontWeight="Bold" Click="RecordButton_Click" Margin="0">
                 <Button.Content>
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
-                        <TextBlock Text="⬤" FontSize="14" Foreground="White" Margin="0,0,4,0" VerticalAlignment="Center"/>
-                        <TextBlock Text="Record" FontSize="14" Foreground="White" VerticalAlignment="Center"/>
+                        <TextBlock Text="⬤ Record" Foreground="White" VerticalAlignment="Center"/>
                     </StackPanel>
                 </Button.Content>
                 <Button.Template>

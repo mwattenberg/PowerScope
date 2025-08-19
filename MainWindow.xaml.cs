@@ -54,10 +54,60 @@ namespace SerialPlotDN_WPF
             
             InitializePlot();
             InitializeDataStream();
-            InitTimer();
+            InitializeTimer();
             InitializeChannelControlBar();
+            InitializeHorizontalControl();
+            readSettingsXML();
+            InitializeEventHandlers();
+        }
 
-            readSettingsXML(); 
+        void InitializeHorizontalControl()
+        {
+            HorizontalControl.WindowSize = DisplayElements; // Set initial window size
+            HorizontalControl.BufferSize = 5000000; // Set initial buffer size
+        }
+
+        private void InitializeEventHandlers()
+        {
+            HorizontalControl.WindowSizeChanged += HorizontalControl_WindowSizeChanged;
+            RunControl.RunStateChanged += RunControl_RunStateChanged;
+        }
+
+        private void HorizontalControl_WindowSizeChanged(object? sender, int newSize)
+        {
+            DisplayElements = newSize;
+            _updatePlotTimer.Stop();
+
+            for (int i = 0; i < _channelCount; i++)
+            {
+                var colorOld = _signals[i].Color;
+                WpfPlot1.Plot.Remove(_signals[i]); // Remove old signals
+                _linearizedDataArrays[i] = new double[DisplayElements];
+                _signals[i] = WpfPlot1.Plot.Add.Signal(_linearizedDataArrays[i]);
+                _signals[i].Color = colorOld;
+            }
+            WpfPlot1.Plot.Axes.SetLimitsX(0, DisplayElements);
+            _updatePlotTimer.Start();
+
+            // Optionally, refresh plot or other UI
+        }
+
+        private void RunControl_RunStateChanged(object? sender, RunControl.RunStates newState)
+        {
+            if (newState == RunControl.RunStates.Running)
+            {
+                // Start the data stream and timers
+                dataStream.Start();
+                _updatePlotTimer.Start();
+                _updateAquisitionTimer.Start();
+            }
+            else
+            {
+                // Stop the data stream and timers
+                dataStream.Stop();
+                _updatePlotTimer.Stop();
+                _updateAquisitionTimer.Stop();
+            }
         }
 
         private void InitializePlot()
@@ -135,18 +185,14 @@ namespace SerialPlotDN_WPF
             SourceSetting sourceSetting = new SourceSetting("COM22", 1000000, 9);
             byte[] startbytes = new byte[] { 0xAA, 0xAA };
             dataStream = new DataStream(sourceSetting, new DataParser(DataParser.BinaryFormat.uint16_t, _channelCount, startbytes));
-            dataStream.Start();
-
             AquisitionControl.Baudrate = sourceSetting.BaudRate;
             
         }
 
-        private void InitTimer()
+        private void InitializeTimer()
         {
             _updatePlotTimer.Elapsed += UpdatePlot;
-            _updatePlotTimer.Start();
             _updateAquisitionTimer.Elapsed += UpdateAquisition;
-            _updateAquisitionTimer.Start();
         }
 
         private void UpdatePlot(object source, ElapsedEventArgs e)
@@ -171,6 +217,7 @@ namespace SerialPlotDN_WPF
                 Application.Current.Dispatcher.BeginInvoke(() =>
                 {
                     UpdateSignalPlots();
+                    
                     WpfPlot1.Refresh();
                 }, System.Windows.Threading.DispatcherPriority.Render);
             }

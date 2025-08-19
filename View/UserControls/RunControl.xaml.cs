@@ -7,49 +7,78 @@ namespace SerialPlotDN_WPF.View.UserControls
 {
     public partial class RunControl : UserControl
     {
-        public enum RunState
+        public enum RunStates
         {
             Running,
             Stopped
         }
 
-        private RunState _currentState = RunState.Stopped;
-        public RunState CurrentState
+        public enum RecordStates
         {
-            get => _currentState;
+            Recording,
+            Stopped
+        }
+
+        private RunStates _runstate;
+        private RecordStates _recordstate;
+        public RunStates RunState
+        {
+            get => _runstate;
             private set
             {
-                if (_currentState != value)
+                if (_runstate != value)
                 {
-                    _currentState = value;
-                    OnRunStateChanged(value);
+                    _runstate = value;
+                    RunStateChanged?.Invoke(this, _runstate);
                     UpdateRunButtonUI();
                 }
             }
         }
 
-        public event EventHandler<RunState> RunStateChanged;
+        public RecordStates RecordState
+        {
+            get => _recordstate;
+            private set
+            {
+                if (_recordstate != value)
+                {
+                    _recordstate = value;
+                    RecordStateChanged?.Invoke(this, _recordstate);
+                    UpdateRecordButtonUI();
+                }
+            }
+        }
+
+        public event EventHandler<RunStates>? RunStateChanged;
+        public event EventHandler<RecordStates>? RecordStateChanged;
 
         public RunControl()
         {
             InitializeComponent();
-            UpdateRunButtonUI();
+            this.RunState = RunStates.Stopped; // Default state
+            this.RecordState = RecordStates.Stopped; // Default state
         }
 
         private void RunButton_Click(object sender, RoutedEventArgs e)
         {
-            CurrentState = CurrentState == RunState.Stopped ? RunState.Running : RunState.Stopped;
+            if(RunState == RunStates.Running)
+                this.RunState = RunStates.Stopped;
+            else
+                this.RunState = RunStates.Running;
         }
 
         private void RecordButton_Click(object sender, RoutedEventArgs e)
         {
-            // Placeholder for Record functionality
+            if(RecordState == RecordStates.Recording)
+                this.RecordState = RecordStates.Stopped;
+            else
+                this.RecordState = RecordStates.Recording;
         }
 
         private void UpdateRunButtonUI()
         {
             if (RunButton == null) return;
-            if (CurrentState == RunState.Running)
+            if (RunState == RunStates.Running)
             {
                 RunButton.Content = "Stop";
                 RunButton.Background = new SolidColorBrush(Colors.Red);
@@ -61,9 +90,23 @@ namespace SerialPlotDN_WPF.View.UserControls
             }
         }
 
-        protected virtual void OnRunStateChanged(RunState newState)
+        private void UpdateRecordButtonUI()
         {
-            RunStateChanged?.Invoke(this, newState);
+            if (RecordButton == null) return;
+            if (RecordState == RecordStates.Recording)
+            {
+                RecordButton.Content = "Pause";
+                RecordButton.Background = new SolidColorBrush(Colors.Gray);
+            }
+            else
+            {
+                RecordButton.Content = "⬤ Record";
+                RecordButton.Background = new SolidColorBrush(Colors.Red);
+            }
         }
+
+
+
+
     }
 }
