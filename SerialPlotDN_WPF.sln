@@ -9,6 +9,8 @@ Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
 		Debug|x64 = Debug|x64
+		Performance|Any CPU = Performance|Any CPU
+		Performance|x64 = Performance|x64
 		Release|Any CPU = Release|Any CPU
 		Release|x64 = Release|x64
 	EndGlobalSection
@@ -17,6 +19,10 @@ Global
 		{F4ECDF66-36B7-4787-A258-EE2BEF88B49D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{F4ECDF66-36B7-4787-A258-EE2BEF88B49D}.Debug|x64.ActiveCfg = Debug|x64
 		{F4ECDF66-36B7-4787-A258-EE2BEF88B49D}.Debug|x64.Build.0 = Debug|x64
+		{F4ECDF66-36B7-4787-A258-EE2BEF88B49D}.Performance|Any CPU.ActiveCfg = Performance|Any CPU
+		{F4ECDF66-36B7-4787-A258-EE2BEF88B49D}.Performance|Any CPU.Build.0 = Performance|Any CPU
+		{F4ECDF66-36B7-4787-A258-EE2BEF88B49D}.Performance|x64.ActiveCfg = Performance|x64
+		{F4ECDF66-36B7-4787-A258-EE2BEF88B49D}.Performance|x64.Build.0 = Performance|x64
 		{F4ECDF66-36B7-4787-A258-EE2BEF88B49D}.Release|Any CPU.ActiveCfg = Release|x64
 		{F4ECDF66-36B7-4787-A258-EE2BEF88B49D}.Release|Any CPU.Build.0 = Release|x64
 		{F4ECDF66-36B7-4787-A258-EE2BEF88B49D}.Release|x64.ActiveCfg = Release|x64

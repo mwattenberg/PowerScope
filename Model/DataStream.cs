@@ -12,7 +12,8 @@ namespace SerialPlotDN_WPF.Model
         private readonly byte[] _workingBuffer;
 
         public enum Baudrates { Baud_9600 = 9600, Baud_19200 = 19200, Baud_57600 = 57600, Baud_115200 = 115200, Baud_256000 = 256000 };
-        public int TotalSamples { get; private set; }
+        public long TotalSamples { get; private set; }
+        public long TotalBits { get; private set; }
         private RingBuffer<double>[] ReceivedData { get; set; }
         private int[] _lastReadPositions;
         public bool IsRunning { get; private set; }
@@ -72,6 +73,7 @@ namespace SerialPlotDN_WPF.Model
                     {
                         int bytesToRead = Math.Min(bytesAvailable, MaxReadSize);
                         int bytesRead = _port.Read(_readBuffer, 0, bytesToRead);
+                        TotalBits = TotalBits + bytesRead * 8;
                         if (bytesRead > 0)
                         {
                             ProcessReceivedData(_readBuffer, bytesRead, _workingBuffer);
@@ -184,7 +186,7 @@ namespace SerialPlotDN_WPF.Model
             // Update total samples count (using first channel as reference)
             if (channelsToProcess > 0)
             {
-                TotalSamples = ReceivedData[0].Count;
+                TotalSamples = TotalSamples + parsedData[0].Length;
             }
         }
 

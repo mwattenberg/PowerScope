@@ -8,20 +8,20 @@
         xmlns:UserForms="clr-namespace:SerialPlotDN_WPF.View.UserForms"
         xmlns:local="clr-namespace:SerialPlotDN_WPF"
         mc:Ignorable="d"
-        Title="MainWindow" Height="450" Width="800"
+        Title="MainWindow" Height="850" Width="1600"
         Loaded="MainWindow_Loaded" Closing="closing"
         Background="{DynamicResource PlotSettings_BackgroundBrush}">
     <Grid Background="{DynamicResource PlotSettings_BackgroundBrush}">
         <Grid.RowDefinitions>
-            <RowDefinition Height="18"/>
+            <RowDefinition Height="22"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
-        <UserControls:MenuBar Grid.Row="0"/>
+        <UserControls:MenuBar Grid.Row="0" Height="Auto"/>
         <!-- Main content area -->
         <Grid Grid.Row="1" Background="{DynamicResource PlotSettings_BackgroundBrush}">
             <Grid.RowDefinitions>
                 <RowDefinition Height="*"/> <!-- DataStreamBar + Plot -->
-                <RowDefinition Height="Auto"/> <!-- ChannelControlBar -->
+                <RowDefinition Height="Auto"/> <!-- Bottom controls -->
             </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="150" MinWidth="150"/> <!-- DataStreamBar -->
@@ -36,9 +36,20 @@
                 <Button x:Name="Button_ConfigPlot" Panel.ZIndex="1" Height="20" Width="20" HorizontalAlignment="Right" VerticalAlignment="Top" Content="🔨" Margin="5,5,5,5" Click="Button_ConfigPlot_Click"/>
             </Grid>
             <!-- PlotAndMeasurementBar (right, full height) -->
-            <UserControls:PlotAndMeasurementBar Grid.Row="0" Grid.Column="2" Grid.RowSpan="2"/>
-            <!-- ChannelControlBar below both, with margin above -->
-            <UserControls:ChannelControlBar Grid.Row="1" Grid.ColumnSpan="2" Panel.ZIndex="2" x:Name="ChannelControlBar" MinHeight="110" Margin="10,5,0,0"/>
+            <UserControls:PlotAndMeasurementBar Grid.Row="0" Grid.Column="2" Grid.RowSpan="1"/>
+            <!-- Bottom controls bar spanning both left columns with space for 4 elements -->
+            <StackPanel Grid.Row="1" Grid.ColumnSpan="3" Orientation="Horizontal" 
+                       Panel.ZIndex="2" MinHeight="110" Margin="0,5,0,0"
+                       Background="{DynamicResource PlotSettings_BackgroundBrush}">
+                <!-- ChannelControlBar - takes available space -->
+                <UserControls:ChannelControlBar x:Name="ChannelControlBar" VerticalAlignment="Top"/>
+                <!-- HorizontalControl - fixed width -->
+                <UserControls:HorizontalControl x:Name="HorizontalControl" VerticalAlignment="Top" />
+                <!-- Placeholder for future element 1 -->
+                <UserControls:AquisitionControl x:Name="AquisitionControl" VerticalAlignment="Top" />
+                <!-- Placeholder for future element 2 -->
+                <UserControls:RunControl x:Name="RunControl" VerticalAlignment="Center" HorizontalAlignment="Right" />
+            </StackPanel>
         </Grid>
     </Grid>
 </Window>

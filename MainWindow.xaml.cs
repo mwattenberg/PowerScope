@@ -1,5 +1,8 @@
-﻿using System.ComponentModel;
+﻿using System;
+using System.ComponentModel;
+using System.Diagnostics;
 using System.IO;
+using System.Management;
 using System.Timers;
 using System.Windows;
 using System.Windows.Input;
@@ -22,9 +25,18 @@ namespace SerialPlotDN_WPF
         private readonly double[][] _linearizedDataArrays = new double[8][];
         // Timer for updating the plot at a fixed rate
         readonly private System.Timers.Timer _updatePlotTimer = new() { Interval = 33, Enabled = true, AutoReset = true }; // ~30 FPS
+        private readonly System.Timers.Timer _updateAquisitionTimer = new() { Interval = 1000, Enabled = true, AutoReset = true }; // 500 ms
         
+        private TimeSpan _prevCpuTime = TimeSpan.Zero;
+        private long _prevCpuStopwatchMs = 0;
+        private long _prevSampleCount = 0;
+        private long _totalBits = 0;
+
+        private readonly Stopwatch _cpuStopwatch = Stopwatch.StartNew();
+        
+
         // Configurable display settings - use DataStream's ring buffer capacity
-        public int DisplayElements { get; set; } = 10000; // Number of elements to display
+        public int DisplayElements { get; set; } = 3000; // Number of elements to display
         private readonly int _channelCount = 8;
 
         //Debug just data parsing and plotting
@@ -34,8 +46,6 @@ namespace SerialPlotDN_WPF
         {
             InitializeComponent();
 
-            
-            
             // Initialize pre-allocated arrays for efficient data copying
             for (int i = 0; i < _channelCount; i++)
             {
@@ -47,7 +57,7 @@ namespace SerialPlotDN_WPF
             InitTimer();
             InitializeChannelControlBar();
 
-            readSettingsXML(); // Load settings at startup
+            readSettingsXML(); 
         }
 
         private void InitializePlot()
@@ -55,7 +65,12 @@ namespace SerialPlotDN_WPF
             WpfPlot1.Plot.Clear();
             WpfPlot1.Plot.Add.Palette = new ScottPlot.Palettes.Category10();
 
-            
+            // Double the axis font size for all axes (ScottPlot v5+)
+            foreach (var axis in WpfPlot1.Plot.Axes.GetAxes())
+            {
+                axis.TickLabelStyle.FontSize *= 2;
+                axis.Label.FontSize *= 2;
+            }
 
             // Initialize Signal plottables with pre-allocated arrays
             for (int i = 0; i < _channelCount; i++)
@@ -70,7 +85,6 @@ namespace SerialPlotDN_WPF
                 _signals[i].LineStyle.AntiAlias = false;
             }
 
-            
             WpfPlot1.Plot.ShowLegend();
 
             // change figure colors
@@ -94,38 +108,25 @@ namespace SerialPlotDN_WPF
             // Set fixed axis limits to prevent auto scaling - show display window
             WpfPlot1.Plot.Axes.SetLimitsX(0, DisplayElements);
             WpfPlot1.Plot.Axes.SetLimitsY(-200, 4000); // Adjust Y range based on your data
-            WpfPlot1.Plot.Axes.Bottom.IsVisible = false;
+            WpfPlot1.Plot.Axes.Bottom.IsVisible = true;
         }
 
         private void InitializeChannelControlBar()
         {
-            // Clear any existing channels
-            ChannelControlBar.ChannelControls.Clear();
-
             // Create 8 channels with different colors
             for (int i = 0; i < 8; i++)
             {
-
-                // Ensure palette is initialized
-                ChannelControl  channel = new ChannelControl();
-
-                
-                // Set channel color using ScottPlot's default palette (same as plot)
+                ChannelControl channel = new ChannelControl();
                 var channelColor = _signals[i].Color;
-
                 var wpfColor = Color.FromArgb(channelColor.A,
-                                            channelColor.R,
-                                            channelColor.G,
-                                            channelColor.B);
-
-                // Configure the channel
+                                      channelColor.R,
+                                      channelColor.G,
+                                      channelColor.B);
                 channel.Color = wpfColor;
                 channel.SetChannelLabel($"CH{i + 1}");
-                channel.Gain = 1.0; // Default gain
-                channel.Offset = 0.0; // Default offset
-
-                // Add to the control bar
-                ChannelControlBar.AddChannel(channel);
+                channel.Gain = 1.0;
+                channel.Offset = 0.0;
+                ChannelControlBar.AddChannel(channel); // Direct access to ChannelControlBar
             }
         }
 
@@ -135,12 +136,17 @@ namespace SerialPlotDN_WPF
             byte[] startbytes = new byte[] { 0xAA, 0xAA };
             dataStream = new DataStream(sourceSetting, new DataParser(DataParser.BinaryFormat.uint16_t, _channelCount, startbytes));
             dataStream.Start();
+
+            AquisitionControl.Baudrate = sourceSetting.BaudRate;
+            
         }
 
         private void InitTimer()
         {
             _updatePlotTimer.Elapsed += UpdatePlot;
             _updatePlotTimer.Start();
+            _updateAquisitionTimer.Elapsed += UpdateAquisition;
+            _updateAquisitionTimer.Start();
         }
 
         private void UpdatePlot(object source, ElapsedEventArgs e)
@@ -172,8 +178,6 @@ namespace SerialPlotDN_WPF
 
         private void UpdateSignalPlots()
         {
-
-
             for (int channel = 0; channel < _channelCount; channel++)
             {
                 // Efficiently copy data to pre-allocated array without memory allocation
@@ -186,6 +190,52 @@ namespace SerialPlotDN_WPF
                     // automatically use the updated data when rendered
                 }
             }
+        }
+
+        private void UpdateAquisition(object sender, ElapsedEventArgs e)
+        {
+            // Ensure up-to-date data
+            var process = Process.GetCurrentProcess();
+            process.Refresh();
+            
+            //Update CPU usage
+            TimeSpan cpuTime = process.TotalProcessorTime;
+            long currentMs = _cpuStopwatch.ElapsedMilliseconds;           
+
+            double cpuUsedMs = (cpuTime - _prevCpuTime).TotalMilliseconds;
+            long elapsedMs = currentMs - _prevCpuStopwatchMs;
+
+            _prevCpuStopwatchMs = currentMs;
+            _prevCpuTime = cpuTime;
+
+            if (elapsedMs < _updateAquisitionTimer.Interval)
+                return; // Avoid division by zero if timer interval is too short
+
+            double cpuUsagePercent = (cpuUsedMs / (elapsedMs * Environment.ProcessorCount)) * 1000;
+
+            //Update memory usage
+            long memoryBytes = Process.GetCurrentProcess().WorkingSet64;
+            double memoryMB = memoryBytes / (1024.0 * 1024.0);
+
+            //Serial port samples
+            long samplesPerSecond = (dataStream.TotalSamples - _prevSampleCount) / (elapsedMs / 1000); 
+            _prevSampleCount = dataStream.TotalSamples;
+
+            //Bits per second
+            long bitsPerSecond = (dataStream.TotalBits - _totalBits) / (elapsedMs / 1000);
+            _totalBits = dataStream.TotalBits;
+
+            Application.Current.Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Normal, new Action(() =>
+            {
+                if (AquisitionControl != null && AquisitionControl.IsLoaded)
+                {
+                    // Update AquisitionControl
+                    AquisitionControl.TotalMemorySize = (long)memoryMB;
+                    AquisitionControl.CPULoad = cpuUsagePercent;
+                    AquisitionControl.SamplesPerSecond = samplesPerSecond;
+                    AquisitionControl.BitsPerSecond = bitsPerSecond;
+                }
+            }));
         }
 
         /// <summary>
@@ -244,6 +294,7 @@ namespace SerialPlotDN_WPF
         {
             writeSettingToXML(); // Save settings on exit
             _updatePlotTimer?.Stop();
+            _updateAquisitionTimer?.Stop();
             dataStream?.Dispose();
             base.OnClosed(e);
         }
@@ -251,18 +302,22 @@ namespace SerialPlotDN_WPF
         // Event handlers for XAML events
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
-            // Window loaded logic can go here
+            // Window loaded logic can go here if needed in the future
         }
 
         private void closing(object sender, CancelEventArgs e)
         {
+            _updateAquisitionTimer?.Stop();
             _updatePlotTimer?.Stop();
             dataStream?.Dispose();
         }
 
         private void WpfPlot1_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            // Left click logic can go here
+            // Restore default axis limits as in initialization
+            WpfPlot1.Plot.Axes.SetLimitsX(0, DisplayElements);
+            WpfPlot1.Plot.Axes.SetLimitsY(-200, 4000);
+            WpfPlot1.Refresh();
         }
 
         private void WpfPlot1_MouseRightButtonDown(object sender, MouseButtonEventArgs e)
@@ -270,6 +325,7 @@ namespace SerialPlotDN_WPF
             // Restore default axis limits as in initialization
             WpfPlot1.Plot.Axes.SetLimitsX(0, DisplayElements);
             WpfPlot1.Plot.Axes.SetLimitsY(-200, 4000);
+            WpfPlot1.Refresh();
         }
 
         private void Button_ConfigPlot_Click(object sender, RoutedEventArgs e)
@@ -277,7 +333,7 @@ namespace SerialPlotDN_WPF
             var settingsWindow = new View.UserForms.PlotSettingsWindow();
             int currentFPS = (int)(1000.0 / _updatePlotTimer.Interval);
             int currentLineWidth = (int)(_signals[0]?.LineWidth ?? 1);
-            bool currentAntiAliasing = _signals[0]?.LineStyle.AntiAlias ?? false;
+            bool currentAntiAliasing = _signals[0]?.LineStyle.AntiAlias ?? false; // Fixed property name
             settingsWindow.InitializeFromMainWindow(currentFPS, dataStream.SerialPortUpdateRateHz, currentLineWidth, currentAntiAliasing, WpfPlot1.Plot.Benchmark.IsVisible);
             settingsWindow.OnSettingsApplied += (settings) => ApplyPlotSettings(settings);
             settingsWindow.Show();

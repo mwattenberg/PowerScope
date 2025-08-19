@@ -6,7 +6,7 @@
         <!-- Use global button style -->
         <Style TargetType="Button">
             <Setter Property="Background" Value="{DynamicResource PlotSettings_TextBoxBackgroundBrush}"/>
-            <Setter Property="Foreground" Value="{DynamicResource PlotSettings_ButtonForegroundBrush}"/>
+            <Setter Property="Foreground" Value="White"/>
             <Setter Property="BorderBrush" Value="{DynamicResource PlotSettings_BorderBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="FontSize" Value="12"/>
@@ -33,7 +33,7 @@
         </Style>
         <!-- TextBox style for channel label -->
         <Style x:Key="ChannelLabelTextBoxStyle" TargetType="TextBox">
-            <Setter Property="Foreground" Value="{DynamicResource PlotSettings_LabelForegroundBrush}"/>
+            <Setter Property="Foreground" Value="White"/>
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="FontWeight" Value="Bold"/>
@@ -41,7 +41,7 @@
         </Style>
         <!-- TextBlock style for gain/offset -->
         <Style x:Key="GainOffsetTextStyle" TargetType="TextBlock">
-            <Setter Property="Foreground" Value="{DynamicResource PlotSettings_LabelForegroundBrush}"/>
+            <Setter Property="Foreground" Value="White"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="FontSize" Value="13"/>
             <Setter Property="HorizontalAlignment" Value="Center"/>

@@ -1,0 +1,40 @@
+﻿<UserControl x:Class="SerialPlotDN_WPF.View.UserControls.RunControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:SerialPlotDN_WPF.View.UserControls"
+             mc:Ignorable="d" 
+             d:DesignHeight="120" d:DesignWidth="100">
+    <Grid>
+        <StackPanel Orientation="Vertical" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="0">
+            <Button x:Name="RunButton" Content="Run" Height="36" Width="90" Foreground="White" FontWeight="Bold" Click="RunButton_Click" Margin="0,0,0,6">
+                <Button.Background>
+                    <SolidColorBrush Color="LimeGreen"/>
+                </Button.Background>
+                <Button.Template>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" CornerRadius="18" BorderThickness="0">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Button.Template>
+            </Button>
+            <Button x:Name="RecordButton" Height="36" Width="90" Background="#FFCC0000" Foreground="White" FontWeight="Bold" Click="RecordButton_Click" Margin="0">
+                <Button.Content>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <TextBlock Text="⬤" FontSize="14" Foreground="White" Margin="0,0,4,0" VerticalAlignment="Center"/>
+                        <TextBlock Text="Record" FontSize="14" Foreground="White" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button.Content>
+                <Button.Template>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" CornerRadius="18" BorderThickness="0">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Button.Template>
+            </Button>
+        </StackPanel>
+    </Grid>
+</UserControl>
