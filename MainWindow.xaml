@@ -9,10 +9,8 @@
         xmlns:local="clr-namespace:SerialPlotDN_WPF"
         mc:Ignorable="d"
         Title="Serial Plot Analyzer" Height="850" Width="1600"
-        Loaded="MainWindow_Loaded" 
         Closing="closing"
-        Background="{DynamicResource PlotSettings_BackgroundBrush}"
-        >
+        Background="{DynamicResource PlotSettings_BackgroundBrush}">
     <Grid Background="{DynamicResource PlotSettings_BackgroundBrush}">
         <Grid.RowDefinitions>
             <RowDefinition Height="22"/> <!-- Toolbar -->
