@@ -117,18 +117,27 @@ namespace SerialPlotDN_WPF.View.UserForms
         {
             get
             {
-                if (Radio_Databits8.IsChecked == true) return 8;
-                if (Radio_Databits7.IsChecked == true) return 7;
-                if (Radio_Databits6.IsChecked == true) return 6;
-                if (Radio_Databits5.IsChecked == true) return 5;
+                if (ComboBox_Databits.SelectedItem is ComboBoxItem item && int.TryParse(item.Content.ToString(), out int bits))
+                    return bits;
+                if (ComboBox_Databits.SelectedItem is string str && int.TryParse(str, out bits))
+                    return bits;
                 return 8; // Default
             }
             set
             {
-                Radio_Databits8.IsChecked = value == 8;
-                Radio_Databits7.IsChecked = value == 7;
-                Radio_Databits6.IsChecked = value == 6;
-                Radio_Databits5.IsChecked = value == 5;
+                foreach (var obj in ComboBox_Databits.Items)
+                {
+                    if (obj is ComboBoxItem item && int.TryParse(item.Content.ToString(), out int bits) && bits == value)
+                    {
+                        ComboBox_Databits.SelectedItem = item;
+                        return;
+                    }
+                    if (obj is string str && int.TryParse(str, out bits) && bits == value)
+                    {
+                        ComboBox_Databits.SelectedItem = obj;
+                        return;
+                    }
+                }
             }
         }
 
@@ -136,14 +145,27 @@ namespace SerialPlotDN_WPF.View.UserForms
         {
             get
             {
-                if (Radio_Stopbits1.IsChecked == true) return 1;
-                if (Radio_Stopbits2.IsChecked == true) return 2;
+                if (ComboBox_Stopbits.SelectedItem is ComboBoxItem item && int.TryParse(item.Content.ToString(), out int bits))
+                    return bits;
+                if (ComboBox_Stopbits.SelectedItem is string str && int.TryParse(str, out bits))
+                    return bits;
                 return 1; // Default
             }
             set
             {
-                Radio_Stopbits1.IsChecked = value == 1;
-                Radio_Stopbits2.IsChecked = value == 2;
+                foreach (var obj in ComboBox_Stopbits.Items)
+                {
+                    if (obj is ComboBoxItem item && int.TryParse(item.Content.ToString(), out int bits) && bits == value)
+                    {
+                        ComboBox_Stopbits.SelectedItem = item;
+                        return;
+                    }
+                    if (obj is string str && int.TryParse(str, out bits) && bits == value)
+                    {
+                        ComboBox_Stopbits.SelectedItem = obj;
+                        return;
+                    }
+                }
             }
         }
 
@@ -151,16 +173,41 @@ namespace SerialPlotDN_WPF.View.UserForms
         {
             get
             {
-                if (Radio_ParityNone.IsChecked == true) return Parity.None;
-                if (Radio_ParityOdd.IsChecked == true) return Parity.Odd;
-                if (Radio_ParityEven.IsChecked == true) return Parity.Even;
-                return Parity.None; // Default
+                string parityStr = null;
+                if (ComboBox_Parity.SelectedItem is ComboBoxItem item)
+                    parityStr = item.Content.ToString();
+                else if (ComboBox_Parity.SelectedItem is string str)
+                    parityStr = str;
+                return parityStr switch
+                {
+                    "None" => Parity.None,
+                    "Odd" => Parity.Odd,
+                    "Even" => Parity.Even,
+                    _ => Parity.None
+                };
             }
             set
             {
-                Radio_ParityNone.IsChecked = value == Parity.None;
-                Radio_ParityOdd.IsChecked = value == Parity.Odd;
-                Radio_ParityEven.IsChecked = value == Parity.Even;
+                string parityStr = value switch
+                {
+                    Parity.None => "None",
+                    Parity.Odd => "Odd",
+                    Parity.Even => "Even",
+                    _ => "None"
+                };
+                foreach (var obj in ComboBox_Parity.Items)
+                {
+                    if (obj is ComboBoxItem item && item.Content.ToString() == parityStr)
+                    {
+                        ComboBox_Parity.SelectedItem = item;
+                        return;
+                    }
+                    if (obj is string str && str == parityStr)
+                    {
+                        ComboBox_Parity.SelectedItem = obj;
+                        return;
+                    }
+                }
             }
         }
 

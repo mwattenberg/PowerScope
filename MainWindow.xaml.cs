@@ -28,12 +28,11 @@ namespace SerialPlotDN_WPF
         private readonly System.Timers.Timer _updateAquisitionTimer = new() { Interval = 1000, Enabled = true, AutoReset = true }; // 500 ms
         
         private TimeSpan _prevCpuTime = TimeSpan.Zero;
+        private readonly Stopwatch _cpuStopwatch = Stopwatch.StartNew();
         private long _prevCpuStopwatchMs = 0;
         private long _prevSampleCount = 0;
         private long _totalBits = 0;
-
-        private readonly Stopwatch _cpuStopwatch = Stopwatch.StartNew();
-        
+           
 
         // Configurable display settings - use DataStream's ring buffer capacity
         public int DisplayElements { get; set; } = 3000; // Number of elements to display
@@ -41,6 +40,10 @@ namespace SerialPlotDN_WPF
 
         //Debug just data parsing and plotting
         private DataStream dataStream;
+
+        // Y-axis range properties for plot
+        public int Ymin { get; set; } = -200;
+        public int Ymax { get; set; } = 4000;
 
         public MainWindow()
         {
@@ -57,8 +60,10 @@ namespace SerialPlotDN_WPF
             InitializeTimer();
             InitializeChannelControlBar();
             InitializeHorizontalControl();
+            InitializeVerticalControl();
             readSettingsXML();
             InitializeEventHandlers();
+            SetupPlotUserInput();
         }
 
         void InitializeHorizontalControl()
@@ -67,29 +72,51 @@ namespace SerialPlotDN_WPF
             HorizontalControl.BufferSize = 5000000; // Set initial buffer size
         }
 
+        void InitializeVerticalControl()
+        {
+            VerticalControl.Max = Ymax; // Set initial max value
+            VerticalControl.Min = Ymin; // Set initial min value
+                                        // 
+
+        }
+
         private void InitializeEventHandlers()
         {
             HorizontalControl.WindowSizeChanged += HorizontalControl_WindowSizeChanged;
             RunControl.RunStateChanged += RunControl_RunStateChanged;
+            VerticalControl.MinValueChanged += VerticalControl_MinValueChanged;
+            VerticalControl.MaxValueChanged += VerticalControl_MaxValueChanged;
+            VerticalControl.AutoScaleChanged += VerticalControl_AutoScaleChanged;
         }
 
         private void HorizontalControl_WindowSizeChanged(object? sender, int newSize)
         {
             DisplayElements = newSize;
-            _updatePlotTimer.Stop();
-
+            bool isRunning = _updatePlotTimer.Enabled;
+            if (_updatePlotTimer.Enabled)
+                _updatePlotTimer.Stop();
+            
             for (int i = 0; i < _channelCount; i++)
             {
                 var colorOld = _signals[i].Color;
+                var linewidthOld = _signals[i].LineWidth;
+                var antiAliasingOld = _signals[i].LineStyle.AntiAlias;
                 WpfPlot1.Plot.Remove(_signals[i]); // Remove old signals
                 _linearizedDataArrays[i] = new double[DisplayElements];
                 _signals[i] = WpfPlot1.Plot.Add.Signal(_linearizedDataArrays[i]);
                 _signals[i].Color = colorOld;
+                _signals[i].LineWidth = linewidthOld; // Reapply old line width
+                _signals[i].LineStyle.AntiAlias = antiAliasingOld; // Reapply old anti-aliasing setting
             }
             WpfPlot1.Plot.Axes.SetLimitsX(0, DisplayElements);
-            _updatePlotTimer.Start();
-
-            // Optionally, refresh plot or other UI
+            
+            if(isRunning ) 
+                _updatePlotTimer.Start();
+            else
+            {
+                UpdatePlot(null, null);
+            }
+                
         }
 
         private void RunControl_RunStateChanged(object? sender, RunControl.RunStates newState)
@@ -108,6 +135,29 @@ namespace SerialPlotDN_WPF
                 _updatePlotTimer.Stop();
                 _updateAquisitionTimer.Stop();
             }
+        }
+
+        private void VerticalControl_MinValueChanged(object? sender, int newMin)
+        {
+            Ymin = newMin;
+            WpfPlot1.Plot.Axes.SetLimitsY(Ymin, Ymax);
+            WpfPlot1.Refresh();
+        }
+
+        private void VerticalControl_MaxValueChanged(object? sender, int newMax)
+        {
+            Ymax = newMax;
+            WpfPlot1.Plot.Axes.SetLimitsY(Ymin, Ymax);
+            WpfPlot1.Refresh();
+        }
+
+        private void VerticalControl_AutoScaleChanged(object? sender, bool isAutoScale)
+        {
+            if (!isAutoScale)
+            {
+                WpfPlot1.Plot.Axes.SetLimitsY(Ymin, Ymax);
+            }
+            WpfPlot1.Refresh();
         }
 
         private void InitializePlot()
@@ -157,7 +207,7 @@ namespace SerialPlotDN_WPF
 
             // Set fixed axis limits to prevent auto scaling - show display window
             WpfPlot1.Plot.Axes.SetLimitsX(0, DisplayElements);
-            WpfPlot1.Plot.Axes.SetLimitsY(-200, 4000); // Adjust Y range based on your data
+            WpfPlot1.Plot.Axes.SetLimitsY(Ymin, Ymax); // Adjust Y range based on your data
             WpfPlot1.Plot.Axes.Bottom.IsVisible = true;
         }
 
@@ -173,7 +223,7 @@ namespace SerialPlotDN_WPF
                                       channelColor.G,
                                       channelColor.B);
                 channel.Color = wpfColor;
-                channel.SetChannelLabel($"CH{i + 1}");
+                channel.Label = $"CH{i + 1}";
                 channel.Gain = 1.0;
                 channel.Offset = 0.0;
                 ChannelControlBar.AddChannel(channel); // Direct access to ChannelControlBar
@@ -195,49 +245,24 @@ namespace SerialPlotDN_WPF
             _updateAquisitionTimer.Elapsed += UpdateAquisition;
         }
 
-        private void UpdatePlot(object source, ElapsedEventArgs e)
+        private void UpdatePlot(object? source, ElapsedEventArgs? e)
         {
-            bool hasNewData = false;
-
-            // Check if any channel has new data
-            for (int channel = 0; channel < _channelCount; channel++)
+            // Use Dispatcher.BeginInvoke for better performance
+            Application.Current.Dispatcher.BeginInvoke(() =>
             {
-                var newData = dataStream.GetNewData(channel);
-                if (newData.Any())
+                for (int channel = 0; channel < _channelCount; channel++)
                 {
-                    hasNewData = true;
-                    break; // No need to check other channels if we found new data
+                    // Efficiently copy data to pre-allocated array without memory allocation
+                   dataStream.CopyLatestDataTo(channel, _linearizedDataArrays[channel], DisplayElements);
                 }
-            }
+                if(VerticalControl.IsAutoScale)
+                    WpfPlot1.Plot.Axes.AutoScaleY();
 
-            // Only refresh if we have new data
-            if (hasNewData)
-            {
-                // Use Dispatcher.BeginInvoke for better performance
-                Application.Current.Dispatcher.BeginInvoke(() =>
-                {
-                    UpdateSignalPlots();
-                    
-                    WpfPlot1.Refresh();
-                }, System.Windows.Threading.DispatcherPriority.Render);
-            }
-        }
-
-        private void UpdateSignalPlots()
-        {
-            for (int channel = 0; channel < _channelCount; channel++)
-            {
-                // Efficiently copy data to pre-allocated array without memory allocation
-                int actualDataCount = dataStream.CopyLatestDataTo(channel, _linearizedDataArrays[channel], DisplayElements);
+                WpfPlot1.Refresh();
                 
-                if (actualDataCount > 0)
-                {
-                    // Signal plots are already connected to the pre-allocated arrays
-                    // Since the array data has been updated in-place, the Signal will 
-                    // automatically use the updated data when rendered
-                }
-            }
+            }, System.Windows.Threading.DispatcherPriority.Render);
         }
+
 
         private void UpdateAquisition(object sender, ElapsedEventArgs e)
         {
@@ -288,19 +313,31 @@ namespace SerialPlotDN_WPF
         /// <summary>
         /// Writes current plot settings to an XML file in the application directory.
         /// </summary>
-        private void writeSettingToXML()
+        private void writeSettingsToXML()
         {
+            var channelLabels = new XElement("ChannelLabels");
+            foreach (ChannelControl channel in ChannelControlBar.Channels)
+            {
+
+                channelLabels.Add(new XElement("Label", channel.Label));
+            }
+
             int plotUpdateRateFPS = (int)(1000.0 / _updatePlotTimer.Interval);
             int serialPortUpdateRateHz = dataStream?.SerialPortUpdateRateHz ?? 1000;
             int lineWidth = (int)(_signals[0]?.LineWidth ?? 1);
             bool antiAliasing = _signals[0]?.LineStyle.AntiAlias ?? false;
             bool showRenderTime = WpfPlot1.Plot.Benchmark.IsVisible;
+            bool autoScale = VerticalControl.IsAutoScale;
             var settingsXml = new XElement("PlotSettings",
                 new XElement("PlotUpdateRateFPS", plotUpdateRateFPS),
                 new XElement("SerialPortUpdateRateHz", serialPortUpdateRateHz),
                 new XElement("LineWidth", lineWidth),
                 new XElement("AntiAliasing", antiAliasing),
-                new XElement("ShowRenderTime", showRenderTime)
+                new XElement("ShowRenderTime", showRenderTime),
+                new XElement("Ymin", Ymin),
+                new XElement("Ymax", Ymax),
+                new XElement("AutoScale", autoScale),
+                channelLabels
             );
             string filePath = Path.Combine(Directory.GetCurrentDirectory(), "Settings.xml");
             settingsXml.Save(filePath);
@@ -315,12 +352,22 @@ namespace SerialPlotDN_WPF
             if (!File.Exists(filePath)) return;
             try
             {
+
+
                 var settingsXml = XElement.Load(filePath);
                 int plotUpdateRateFPS = int.Parse(settingsXml.Element("PlotUpdateRateFPS")?.Value ?? "30");
                 int serialPortUpdateRateHz = int.Parse(settingsXml.Element("SerialPortUpdateRateHz")?.Value ?? "1000");
                 int lineWidth = int.Parse(settingsXml.Element("LineWidth")?.Value ?? "1");
                 bool antiAliasing = bool.Parse(settingsXml.Element("AntiAliasing")?.Value ?? "false");
                 bool showRenderTime = bool.Parse(settingsXml.Element("ShowRenderTime")?.Value ?? "false");
+                int yMin = int.Parse(settingsXml.Element("Ymin")?.Value ?? "-200");
+                int yMax = int.Parse(settingsXml.Element("Ymax")?.Value ?? "4000");
+                bool autoScale = bool.Parse(settingsXml.Element("AutoScale")?.Value ?? "true");
+                Ymin = yMin;
+                Ymax = yMax;
+                VerticalControl.Min = Ymin;
+                VerticalControl.Max = Ymax;
+                VerticalControl.IsAutoScale = autoScale;
                 _updatePlotTimer.Interval = 1000.0 / plotUpdateRateFPS;
                 if (dataStream != null)
                     dataStream.SerialPortUpdateRateHz = serialPortUpdateRateHz;
@@ -333,13 +380,29 @@ namespace SerialPlotDN_WPF
                     }
                 }
                 WpfPlot1.Plot.Benchmark.IsVisible = showRenderTime;
+                WpfPlot1.Plot.Axes.SetLimitsY(Ymin, Ymax);
+
+                var channelLabelElement = settingsXml.Element("ChannelLabels");
+                if (channelLabelElement != null)
+                {
+                    var labelElements = channelLabelElement.Elements("Label").ToList();
+                    int i = 0;
+                    foreach (ChannelControl channel in ChannelControlBar.Channels)
+                    {
+                        if (i < labelElements.Count)
+                        {
+                            channel.Label = labelElements[i].Value;
+                        }
+                        i++;
+                    }
+                }
             }
             catch { /* Ignore errors and use defaults */ }
         }
 
         protected override void OnClosed(EventArgs e)
         {
-            writeSettingToXML(); // Save settings on exit
+            writeSettingsToXML(); // Save settings on exit
             _updatePlotTimer?.Stop();
             _updateAquisitionTimer?.Stop();
             dataStream?.Dispose();
@@ -363,7 +426,7 @@ namespace SerialPlotDN_WPF
         {
             // Restore default axis limits as in initialization
             WpfPlot1.Plot.Axes.SetLimitsX(0, DisplayElements);
-            WpfPlot1.Plot.Axes.SetLimitsY(-200, 4000);
+            WpfPlot1.Plot.Axes.SetLimitsY(Ymin, Ymax);
             WpfPlot1.Refresh();
         }
 
@@ -371,7 +434,7 @@ namespace SerialPlotDN_WPF
         {
             // Restore default axis limits as in initialization
             WpfPlot1.Plot.Axes.SetLimitsX(0, DisplayElements);
-            WpfPlot1.Plot.Axes.SetLimitsY(-200, 4000);
+            WpfPlot1.Plot.Axes.SetLimitsY(Ymin, Ymax);
             WpfPlot1.Refresh();
         }
 
@@ -385,6 +448,20 @@ namespace SerialPlotDN_WPF
             settingsWindow.OnSettingsApplied += (settings) => ApplyPlotSettings(settings);
             settingsWindow.Show();
         }
+
+        private void SetupPlotUserInput()
+        {  
+            WpfPlot1.UserInputProcessor.Reset();
+            WpfPlot1.UserInputProcessor.IsEnabled = false;
+
+            // right-click-drag zoom rectangle
+            var zoomRectangleButton = ScottPlot.Interactivity.StandardMouseButtons.Right;
+            var zoomRectangleResponse = new ScottPlot.Interactivity.UserActionResponses.MouseDragZoomRectangle(zoomRectangleButton);
+            WpfPlot1.UserInputProcessor.UserActionResponses.Add(zoomRectangleResponse);
+        }
+
+
+
 
         private void ApplyPlotSettings(View.UserForms.PlotSettingsWindow settings)
         {
@@ -401,6 +478,16 @@ namespace SerialPlotDN_WPF
             }
             WpfPlot1.Plot.Benchmark.IsVisible = settings.ShowRenderTime;
             WpfPlot1.Refresh();
+        }
+
+        private void Scrollbar_ValueChanged(object sender, System.Windows.Controls.Primitives.ScrollEventArgs e)
+        {
+            double test = e.NewValue;
+        }
+
+        private void WpfPlot1_MouseDoubleCLick(object sender, MouseButtonEventArgs e)
+        {
+
         }
     }
 }

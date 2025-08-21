@@ -282,53 +282,65 @@
                         Click="CloseButton_Click"
                         ToolTip="Close"/>
             </Grid>
-            <!-- Header -->
-            <TextBlock Grid.Row="1" Text="Configure serial port settings and data format" 
-                       FontSize="12" 
-                       Foreground="{DynamicResource PlotSettings_HeaderForegroundBrush}" 
-                       Margin="20,15,20,5"/>
+
             <!-- Content Area -->
             <DockPanel Grid.Row="2" Margin="10,10,10,0">
                 <!-- Tab Control -->
                 <TabControl>
                     <!-- Port Tab -->
-                    <TabItem Header="Port">
-                        <StackPanel Margin="10" VerticalAlignment="Top">
+                    <TabItem Header="Serial">
+                        <Grid Margin="10" VerticalAlignment="Top">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="80" />
+                                <ColumnDefinition Width="200" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="5" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="5" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="5" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="5" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
                             <!-- Port -->
-                            <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-                                <Label Content="Port:" Width="80"/>
-                                <ComboBox x:Name="ComboBox_Port" Width="200" />
-                            </StackPanel>
+                            <Label Grid.Row="0" Grid.Column="0" Content="Port:" VerticalAlignment="Center" />
+                            <ComboBox x:Name="ComboBox_Port" Grid.Row="0" Grid.Column="1" Width="200" />
+                            <!-- Spacer -->
+                            <Rectangle Grid.Row="1" Grid.ColumnSpan="2" Height="5" Fill="Transparent" />
                             <!-- Baud -->
-                            <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-                                <Label Content="Baud:" Width="80"/>
-                                <ComboBox x:Name="ComboBox_Baud" Width="200" IsEditable="True"/>
-                            </StackPanel>
-                            <!-- Databits, Stop bits, Parity horizontally -->
-                            <StackPanel Orientation="Horizontal" Margin="0,0,0,0" HorizontalAlignment="Left">
-                                <!-- Databits -->
-                                <StackPanel Margin="0,0,20,0">
-                                    <Label Content="Databits:"/>
-                                    <RadioButton x:Name="Radio_Databits8" Content="8 bits" GroupName="Databits" IsChecked="True"/>
-                                    <RadioButton x:Name="Radio_Databits7" Content="7 bits" GroupName="Databits"/>
-                                    <RadioButton x:Name="Radio_Databits6" Content="6 bits" GroupName="Databits"/>
-                                    <RadioButton x:Name="Radio_Databits5" Content="5 bits" GroupName="Databits"/>
-                                </StackPanel>
-                                <!-- Stop bits -->
-                                <StackPanel Margin="0,0,20,0">
-                                    <Label Content="Stop bits:"/>
-                                    <RadioButton x:Name="Radio_Stopbits1" Content="1 bit" GroupName="Stopbits" IsChecked="True"/>
-                                    <RadioButton x:Name="Radio_Stopbits2" Content="2 bits" GroupName="Stopbits"/>
-                                </StackPanel>
-                                <!-- Parity -->
-                                <StackPanel>
-                                    <Label Content="Parity:"/>
-                                    <RadioButton x:Name="Radio_ParityNone" Content="None" GroupName="Parity" IsChecked="True"/>
-                                    <RadioButton x:Name="Radio_ParityOdd" Content="Odd" GroupName="Parity"/>
-                                    <RadioButton x:Name="Radio_ParityEven" Content="Even" GroupName="Parity"/>
-                                </StackPanel>
-                            </StackPanel>
-                        </StackPanel>
+                            <Label Grid.Row="2" Grid.Column="0" Content="Baud:" VerticalAlignment="Center" />
+                            <ComboBox x:Name="ComboBox_Baud" Grid.Row="2" Grid.Column="1" Width="200" IsEditable="True" />
+                            <!-- Spacer -->
+                            <Rectangle Grid.Row="3" Grid.ColumnSpan="2" Height="5" Fill="Transparent" />
+                            <!-- Databits -->
+                            <Label Grid.Row="4" Grid.Column="0" Content="Databits:" VerticalAlignment="Center" />
+                            <ComboBox x:Name="ComboBox_Databits" Grid.Row="4" Grid.Column="1" Width="200">
+                                <ComboBoxItem Content="8" IsSelected="True"/>
+                                <ComboBoxItem Content="7"/>
+                                <ComboBoxItem Content="6"/>
+                                <ComboBoxItem Content="5"/>
+                            </ComboBox>
+                            <!-- Spacer -->
+                            <Rectangle Grid.Row="5" Grid.ColumnSpan="2" Height="5" Fill="Transparent" />
+                            <!-- Stop bits -->
+                            <Label Grid.Row="6" Grid.Column="0" Content="Stop bits:" VerticalAlignment="Center" />
+                            <ComboBox x:Name="ComboBox_Stopbits" Grid.Row="6" Grid.Column="1" Width="200">
+                                <ComboBoxItem Content="1" IsSelected="True"/>
+                                <ComboBoxItem Content="2"/>
+                            </ComboBox>
+                            <!-- Spacer -->
+                            <Rectangle Grid.Row="7" Grid.ColumnSpan="2" Height="5" Fill="Transparent" />
+                            <!-- Parity -->
+                            <Label Grid.Row="8" Grid.Column="0" Content="Parity:" VerticalAlignment="Center" />
+                            <ComboBox x:Name="ComboBox_Parity" Grid.Row="8" Grid.Column="1" Width="200">
+                                <ComboBoxItem Content="None" IsSelected="True"/>
+                                <ComboBoxItem Content="Odd"/>
+                                <ComboBoxItem Content="Even"/>
+                            </ComboBox>
+                        </Grid>
                     </TabItem>
                     <!-- Dataformat Tab -->
                     <TabItem Header="Dataformat" Height="28" VerticalAlignment="Top">
@@ -353,16 +365,23 @@
                                         <xctk:IntegerUpDown x:Name="NumChannelsUpDown" Width="60" Minimum="1" Maximum="32" Value="1"/>
                                     </StackPanel>
                                     <Label Content="Number Type:"/>
-                                    <StackPanel Margin="20,0,0,10">
-                                        <RadioButton x:Name="Radio_Uint8" Content="Uint8" GroupName="NumberType" IsChecked="True"/>
-                                        <RadioButton x:Name="Radio_Uint16" Content="Uint16" GroupName="NumberType"/>
-                                        <RadioButton x:Name="Radio_Uint32" Content="Uint32" GroupName="NumberType"/>
-                                        <RadioButton x:Name="Radio_Int8" Content="Int8" GroupName="NumberType"/>
-                                        <RadioButton x:Name="Radio_Int16" Content="Int16" GroupName="NumberType"/>
-                                        <RadioButton x:Name="Radio_Int32" Content="Int32" GroupName="NumberType"/>
-                                        <RadioButton x:Name="Radio_Float" Content="Float" GroupName="NumberType"/>
-                                        <RadioButton x:Name="Radio_Double" Content="Double" GroupName="NumberType"/>
-                                    </StackPanel>
+                                    <Grid Margin="20,0,0,10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="100"/>
+                                            <ColumnDefinition Width="100"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <RadioButton x:Name="Radio_Uint8" Content="Uint8" GroupName="NumberType" IsChecked="True"/>
+                                            <RadioButton x:Name="Radio_Uint16" Content="Uint16" GroupName="NumberType"/>
+                                            <RadioButton x:Name="Radio_Uint32" Content="Uint32" GroupName="NumberType"/>
+                                            <RadioButton x:Name="Radio_Float" Content="Float" GroupName="NumberType"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1">
+                                            <RadioButton x:Name="Radio_Int8" Content="Int8" GroupName="NumberType"/>
+                                            <RadioButton x:Name="Radio_Int16" Content="Int16" GroupName="NumberType"/>
+                                            <RadioButton x:Name="Radio_Int32" Content="Int32" GroupName="NumberType"/>
+                                        </StackPanel>
+                                    </Grid>
                                     <Label Content="Endianness:"/>
                                     <StackPanel Orientation="Horizontal" Margin="20,0,0,0">
                                         <RadioButton x:Name="Radio_LittleEndian" Content="Little Endian" GroupName="Endian" IsChecked="True"/>
@@ -389,16 +408,23 @@
                                         <xctk:IntegerUpDown x:Name="NumChannelsUpDown_Custom" Width="60" Minimum="1" Maximum="32" Value="1"/>
                                     </StackPanel>
                                     <Label Content="Number Type:"/>
-                                    <StackPanel Margin="20,0,0,10">
-                                        <RadioButton x:Name="Radio_Uint8_Custom" Content="Uint8" GroupName="NumberTypeCustom" IsChecked="True"/>
-                                        <RadioButton x:Name="Radio_Uint16_Custom" Content="Uint16" GroupName="NumberTypeCustom"/>
-                                        <RadioButton x:Name="Radio_Uint32_Custom" Content="Uint32" GroupName="NumberTypeCustom"/>
-                                        <RadioButton x:Name="Radio_Int8_Custom" Content="Int8" GroupName="NumberTypeCustom"/>
-                                        <RadioButton x:Name="Radio_Int16_Custom" Content="Int16" GroupName="NumberTypeCustom"/>
-                                        <RadioButton x:Name="Radio_Int32_Custom" Content="Int32" GroupName="NumberTypeCustom"/>
-                                        <RadioButton x:Name="Radio_Float_Custom" Content="Float" GroupName="NumberTypeCustom"/>
-                                        <RadioButton x:Name="Radio_Double_Custom" Content="Double" GroupName="NumberTypeCustom"/>
-                                    </StackPanel>
+                                    <Grid Margin="20,0,0,10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="100"/>
+                                            <ColumnDefinition Width="100"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <RadioButton x:Name="Radio_Uint8_Custom" Content="Uint8" GroupName="NumberTypeCustom" IsChecked="True"/>
+                                            <RadioButton x:Name="Radio_Uint16_Custom" Content="Uint16" GroupName="NumberTypeCustom"/>
+                                            <RadioButton x:Name="Radio_Uint32_Custom" Content="Uint32" GroupName="NumberTypeCustom"/>
+                                            <RadioButton x:Name="Radio_Float_Custom" Content="Float" GroupName="NumberTypeCustom"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1">
+                                            <RadioButton x:Name="Radio_Int8_Custom" Content="Int8" GroupName="NumberTypeCustom"/>
+                                            <RadioButton x:Name="Radio_Int16_Custom" Content="Int16" GroupName="NumberTypeCustom"/>
+                                            <RadioButton x:Name="Radio_Int32_Custom" Content="Int32" GroupName="NumberTypeCustom"/>
+                                        </StackPanel>
+                                    </Grid>
                                     <Label Content="Endianness:"/>
                                     <StackPanel Orientation="Horizontal" Margin="20,0,0,10">
                                         <RadioButton x:Name="Radio_LittleEndian_Custom" Content="Little Endian" GroupName="EndianCustom" IsChecked="True"/>

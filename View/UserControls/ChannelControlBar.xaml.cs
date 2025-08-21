@@ -8,24 +8,24 @@ namespace SerialPlotDN_WPF.View.UserControls
     /// </summary>
     public partial class ChannelControlBar : UserControl
     {
-        public ObservableCollection<ChannelControl> ChannelControls { get; } = new();
+        public ObservableCollection<ChannelControl> Channels { get; } = new();
 
         public ChannelControlBar()
         {
             InitializeComponent();
-            ChannelItemsControl.ItemsSource = ChannelControls;
+            ChannelItemsControl.ItemsSource = Channels;
         }
 
         // Helper to add a channel control
         public void AddChannel(ChannelControl control)
         {
-            ChannelControls.Add(control);
+            Channels.Add(control);
         }
 
         // Helper to remove a channel control
         public void RemoveChannel(ChannelControl control)
         {
-            ChannelControls.Remove(control);
+            Channels.Remove(control);
         }
     }
 }

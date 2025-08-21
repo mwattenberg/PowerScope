@@ -34,7 +34,7 @@ namespace SerialPlotDN_WPF.View.UserControls
             get => _windowSize;
             set
             {
-                _windowSize = Math.Clamp(value,100,this._bufferSize);
+                _windowSize = value;
                 WindowSizeTextBox.Text = value.ToString();
                 WindowSizeChanged?.Invoke(this, value);
             }
@@ -48,13 +48,13 @@ namespace SerialPlotDN_WPF.View.UserControls
         private void ButtonGrow_Click(object sender, RoutedEventArgs e)
         {
             // Double the window size
-            this.WindowSize = Math.Min(WindowSize * 2, 100000); // Cap at 100,000 to prevent overflow
+            this.WindowSize = Math.Min(WindowSize * 2, BufferSize); // Cap at 100,000 to prevent overflow
         }
 
         private void ButtonShrink_Click(object sender, RoutedEventArgs e)
         {
             // Halve the window size (divide by 2)
-            this.WindowSize = Math.Max(WindowSize / 2, 1); // Minimum value of 1
+            this.WindowSize = Math.Max(WindowSize / 2, 128); // Minimum value of 1
         }
 
         private void BufferSizeTextBox_TextChanged(object sender, TextChangedEventArgs e)

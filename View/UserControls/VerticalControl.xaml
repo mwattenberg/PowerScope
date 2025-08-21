@@ -1,14 +1,12 @@
-﻿<UserControl x:Class="SerialPlotDN_WPF.View.UserControls.HorizontalControl"
+﻿<UserControl x:Class="SerialPlotDN_WPF.View.UserControls.VerticalControl"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:SerialPlotDN_WPF.View.UserControls"
              mc:Ignorable="d" 
-             Width="280" Height="150">
-    
+             Width="150" Height="150">
     <UserControl.Resources>
-        <!-- Button style matching ChannelControl -->
         <Style TargetType="Button">
             <Setter Property="Background" Value="{DynamicResource PlotSettings_TextBoxBackgroundBrush}"/>
             <Setter Property="Foreground" Value="White"/>
@@ -36,9 +34,7 @@
                 </Setter.Value>
             </Setter>
         </Style>
-        
-        <!-- TextBox style for horizontal label -->
-        <Style x:Key="HorizontalLabelTextBoxStyle" TargetType="TextBox">
+        <Style x:Key="VerticalLabelTextBoxStyle" TargetType="TextBox">
             <Setter Property="Foreground" Value="White"/>
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderThickness" Value="0"/>
@@ -48,73 +44,59 @@
             <Setter Property="VerticalContentAlignment" Value="Center"/>
             <Setter Property="FontSize" Value="14"/>
         </Style>
-        
-        <!-- TextBox style for input fields -->
         <Style x:Key="InputTextBoxStyle" TargetType="TextBox">
             <Setter Property="Foreground" Value="White"/>
             <Setter Property="Background" Value="{DynamicResource PlotSettings_TextBoxBackgroundBrush}"/>
             <Setter Property="BorderBrush" Value="{DynamicResource PlotSettings_BorderBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="FontSize" Value="12"/>
-            <Setter Property="TextAlignment" Value="Center"/>
+            <Setter Property="TextAlignment" Value="Right"/>
             <Setter Property="Padding" Value="2"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
         </Style>
-        
-        <!-- Label style -->
         <Style x:Key="LabelTextStyle" TargetType="TextBlock">
             <Setter Property="Foreground" Value="White"/>
             <Setter Property="FontSize" Value="12"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
             <Setter Property="Margin" Value="5,0,5,0"/>
         </Style>
     </UserControl.Resources>
-    
     <Border Height="Auto" Background="{DynamicResource PlotSettings_BackgroundBrush}" CornerRadius="5"
             BorderBrush="{DynamicResource PlotSettings_BorderBrush}" BorderThickness="1">
-        <Grid x:Name="RootGrid" Background="{DynamicResource PlotSettings_BackgroundBrush}">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="32"/>  <!-- Top color bar -->
-                <RowDefinition Height="40"/>  <!-- Buttons -->
-                <RowDefinition Height="*"/>  <!-- Window Size row -->
-                <RowDefinition Height="*"/>  <!-- Buffer Size row -->
-            </Grid.RowDefinitions>
-            
-            <!-- Top color bar with dark grey background and "Horizontal" label -->
-            <Border x:Name="TopColorBar" Grid.Row="0" Background="Gray" CornerRadius="2" Height="20" Margin="2">
-                <TextBox x:Name="HorizontalLabelTextBox" Text="Horizontal" Style="{StaticResource HorizontalLabelTextBoxStyle}"/>
+        <StackPanel Orientation="Vertical" Margin="10">
+            <!-- Top color bar with "Vertical" label -->
+            <Border Background="Gray" CornerRadius="2" Height="20" Margin="0,0,0,10">
+                <TextBox x:Name="VerticalLabelTextBox" Text="Vertical" Style="{StaticResource VerticalLabelTextBoxStyle}"/>
             </Border>
-            
-            <!-- Two wider buttons with "~~" and "~" text -->
-            <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="2">
-                <Button x:Name="ButtonGrow" VerticalAlignment="Center" Width="120" Height="25" Margin="5" Content="~~" FontSize="18" FontWeight="Bold" Click="ButtonGrow_Click"/>
-                <Button x:Name="ButtonShrink" VerticalAlignment="Center" Width="120" Height="25" Margin="5" Content="~" FontSize="18" FontWeight="Bold" Click="ButtonShrink_Click"/>
-            </StackPanel>
-            
-            <!-- Window Size row with label on left and textbox on right -->
-            <Grid Grid.Row="2" Margin="5,2,5,2">
+            <!-- Max row -->
+            <Grid Margin="0,0,0,5">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="80"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="Max:" Style="{StaticResource LabelTextStyle}" VerticalAlignment="Center"/>
+                <TextBox Grid.Column="1" x:Name="MaxTextBox" Style="{StaticResource InputTextBoxStyle}" Width="80" HorizontalAlignment="Right" TextChanged="MaxTextBox_TextChanged"/>
+            </Grid>
+            <!-- Min row -->
+            <Grid Margin="0,0,0,5">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="80"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="Min:" Style="{StaticResource LabelTextStyle}" VerticalAlignment="Center"/>
+                <TextBox Grid.Column="1" x:Name="MinTextBox" Style="{StaticResource InputTextBoxStyle}" Width="80" HorizontalAlignment="Right" TextChanged="MinTextBox_TextChanged"/>
+            </Grid>
+            <!-- Auto Scale row -->
+            <Grid Margin="0,5,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="70"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
-                
-                <TextBlock Grid.Column="0" Text="Default Window Size:" Style="{StaticResource LabelTextStyle}"/>
-                <TextBox Grid.Column="1" x:Name="WindowSizeTextBox" Style="{StaticResource InputTextBoxStyle}" 
-                         Text="500" Width="120" HorizontalAlignment="Right" Margin="5,0,0,0"/>
+                <TextBlock Grid.Column="0" Text="Auto Scale" Style="{StaticResource LabelTextStyle}" VerticalAlignment="Center"/>
+                <CheckBox Grid.Column="1" x:Name="AutoScaleCheckBox" Foreground="White" FontSize="12" HorizontalAlignment="Right" Margin="10,0,0,0" Click="AutoScaleCheckBox_CheckedChanged" />
             </Grid>
-            
-            <!-- Buffer Size row with label on left and textbox on right -->
-            <Grid Grid.Row="3" Margin="5,2,5,2">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-                
-                <TextBlock Grid.Column="0" Text="Buffer Size:" Style="{StaticResource LabelTextStyle}"/>
-                <TextBox Grid.Column="1" x:Name="BufferSizeTextBox" Style="{StaticResource InputTextBoxStyle}" 
-                         Text="1000" Width="120" HorizontalAlignment="Right" Margin="5,0,0,0" TextChanged="BufferSizeTextBox_TextChanged"/>
-            </Grid>
-        </Grid>
+        </StackPanel>
     </Border>
 </UserControl>

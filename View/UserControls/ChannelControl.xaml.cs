@@ -27,13 +27,49 @@ namespace SerialPlotDN_WPF.View.UserControls
         private static readonly Color DisabledColor = Colors.Gray;
         private static readonly Brush SelectedBrush = new SolidColorBrush(Colors.LimeGreen);
         private static readonly Brush DefaultBrush = new SolidColorBrush(DisabledColor);
-        private bool _isEnabled = true;
+       
         
         public double _gain = 1.0;
         public double _offset = 0.0;
         private CouplingMode _coupling;
         private FilterMode _filter;
+
         private Color _color;
+        public Color Color
+        {
+            get => _color;
+            set
+            {
+                _color = value;
+                UpdateColorBarBackground();
+            }
+        }
+
+        private bool _isEnabled = true;
+        public bool IsEnabled
+        {
+            get => _isEnabled;
+            set
+            {
+                _isEnabled = value;
+                UpdateColorBarBackground();
+                ChannelEnabledChanged?.Invoke(this, new RoutedEventArgs());
+            }
+        }
+
+        public string Label
+        {
+            get => ChannelLabelTextBox.Text;
+            set
+            {
+                if (ChannelLabelTextBox.Text != value)
+                {
+                    ChannelLabelTextBox.Text = value;
+                    if (ChannelLabelTextBox != null)
+                        ChannelLabelTextBox.Text = ChannelLabelTextBox.Text;
+                }
+            }
+        }
 
         // Events
         public event RoutedEventHandler? ChannelEnabledChanged;
@@ -46,6 +82,7 @@ namespace SerialPlotDN_WPF.View.UserControls
             this.Coupling = CouplingMode.DC; // Default mode
             this.Filter = FilterMode.None; // Default filter mode
             this.Color = Colors.Gray; // Default color
+            this.Label = "Channel"; // Default label
         }
 
         public CouplingMode Coupling
@@ -103,35 +140,6 @@ namespace SerialPlotDN_WPF.View.UserControls
             }
         }
 
-        // Set the top color bar
-        public Color Color
-        {
-            get => _color;
-            set
-            {
-                _color = value;
-                UpdateColorBarBackground();
-            }             
-        }
-
-        // Set the channel label
-        public void SetChannelLabel(string label)
-        {
-            ChannelLabelTextBox.Text = label;
-        }
-
-        // Get/set channel enabled state
-        public bool IsEnabled
-        {
-            get => _isEnabled;
-            set
-            {
-                _isEnabled = value;
-                UpdateColorBarBackground();
-                ChannelEnabledChanged?.Invoke(this, new RoutedEventArgs());
-            }
-        }
-
         // Gain property
         public double Gain
         {
@@ -154,6 +162,8 @@ namespace SerialPlotDN_WPF.View.UserControls
                 UpdateGainOffsetDisplay();
             }
         }
+
+
 
         private void UpdateColorBarBackground()
         {
@@ -180,12 +190,12 @@ namespace SerialPlotDN_WPF.View.UserControls
 
         private void ButtonGainUp_Click(object sender, RoutedEventArgs e)
         {
-            Gain += 0.1; // Increment gain by 0.1
+            Gain = Math.Min(Gain * 2,16); // Increment gain by 0.1
         }
 
         private void ButtonGainDown_Click(object sender, RoutedEventArgs e)
         {
-            Gain = Math.Max(0.1, Gain - 0.1); // Decrement gain by 0.1, minimum 0.1
+            Gain = Math.Max(Gain/ 2, 0.125); // Decrement gain by 0.1, minimum 0.1
         }
 
         private void CouplingMode_Click(object sender, RoutedEventArgs e)
