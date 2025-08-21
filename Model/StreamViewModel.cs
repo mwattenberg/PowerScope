@@ -21,9 +21,31 @@ namespace SerialPlotDN_WPF.Model
         private string audioDevice;
         private int audioDeviceIndex;
         private int sampleRate;
+        private bool enableChecksum;
 
         // Dataformat Tab properties
-        private string format; // "SimpleBinary", "ASCII", "CustomFrame"
+        private bool _isRawBinary;
+        public bool IsRawBinary
+        {
+            get => _isRawBinary;
+            set
+            {
+                if (_isRawBinary != value)
+                {
+                    _isRawBinary = value;
+                    OnPropertyChanged(nameof(IsRawBinary));
+                    OnPropertyChanged(nameof(IsASCII));
+                }
+            }
+        }
+        public bool IsASCII
+        {
+            get => !_isRawBinary;
+            set
+            {
+                IsRawBinary = !value;
+            }
+        }
         private int numberOfChannels;
         private string numberType; // "Uint8", "Uint16", etc.
         private string endianness; // "LittleEndian", "BigEndian"
@@ -112,6 +134,12 @@ namespace SerialPlotDN_WPF.Model
             }
         }
 
+        public bool EnableChecksum
+        {
+            get => enableChecksum;
+            set { enableChecksum = value; OnPropertyChanged(nameof(EnableChecksum)); }
+        }
+
         public bool IsConnected
         {
             get { return isConnected; }
@@ -135,11 +163,6 @@ namespace SerialPlotDN_WPF.Model
 
         public string PortAndBaudDisplay => $"Port: {Port}\nBaud: {Baud}";
 
-        public string Format
-        {
-            get => format;
-            set { format = value; OnPropertyChanged(nameof(Format)); }
-        }
         public int NumberOfChannels
         {
             get => numberOfChannels;

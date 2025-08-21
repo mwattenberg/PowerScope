@@ -28,20 +28,18 @@ namespace SerialPlotDN_WPF.View.UserControls
 
         private void Button_AddStream_Click(object sender, RoutedEventArgs e)
         {
-            var configWindow = new SerialConfigWindow();
-            
+            var vm = new DataStreamViewModel();
+            var configWindow = new SerialConfigWindow(vm);
             if (configWindow.ShowDialog() == true)
             {
                 var manager = new DataStreamManager();
                 DataStreamManagers.Add(manager);
-                var vm = manager.AddStream(configWindow.SelectedPort, configWindow.SelectedBaud);
-
+                manager.StreamViewModels.Add(vm);
                 var panel = new StreamInfoPanel
                 {
                     DataContext = vm,
                     Manager = manager
                 };
-
                 Panel_Streams.Children.Add(panel);
             }
         }

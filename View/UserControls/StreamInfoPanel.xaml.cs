@@ -19,14 +19,11 @@ namespace SerialPlotDN_WPF.View.UserControls
 
         private void Button_Configure_Click(object sender, RoutedEventArgs e)
         {
-            Window myWindow = new SerialConfigWindow();
             if (DataContext is DataStreamViewModel vm)
             {
-                // Initialize the window with the current DataContext
-                vm.ApplyToWindow((SerialConfigWindow)myWindow);
-                
+                var configWindow = new SerialConfigWindow(vm);
+                configWindow.ShowDialog();
             }
-            myWindow.ShowDialog();
         }
 
         private void Button_Connect_Click(object sender, RoutedEventArgs e)

@@ -7,6 +7,7 @@ using NAudio.Wave;
 using System.Management;
 using System.Collections.Generic;
 using System.Windows.Input;
+using SerialPlotDN_WPF.Model;
 
 namespace SerialPlotDN_WPF.View.UserForms
 {
@@ -15,15 +16,24 @@ namespace SerialPlotDN_WPF.View.UserForms
     /// </summary>
     public partial class SerialConfigWindow : Window
     {
-        private readonly int[] CommonSampleRates = new int[] { 8000, 16000, 22050, 44100, 48000, 96000 };
+        private readonly int[] CommonAudioSampleRates = new int[] { 8000, 16000, 22050, 44100, 48000, 96000 };
         readonly List<PortInfo> ports = new List<PortInfo>();
+        public DataStreamViewModel ViewModel { get; }
 
-        public SerialConfigWindow()
+        public SerialConfigWindow(DataStreamViewModel viewModel)
         {
             InitializeComponent();
+            ViewModel = viewModel;
+            this.DataContext = ViewModel;
             Loaded += SerialConfigWindow_Loaded;
             Loaded += SerialConfigWindow_Loaded_AudioDevices;
+            Radio_RawBinary.Checked += DataFormatRadio_Checked;
+            Radio_ASCII.Checked += DataFormatRadio_Checked;
+            SetRawBinaryPanelVisibility();
+            SetASCIIPanelVisibility();
         }
+
+        public SerialConfigWindow() : this(new DataStreamViewModel()) { }
 
         // Custom window event handlers
         private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -90,7 +100,7 @@ namespace SerialPlotDN_WPF.View.UserForms
 
             // Populate sample rates
             ComboBox_SampleRates.Items.Clear();
-            foreach (var rate in CommonSampleRates)
+            foreach (var rate in CommonAudioSampleRates)
             {
                 ComboBox_SampleRates.Items.Add(rate.ToString());
             }
@@ -256,12 +266,20 @@ namespace SerialPlotDN_WPF.View.UserForms
 
         private void DataFormatRadio_Checked(object sender, RoutedEventArgs e)
         {
-            if (Panel_SimpleBinary == null || Panel_ASCII == null || Panel_CustomFrame == null)
-                return;
+            SetRawBinaryPanelVisibility();
+            SetASCIIPanelVisibility();
+        }
 
-            Panel_SimpleBinary.Visibility = Radio_SimpleBinary.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
-            Panel_ASCII.Visibility = Radio_ASCII.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
-            Panel_CustomFrame.Visibility = Radio_CustomFrame.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
+        private void SetRawBinaryPanelVisibility()
+        {
+            if (Panel_RawBinary != null)
+                Panel_RawBinary.Visibility = Radio_RawBinary.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private void SetASCIIPanelVisibility()
+        {
+            if (Panel_ASCII != null)
+                Panel_ASCII.Visibility = Radio_ASCII.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
         }
     }
 

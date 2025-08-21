@@ -14,6 +14,12 @@ public class DataStreamManager
         return vm;
     }
 
+    public DataStreamViewModel AddStream(DataStreamViewModel vm)
+    {
+        StreamViewModels.Add(vm);
+        return vm;
+    }
+
     public void Connect(DataStreamViewModel vm)
     {
         if (_dataStreams.ContainsKey(vm))

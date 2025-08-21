@@ -85,7 +85,7 @@ namespace SerialPlotDN_WPF.View.UserControls
             }
             else
             {
-                RunButton.Content = "Run";
+                RunButton.Content = "Run 🏃‍♂️‍➡️";
                 RunButton.Background = new SolidColorBrush(Colors.LimeGreen);
             }
         }
@@ -105,8 +105,11 @@ namespace SerialPlotDN_WPF.View.UserControls
             }
         }
 
+        private void ClearButton_Click(object sender, RoutedEventArgs e)
+        {
+            // TODO: Add logic to clear relevant fields or reset controls
 
-
-
+            // You can add more clear/reset logic here as needed
+        }
     }
 }

@@ -2,7 +2,8 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:xctk="http://schemas.xceed.com/wpf/xaml/toolkit"
-        Title="Serial Configuration" Height="420" Width="480" 
+        xmlns:local="clr-namespace:SerialPlotDN_WPF.View.UserForms"
+        Title="Input Data Stream Configuratoin" Height="600" Width="480" 
         WindowStyle="None"
         AllowsTransparency="True"
         ResizeMode="NoResize" 
@@ -270,7 +271,7 @@
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <TextBlock Grid.Column="0" Text="Serial Configuration" 
+                <TextBlock Grid.Column="0" Text="Input Stream Configuration" 
                            Foreground="{DynamicResource PlotSettings_LabelForegroundBrush}" 
                            FontSize="14" FontWeight="SemiBold"
                            VerticalAlignment="Center" 
@@ -289,165 +290,118 @@
                 <TabControl>
                     <!-- Port Tab -->
                     <TabItem Header="Serial">
-                        <Grid Margin="10" VerticalAlignment="Top">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="80" />
-                                <ColumnDefinition Width="200" />
-                            </Grid.ColumnDefinitions>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="5" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="5" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="5" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="5" />
-                                <RowDefinition Height="Auto" />
-                            </Grid.RowDefinitions>
-                            <!-- Port -->
-                            <Label Grid.Row="0" Grid.Column="0" Content="Port:" VerticalAlignment="Center" />
-                            <ComboBox x:Name="ComboBox_Port" Grid.Row="0" Grid.Column="1" Width="200" />
-                            <!-- Spacer -->
-                            <Rectangle Grid.Row="1" Grid.ColumnSpan="2" Height="5" Fill="Transparent" />
-                            <!-- Baud -->
-                            <Label Grid.Row="2" Grid.Column="0" Content="Baud:" VerticalAlignment="Center" />
-                            <ComboBox x:Name="ComboBox_Baud" Grid.Row="2" Grid.Column="1" Width="200" IsEditable="True" />
-                            <!-- Spacer -->
-                            <Rectangle Grid.Row="3" Grid.ColumnSpan="2" Height="5" Fill="Transparent" />
-                            <!-- Databits -->
-                            <Label Grid.Row="4" Grid.Column="0" Content="Databits:" VerticalAlignment="Center" />
-                            <ComboBox x:Name="ComboBox_Databits" Grid.Row="4" Grid.Column="1" Width="200">
-                                <ComboBoxItem Content="8" IsSelected="True"/>
-                                <ComboBoxItem Content="7"/>
-                                <ComboBoxItem Content="6"/>
-                                <ComboBoxItem Content="5"/>
-                            </ComboBox>
-                            <!-- Spacer -->
-                            <Rectangle Grid.Row="5" Grid.ColumnSpan="2" Height="5" Fill="Transparent" />
-                            <!-- Stop bits -->
-                            <Label Grid.Row="6" Grid.Column="0" Content="Stop bits:" VerticalAlignment="Center" />
-                            <ComboBox x:Name="ComboBox_Stopbits" Grid.Row="6" Grid.Column="1" Width="200">
-                                <ComboBoxItem Content="1" IsSelected="True"/>
-                                <ComboBoxItem Content="2"/>
-                            </ComboBox>
-                            <!-- Spacer -->
-                            <Rectangle Grid.Row="7" Grid.ColumnSpan="2" Height="5" Fill="Transparent" />
-                            <!-- Parity -->
-                            <Label Grid.Row="8" Grid.Column="0" Content="Parity:" VerticalAlignment="Center" />
-                            <ComboBox x:Name="ComboBox_Parity" Grid.Row="8" Grid.Column="1" Width="200">
-                                <ComboBoxItem Content="None" IsSelected="True"/>
-                                <ComboBoxItem Content="Odd"/>
-                                <ComboBoxItem Content="Even"/>
-                            </ComboBox>
-                        </Grid>
-                    </TabItem>
-                    <!-- Dataformat Tab -->
-                    <TabItem Header="Dataformat" Height="28" VerticalAlignment="Top">
-                        <Grid Margin="10">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="150"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
-                            <!-- Left: Format selection -->
-                            <StackPanel Grid.Column="0" VerticalAlignment="Top">
-                                <Label Content="Format:"/>
-                                <RadioButton x:Name="Radio_SimpleBinary" Content="Simple Binary" GroupName="Format" IsChecked="True" Checked="DataFormatRadio_Checked"/>
-                                <RadioButton x:Name="Radio_ASCII" Content="ASCII" GroupName="Format" Checked="DataFormatRadio_Checked"/>
-                                <RadioButton x:Name="Radio_CustomFrame" Content="Custom Frame" GroupName="Format" Checked="DataFormatRadio_Checked"/>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel Margin="10" VerticalAlignment="Top">
+                                <!-- Port -->
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                                    <Label Content="Port:" VerticalAlignment="Center" ToolTip="Select the serial port to use." Width="80"/>
+                                    <ComboBox x:Name="ComboBox_Port" Width="200" SelectedValue="{Binding Port, Mode=TwoWay}" SelectedValuePath="Port" />
+                                </StackPanel>
+                                <!-- Baud -->
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                                    <Label Content="Baud:" VerticalAlignment="Center" ToolTip="Set the baud rate for serial communication. Custom baud rates are possible and only depend on the device." Width="80"/>
+                                    <ComboBox x:Name="ComboBox_Baud" Width="200" IsEditable="True" Text="{Binding Baud, Mode=TwoWay}" />
+                                </StackPanel>
+                                <!-- Databits -->
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                                    <Label Content="Databits:" VerticalAlignment="Center" ToolTip="Choose the number of data bits per frame." Width="80"/>
+                                    <ComboBox x:Name="ComboBox_Databits" Width="200" SelectedValue="{Binding DataBits, Mode=TwoWay}" SelectedValuePath="Content">
+                                        <ComboBoxItem Content="8" IsSelected="True"/>
+                                        <ComboBoxItem Content="7"/>
+                                        <ComboBoxItem Content="6"/>
+                                        <ComboBoxItem Content="5"/>
+                                    </ComboBox>
+                                </StackPanel>
+                                <!-- Stop bits -->
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                                    <Label Content="Stop bits:" VerticalAlignment="Center" ToolTip="Choose the number of stop bits." Width="80"/>
+                                    <ComboBox x:Name="ComboBox_Stopbits" Width="200" SelectedValue="{Binding StopBits, Mode=TwoWay}" SelectedValuePath="Content">
+                                        <ComboBoxItem Content="1" IsSelected="True"/>
+                                        <ComboBoxItem Content="2"/>
+                                    </ComboBox>
+                                </StackPanel>
+                                <!-- Parity -->
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                                    <Label Content="Parity:" VerticalAlignment="Center" ToolTip="Select the parity mode for error checking." Width="80"/>
+                                    <ComboBox x:Name="ComboBox_Parity" Width="200" SelectedValue="{Binding Parity, Mode=TwoWay}" SelectedValuePath="Content">
+                                        <ComboBoxItem Content="None" IsSelected="True"/>
+                                        <ComboBoxItem Content="Odd"/>
+                                        <ComboBoxItem Content="Even"/>
+                                    </ComboBox>
+                                </StackPanel>
+                                <!-- Channels -->
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                                    <Label Content="Channels:" VerticalAlignment="Center" ToolTip="Set the number of data channels. Custom value can be entered." Width="80"/>
+                                    <ComboBox x:Name="ComboBox_Channels" Width="200" IsEditable="True" SelectedValue="{Binding NumberOfChannels, Mode=TwoWay}" SelectedValuePath="Content">
+                                        <ComboBoxItem Content="1" IsSelected="True"/>
+                                        <ComboBoxItem Content="2"/>
+                                        <ComboBoxItem Content="3"/>
+                                        <ComboBoxItem Content="4"/>
+                                        <ComboBoxItem Content="5"/>
+                                        <ComboBoxItem Content="6"/>
+                                        <ComboBoxItem Content="7"/>
+                                        <ComboBoxItem Content="8"/>
+                                    </ComboBox>
+                                </StackPanel>
+                                <!-- Data format -->
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                                    <Label Content="Data format:" VerticalAlignment="Center" ToolTip="Raw binary uses fewer bits per value but is harder to debug. ASCI is easy to debug but requires more bits per value." Width="80"/>
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <RadioButton x:Name="Radio_RawBinary" Content="Raw binary" GroupName="DataFormat" IsChecked="{Binding IsRawBinary, Mode=TwoWay}" Margin="0,0,10,0"/>
+                                        <RadioButton x:Name="Radio_ASCII" Content="ASCII" GroupName="DataFormat" IsChecked="{Binding IsASCII, Mode=TwoWay}"/>
+                                    </StackPanel>
+                                </StackPanel>
+                                <!-- Raw binary conditional controls -->
+                                <StackPanel x:Name="Panel_RawBinary" Visibility="Collapsed" Margin="0,0,0,5">
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                                        <Label Content="Frame start:" VerticalAlignment="Center" ToolTip="Optional but recommended. Specify the frame start sequence to distinguish between frames." Width="80"/>
+                                        <TextBox x:Name="TextBox_FrameStart" Width="200" Text="{Binding FrameStart, Mode=TwoWay}" />
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                                        <Label Content="Number Type:" VerticalAlignment="Center" ToolTip="Select the type of numbers in the data stream." Width="80"/>
+                                        <ComboBox x:Name="ComboBox_NumberType" Width="200" SelectedValue="{Binding NumberType, Mode=TwoWay}" SelectedValuePath="Content">
+                                            <ComboBoxItem Content="uint8" IsSelected="True"/>
+                                            <ComboBoxItem Content="int8"/>
+                                            <ComboBoxItem Content="uint16"/>
+                                            <ComboBoxItem Content="int16"/>
+                                            <ComboBoxItem Content="uint32"/>
+                                            <ComboBoxItem Content="int32"/>
+                                            <ComboBoxItem Content="float"/>
+                                        </ComboBox>
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                                        <Label Content="Endianness:" VerticalAlignment="Center" ToolTip="Choose the byte order for binary data." Width="80"/>
+                                        <ComboBox x:Name="ComboBox_Endianness" Width="200" SelectedValue="{Binding Endianness, Mode=TwoWay}" SelectedValuePath="Content">
+                                            <ComboBoxItem Content="Little Endian" IsSelected="True"/>
+                                            <ComboBoxItem Content="Big Endian"/>
+                                        </ComboBox>
+                                    </StackPanel>
+                                    <CheckBox x:Name="CheckBox_EnableChecksum" Content="Enable Checksum" VerticalAlignment="Center" Margin="80,0,0,0" IsChecked="{Binding EnableChecksum, Mode=TwoWay}" />
+                                </StackPanel>
+                                <!-- ASCII conditional controls -->
+                                <StackPanel x:Name="Panel_ASCII" Visibility="Collapsed" Margin="0,0,0,5">
+                                    <StackPanel Orientation="Horizontal">
+                                        <Label Content="Column delimiter:" VerticalAlignment="Center" ToolTip="Set the delimiter used to separate columns in ASCII data." Width="80"/>
+                                        <ComboBox x:Name="ComboBox_ColumnDelimiter" Width="200" SelectedValue="{Binding Delimiter, Mode=TwoWay}" SelectedValuePath="Content">
+                                            <ComboBoxItem Content="Comma" IsSelected="True"/>
+                                            <ComboBoxItem Content="Space"/>
+                                            <ComboBoxItem Content="CRLF"/>
+                                        </ComboBox>
+                                    </StackPanel>
+                                </StackPanel>
                             </StackPanel>
-                            <!-- Right: Format-specific settings -->
-                            <Grid Grid.Column="1" Margin="20,0,0,0">
-                                <!-- Simple Binary Panel -->
-                                <StackPanel x:Name="Panel_SimpleBinary" Visibility="Visible">
-                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-                                        <Label Content="Number of Channels:" Width="130"/>
-                                        <xctk:IntegerUpDown x:Name="NumChannelsUpDown" Width="60" Minimum="1" Maximum="32" Value="1"/>
-                                    </StackPanel>
-                                    <Label Content="Number Type:"/>
-                                    <Grid Margin="20,0,0,10">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="100"/>
-                                            <ColumnDefinition Width="100"/>
-                                        </Grid.ColumnDefinitions>
-                                        <StackPanel Grid.Column="0">
-                                            <RadioButton x:Name="Radio_Uint8" Content="Uint8" GroupName="NumberType" IsChecked="True"/>
-                                            <RadioButton x:Name="Radio_Uint16" Content="Uint16" GroupName="NumberType"/>
-                                            <RadioButton x:Name="Radio_Uint32" Content="Uint32" GroupName="NumberType"/>
-                                            <RadioButton x:Name="Radio_Float" Content="Float" GroupName="NumberType"/>
-                                        </StackPanel>
-                                        <StackPanel Grid.Column="1">
-                                            <RadioButton x:Name="Radio_Int8" Content="Int8" GroupName="NumberType"/>
-                                            <RadioButton x:Name="Radio_Int16" Content="Int16" GroupName="NumberType"/>
-                                            <RadioButton x:Name="Radio_Int32" Content="Int32" GroupName="NumberType"/>
-                                        </StackPanel>
-                                    </Grid>
-                                    <Label Content="Endianness:"/>
-                                    <StackPanel Orientation="Horizontal" Margin="20,0,0,0">
-                                        <RadioButton x:Name="Radio_LittleEndian" Content="Little Endian" GroupName="Endian" IsChecked="True"/>
-                                        <RadioButton x:Name="Radio_BigEndian" Content="Big Endian" GroupName="Endian"/>
-                                    </StackPanel>
-                                </StackPanel>
-                                <!-- ASCII Panel -->
-                                <StackPanel x:Name="Panel_ASCII" Visibility="Collapsed">
-                                    <Label Content="Column delimited:"/>
-                                    <StackPanel Margin="20,0,0,0">
-                                        <RadioButton x:Name="Radio_DelimiterComma" Content="Comma" GroupName="Delimiter" IsChecked="True"/>
-                                        <RadioButton x:Name="Radio_DelimiterSpace" Content="Space" GroupName="Delimiter"/>
-                                        <RadioButton x:Name="Radio_DelimiterTab" Content="Tab" GroupName="Delimiter"/>
-                                        <StackPanel Orientation="Horizontal">
-                                            <RadioButton x:Name="Radio_DelimiterOther" Content="Other" GroupName="Delimiter"/>
-                                            <TextBox x:Name="TextBox_DelimiterOther" Width="40" Margin="5,0,0,0" VerticalAlignment="Center"/>
-                                        </StackPanel>
-                                    </StackPanel>
-                                </StackPanel>
-                                <!-- Custom Frame Panel -->
-                                <StackPanel x:Name="Panel_CustomFrame" Visibility="Collapsed">
-                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-                                        <Label Content="Number of Channels:" Width="130"/>
-                                        <xctk:IntegerUpDown x:Name="NumChannelsUpDown_Custom" Width="60" Minimum="1" Maximum="32" Value="1"/>
-                                    </StackPanel>
-                                    <Label Content="Number Type:"/>
-                                    <Grid Margin="20,0,0,10">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="100"/>
-                                            <ColumnDefinition Width="100"/>
-                                        </Grid.ColumnDefinitions>
-                                        <StackPanel Grid.Column="0">
-                                            <RadioButton x:Name="Radio_Uint8_Custom" Content="Uint8" GroupName="NumberTypeCustom" IsChecked="True"/>
-                                            <RadioButton x:Name="Radio_Uint16_Custom" Content="Uint16" GroupName="NumberTypeCustom"/>
-                                            <RadioButton x:Name="Radio_Uint32_Custom" Content="Uint32" GroupName="NumberTypeCustom"/>
-                                            <RadioButton x:Name="Radio_Float_Custom" Content="Float" GroupName="NumberTypeCustom"/>
-                                        </StackPanel>
-                                        <StackPanel Grid.Column="1">
-                                            <RadioButton x:Name="Radio_Int8_Custom" Content="Int8" GroupName="NumberTypeCustom"/>
-                                            <RadioButton x:Name="Radio_Int16_Custom" Content="Int16" GroupName="NumberTypeCustom"/>
-                                            <RadioButton x:Name="Radio_Int32_Custom" Content="Int32" GroupName="NumberTypeCustom"/>
-                                        </StackPanel>
-                                    </Grid>
-                                    <Label Content="Endianness:"/>
-                                    <StackPanel Orientation="Horizontal" Margin="20,0,0,10">
-                                        <RadioButton x:Name="Radio_LittleEndian_Custom" Content="Little Endian" GroupName="EndianCustom" IsChecked="True"/>
-                                        <RadioButton x:Name="Radio_BigEndian_Custom" Content="Big Endian" GroupName="EndianCustom"/>
-                                    </StackPanel>
-                                    <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
-                                        <Label Content="Frame Start:" Width="130"/>
-                                        <TextBox x:Name="TextBox_FrameStart" Width="120"/>
-                                    </StackPanel>
-                                </StackPanel>
-                            </Grid>
-                        </Grid>
+                        </ScrollViewer>
                     </TabItem>
                     <!-- Audio Tab -->
                     <TabItem Header="Audio">
                         <StackPanel Margin="10">
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                                 <Label Content="Input:" VerticalAlignment="Center" Width="50"/>
-                                <ComboBox x:Name="ComboBox_AudioDevices" Width="250"/>
+                                <ComboBox x:Name="ComboBox_AudioDevices" Width="250" SelectedItem="{Binding AudioDevice, Mode=TwoWay}" SelectedIndex="{Binding AudioDeviceIndex, Mode=TwoWay}" />
                             </StackPanel>
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                                 <Label Content="Sample rate:" VerticalAlignment="Center" Width="80"/>
-                                <ComboBox x:Name="ComboBox_SampleRates" Width="120"/>
+                                <ComboBox x:Name="ComboBox_SampleRates" Width="120" SelectedValue="{Binding SampleRate, Mode=TwoWay}" SelectedValuePath="Content" />
                             </StackPanel>
                             <!-- Add your Audio controls here -->
                         </StackPanel>
