@@ -16,6 +16,9 @@ namespace SerialPlotDN_WPF.View.UserControls
     public partial class DataStreamBar : UserControl
     {
         public List<DataStreamViewModel> _dataStreamModels = new List<DataStreamViewModel>();
+        
+        // Event to notify when channels need to be updated
+        public event System.Action<int> ChannelsChanged;
 
         public DataStreamBar()
         {
@@ -32,14 +35,139 @@ namespace SerialPlotDN_WPF.View.UserControls
             {
                 _dataStreamModels.Add(vm);
 
-                
                 var panel = new StreamInfoPanel
                 {
                     DataContext = vm,
-                    
                 };
                 Panel_Streams.Children.Add(panel);
+
+                // Subscribe to property changes to monitor NumberOfChannels and IsConnected
+                vm.PropertyChanged += DataStreamViewModel_PropertyChanged;
+
+                // Automatically connect the serial stream after successful configuration
+                vm.Connect();
+
+                // Update channels after adding new stream
+                UpdateChannels();
             }
+        }
+
+        /// <summary>
+        /// Adds a stream from settings without showing the configuration dialog
+        /// </summary>
+        /// <param name="viewModel">The stream view model to add</param>
+        public void AddStreamFromSettings(DataStreamViewModel viewModel)
+        {
+            _dataStreamModels.Add(viewModel);
+            
+            var panel = new StreamInfoPanel
+            {
+                DataContext = viewModel,
+            };
+            Panel_Streams.Children.Add(panel);
+
+            // Subscribe to property changes
+            viewModel.PropertyChanged += DataStreamViewModel_PropertyChanged;
+
+            // Update channels after adding stream from settings
+            UpdateChannels();
+        }
+
+        /// <summary>
+        /// Removes a stream and disposes its resources
+        /// </summary>
+        /// <param name="viewModel">The stream view model to remove</param>
+        public void RemoveStream(DataStreamViewModel viewModel)
+        {
+            if (_dataStreamModels.Contains(viewModel))
+            {
+                // Unsubscribe from property changes
+                viewModel.PropertyChanged -= DataStreamViewModel_PropertyChanged;
+
+                // Disconnect and dispose the stream
+                viewModel.Disconnect();
+                viewModel.Dispose();
+                
+                // Remove from collection
+                _dataStreamModels.Remove(viewModel);
+                
+                // Find and remove the corresponding panel
+                for (int i = Panel_Streams.Children.Count - 1; i >= 0; i--)
+                {
+                    if (Panel_Streams.Children[i] is StreamInfoPanel panel && 
+                        panel.DataContext == viewModel)
+                    {
+                        Panel_Streams.Children.RemoveAt(i);
+                        break;
+                    }
+                }
+
+                // Update channels after removing stream
+                UpdateChannels();
+            }
+        }
+
+        /// <summary>
+        /// Disposes all streams and cleans up resources
+        /// </summary>
+        public void Dispose()
+        {
+            foreach (var stream in _dataStreamModels.ToList())
+            {
+                stream.PropertyChanged -= DataStreamViewModel_PropertyChanged;
+                stream.Disconnect();
+                stream.Dispose();
+            }
+            _dataStreamModels.Clear();
+            Panel_Streams.Children.Clear();
+
+            // Clear all channels when disposing
+            ChannelsChanged?.Invoke(0);
+        }
+
+        /// <summary>
+        /// Handles property changes in DataStreamViewModel to update channels when needed
+        /// </summary>
+        private void DataStreamViewModel_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            // Update channels when NumberOfChannels or IsConnected changes
+            if (e.PropertyName == nameof(DataStreamViewModel.NumberOfChannels) || 
+                e.PropertyName == nameof(DataStreamViewModel.IsConnected))
+            {
+                UpdateChannels();
+            }
+        }
+
+        /// <summary>
+        /// Calculates total channels from connected streams and notifies listeners
+        /// </summary>
+        private void UpdateChannels()
+        {
+            // Sum up channels from all connected streams
+            int totalChannels = _dataStreamModels
+                .Where(vm => vm.IsConnected)
+                .Sum(vm => vm.NumberOfChannels);
+
+            // Notify subscribers about the channel count change
+            ChannelsChanged?.Invoke(totalChannels);
+        }
+
+        /// <summary>
+        /// Gets the total number of channels from all connected streams
+        /// </summary>
+        public int GetTotalChannelCount()
+        {
+            return _dataStreamModels
+                .Where(vm => vm.IsConnected)
+                .Sum(vm => vm.NumberOfChannels);
+        }
+
+        /// <summary>
+        /// Gets all connected streams
+        /// </summary>
+        public IEnumerable<DataStreamViewModel> GetConnectedStreams()
+        {
+            return _dataStreamModels.Where(vm => vm.IsConnected);
         }
     }
 }

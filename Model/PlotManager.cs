@@ -1,13 +1,13 @@
 ﻿using System;
-using System.Windows;
+using System.Linq; // Add for LINQ methods
 using System.Timers;
+using System.Windows;
+using System.Windows.Media;
 using ScottPlot;
 using ScottPlot.Plottables;
 using ScottPlot.WPF;
-using System.Windows.Media;
 using SerialPlotDN_WPF.View.UserControls;
 using Color = System.Windows.Media.Color;
-using System.Collections.ObjectModel;
 
 namespace SerialPlotDN_WPF.Model
 {
@@ -15,31 +15,45 @@ namespace SerialPlotDN_WPF.Model
     {
         private readonly System.Timers.Timer _updatePlotTimer;
         private readonly WpfPlotGL _plot;
-        private readonly ChannelControlBar _channelControlBar;
         private readonly VerticalControl _verticalControl;
         private readonly HorizontalControl _horizontalControl;
         private readonly Signal[] _signals;
         private readonly double[][] _data;
-        private readonly int _channelCount;
-        public List<SerialDataStream> _dataStreams = new List<SerialDataStream>();
+        private readonly int _maxChannels;
         
+        // Stream management - simplified interface
+        private IEnumerable<DataStreamViewModel> _connectedStreams = Enumerable.Empty<DataStreamViewModel>();
+
+        /// <summary>
+        /// Current number of channels being plotted
+        /// </summary>
+        public int NumberOfChannels { get; private set; } = 0;
+
         public int Xmin { get; set; } = 0;
         public int Xmax { get; set; } = 3000;
         public int Ymin { get; set; } = -200;
         public int Ymax { get; set; } = 4000;
 
-        public PlotManager(WpfPlotGL wpfPlot1, ChannelControlBar channelControlBar, VerticalControl verticalControl, HorizontalControl horizontalControl, SerialDataStream datastream)
+        public PlotManager(WpfPlotGL wpfPlot1, VerticalControl verticalControl, HorizontalControl horizontalControl, int maxChannels = 64)
         {
             _plot = wpfPlot1;
-            _channelControlBar = channelControlBar;
             _verticalControl = verticalControl;
             _horizontalControl = horizontalControl;
-            _channelCount = datastream.Parser.NumberOfChannels;
-            _dataStreams.Add(datastream);
-            _signals = new Signal[_channelCount];
-            _data = new double[_channelCount][];
+            _maxChannels = maxChannels;
+            _signals = new Signal[_maxChannels];
+            
+            _data = new double[_maxChannels][];
             _updatePlotTimer = new System.Timers.Timer(33) { Enabled = true, AutoReset = true };
             _updatePlotTimer.Elapsed += UpdatePlot;
+        }
+
+        /// <summary>
+        /// Updates the data streams that provide data for plotting
+        /// /// </summary>
+        /// <param name="connectedStreams">Currently connected streams</param>
+        public void SetDataStreams(IEnumerable<DataStreamViewModel> connectedStreams)
+        {
+            _connectedStreams = connectedStreams ?? Enumerable.Empty<DataStreamViewModel>();
         }
 
         private void setDarkMode()
@@ -63,37 +77,88 @@ namespace SerialPlotDN_WPF.Model
         {
             _plot.Plot.Clear();
             _plot.Plot.Add.Palette = new ScottPlot.Palettes.Category10();
-            //foreach (var axis in _plot.Plot.Axes.GetAxes())
-            //{
-            //    axis.TickLabelStyle.FontSize *= 2;
-            //    axis.Label.FontSize *= 2;
-            //}
-            for (int i = 0; i < _channelCount; i++)
+            
+            // Initialize all potential signal slots but don't add them to plot yet
+            for (int i = 0; i < _maxChannels; i++)
             {
                 _data[i] = new double[Xmax];
-                _signals[i] = _plot.Plot.Add.Signal(_data[i]);
-                _signals[i].Color = _signals[i].Color.Lighten(0.2);
-                _signals[i].Color = _signals[i].Color.WithOpacity(1.0);
-                _signals[i].LineWidth = 1;
-                _signals[i].LineStyle.AntiAlias = false;
             }
 
             setDarkMode();
         }
 
-        public void InitializeChannelControlBar()
+        /// <summary>
+        /// Updates the plot to display the specified number of channels
+        /// </summary>
+        /// <param name="channelCount">Number of channels to display</param>
+        /// <param name="channelColors">Optional colors for each channel</param>
+        public void UpdateChannelDisplay(int channelCount, Color[] channelColors = null)
         {
-            for (int i = 0; i < _channelCount; i++)
+            // Update the number of channels
+            NumberOfChannels = Math.Min(channelCount, _maxChannels);
+
+            // Remove existing signals
+            for (int i = 0; i < _maxChannels; i++)
             {
-                ChannelControl channel = new ChannelControl();
-                var channelColor = _signals[i].Color;
-                var wpfColor = Color.FromArgb(channelColor.A, channelColor.R, channelColor.G, channelColor.B);
-                channel.Color = wpfColor;
-                channel.Label = $"CH{i + 1}";
-                channel.Gain = 1.0;
-                channel.Offset = 0.0;
-                _channelControlBar.AddChannel(channel);
+                if (_signals[i] != null)
+                {
+                    _plot.Plot.Remove(_signals[i]);
+                    _signals[i] = null;
+                }
             }
+
+            // Add signals for active channels
+            for (int i = 0; i < NumberOfChannels; i++)
+            {
+                _signals[i] = _plot.Plot.Add.Signal(_data[i]);
+                
+                // Set color if provided, otherwise use palette
+                if (channelColors != null && i < channelColors.Length)
+                {
+                    var color = channelColors[i];
+                    _signals[i].Color = new ScottPlot.Color(color.R, color.G, color.B);
+                }
+                else
+                {
+                    _signals[i].Color = _signals[i].Color.Lighten(0.2);
+                }
+                
+                _signals[i].Color = _signals[i].Color.WithOpacity(1.0);
+                _signals[i].LineWidth = 1;
+                _signals[i].LineStyle.AntiAlias = false;
+            }
+
+            _plot.Refresh();
+        }
+
+        /// <summary>
+        /// Gets the colors currently used by the plot signals
+        /// </summary>
+        /// <param name="channelCount">Number of channels to get colors for</param>
+        /// <returns>Array of colors</returns>
+        public Color[] GetSignalColors(int channelCount)
+        {
+            var colors = new Color[channelCount];
+            for (int i = 0; i < channelCount && i < _maxChannels; i++)
+            {
+                if (_signals[i] != null)
+                {
+                    var signalColor = _signals[i].Color;
+                    colors[i] = Color.FromArgb(signalColor.A, signalColor.R, signalColor.G, signalColor.B);
+                }
+                else
+                {
+                    // Fallback to default colors
+                    var defaultColors = new Color[]
+                    {
+                        System.Windows.Media.Colors.Red, System.Windows.Media.Colors.Green, System.Windows.Media.Colors.Blue, System.Windows.Media.Colors.Orange,
+                        System.Windows.Media.Colors.Purple, System.Windows.Media.Colors.Brown, System.Windows.Media.Colors.Pink, System.Windows.Media.Colors.Gray,
+                        System.Windows.Media.Colors.Yellow, System.Windows.Media.Colors.Cyan, System.Windows.Media.Colors.Magenta, System.Windows.Media.Colors.Lime
+                    };
+                    colors[i] = defaultColors[i % defaultColors.Length];
+                }
+            }
+            return colors;
         }
 
         public void startAutoUpdate() => _updatePlotTimer.Start();
@@ -103,11 +168,23 @@ namespace SerialPlotDN_WPF.Model
         {
             Application.Current.Dispatcher.BeginInvoke(() =>
             {
-                //for (int channel = 0; channel < _channelCount; channel++)
-                //{
-                //    // Efficiently copy data to pre-allocated array without memory allocation
-                //    _dataStreams[0].CopyLatestDataTo(channel, _data[channel], Xmax);
-                //}
+                int channelIndex = 0;
+                
+                // Iterate through all connected streams and their channels
+                foreach (var stream in _connectedStreams)
+                {
+                    if (stream.SerialDataStream != null)
+                    {
+                        for (int streamChannel = 0; streamChannel < stream.NumberOfChannels; streamChannel++)
+                        {
+                            if (channelIndex < NumberOfChannels)
+                            {
+                                stream.SerialDataStream.CopyLatestDataTo(streamChannel, _data[channelIndex], Xmax);
+                                channelIndex++;
+                            }
+                        }
+                    }
+                }
 
                 if (_verticalControl.IsAutoScale)
                     _plot.Plot.Axes.AutoScaleY();
@@ -123,18 +200,25 @@ namespace SerialPlotDN_WPF.Model
             bool isRunning = _updatePlotTimer.Enabled;
             if (_updatePlotTimer.Enabled)
                 _updatePlotTimer.Stop();
-            for (int i = 0; i < _channelCount; i++)
+                
+            // Recreate data arrays for all channels
+            for (int i = 0; i < _maxChannels; i++)
             {
-                var colorOld = _signals[i].Color;
-                var linewidthOld = _signals[i].LineWidth;
-                var antiAliasingOld = _signals[i].LineStyle.AntiAlias;
-                _plot.Plot.Remove(_signals[i]);
                 _data[i] = new double[Xmax];
-                _signals[i] = _plot.Plot.Add.Signal(_data[i]);
-                _signals[i].Color = colorOld;
-                _signals[i].LineWidth = linewidthOld;
-                _signals[i].LineStyle.AntiAlias = antiAliasingOld;
+                
+                if (_signals[i] != null)
+                {
+                    var colorOld = _signals[i].Color;
+                    var linewidthOld = _signals[i].LineWidth;
+                    var antiAliasingOld = _signals[i].LineStyle.AntiAlias;
+                    _plot.Plot.Remove(_signals[i]);
+                    _signals[i] = _plot.Plot.Add.Signal(_data[i]);
+                    _signals[i].Color = colorOld;
+                    _signals[i].LineWidth = linewidthOld;
+                    _signals[i].LineStyle.AntiAlias = antiAliasingOld;
+                }
             }
+            
             _plot.Plot.Axes.SetLimitsX(0, Xmax);
             if (isRunning)
                 _updatePlotTimer.Start();
@@ -176,8 +260,8 @@ namespace SerialPlotDN_WPF.Model
         }
 
         public int CurrentPlotUpdateRateFPS => (int)(1000.0 / _updatePlotTimer.Interval);
-        public int CurrentLineWidth => (int)(_signals[0]?.LineWidth ?? 1);
-        public bool CurrentAntiAliasing => _signals[0]?.LineStyle.AntiAlias ?? false;
+        public int CurrentLineWidth => (int)(_signals.FirstOrDefault(s => s != null)?.LineWidth ?? 1);
+        public bool CurrentAntiAliasing => _signals.FirstOrDefault(s => s != null)?.LineStyle.AntiAlias ?? false;
         public bool ShowRenderTime => _plot.Plot.Benchmark.IsVisible;
     }
 }

@@ -1,7 +1,49 @@
 ﻿using System.Text;
+using System.IO.Ports; // Add for port validation
+using System.Linq; // Add for LINQ methods
 
 namespace SerialPlotDN_WPF.Model
 {
+    /// <summary>
+    /// Exception thrown when a serial port is not found on the system
+    /// </summary>
+    public class PortNotFoundException : Exception
+    {
+        public string PortName { get; }
+
+        public PortNotFoundException(string portName) 
+            : base($"Port '{portName}' was not found on this system")
+        {
+            PortName = portName;
+        }
+
+        public PortNotFoundException(string portName, Exception innerException) 
+            : base($"Port '{portName}' was not found on this system", innerException)
+        {
+            PortName = portName;
+        }
+    }
+
+    /// <summary>
+    /// Exception thrown when a serial port is already in use by another application
+    /// </summary>
+    public class PortAlreadyInUseException : Exception
+    {
+        public string PortName { get; }
+
+        public PortAlreadyInUseException(string portName) 
+            : base($"Port '{portName}' is already in use by another application")
+        {
+            PortName = portName;
+        }
+
+        public PortAlreadyInUseException(string portName, Exception innerException) 
+            : base($"Port '{portName}' is already in use by another application", innerException)
+        {
+            PortName = portName;
+        }
+    }
+
     public class SerialDataStream : IDisposable
     {
 
@@ -17,19 +59,45 @@ namespace SerialPlotDN_WPF.Model
         public bool IsRunning { get; private set; }
         public DataParser Parser { get; init; }
         public int SerialPortUpdateRateHz { get; set; } = 200; // Default update rate in Hz
-
+        public int NumberOfChannels => Parser.NumberOfChannels;
         public SourceSetting SourceSetting { get; init; }
 
         public SerialDataStream(SourceSetting source, DataParser dataParser)
         {
             SourceSetting = source;
             Parser = dataParser;
-            _port = new System.IO.Ports.SerialPort(source.PortName, source.BaudRate, System.IO.Ports.Parity.None, 8);
-            _port.Encoding = Encoding.ASCII;
-            _port.ReadTimeout = 100;
-            _port.WriteTimeout = 100;
-            _port.ReadBufferSize = 8192; // Set buffer size directly
-            _port.Open();
+
+            // Validate that the port exists on the system
+            ValidatePortExists(source.PortName);
+
+            try
+            {
+                _port = new System.IO.Ports.SerialPort(source.PortName, source.BaudRate, source.Parity, source.DataBits);
+                _port.Encoding = Encoding.ASCII;
+                _port.ReadTimeout = 100;
+                _port.WriteTimeout = 100;
+                _port.ReadBufferSize = 8192; // Set buffer size directly
+                _port.Open();
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                // Port is already in use by another application
+                _port?.Dispose();
+                throw new PortAlreadyInUseException(source.PortName, ex);
+            }
+            catch (ArgumentException ex)
+            {
+                // Invalid port name or parameters
+                _port?.Dispose();
+                throw new PortNotFoundException(source.PortName, ex);
+            }
+            catch (InvalidOperationException ex)
+            {
+                // Port is already open or other operation issue
+                _port?.Dispose();
+                throw new PortAlreadyInUseException(source.PortName, ex);
+            }
+
             int ringBufferSize = Math.Max(500000, source.BaudRate / 10);
             
             ReceivedData = new RingBuffer<double>[dataParser.NumberOfChannels];
@@ -42,6 +110,31 @@ namespace SerialPlotDN_WPF.Model
             int MaxReadSize = _port.ReadBufferSize * 2;
             _readBuffer = new byte[MaxReadSize];
             _workingBuffer = new byte[MaxReadSize];
+        }
+
+        /// <summary>
+        /// Validates that the specified port exists on the system
+        /// </summary>
+        /// <param name="portName">The port name to validate (e.g., "COM1")</param>
+        /// <exception cref="PortNotFoundException">Thrown when the port is not found</exception>
+        private static void ValidatePortExists(string portName)
+        {
+            if (string.IsNullOrWhiteSpace(portName))
+            {
+                throw new PortNotFoundException(portName ?? "null");
+            }
+
+            // Get all available serial ports on the system
+            string[] availablePorts = SerialPort.GetPortNames();
+            
+            // Check if the requested port exists (case-insensitive comparison)
+            bool portExists = availablePorts.Any(port => 
+                string.Equals(port, portName, StringComparison.OrdinalIgnoreCase));
+
+            if (!portExists)
+            {
+                throw new PortNotFoundException(portName);
+            }
         }
 
         public void Start()
@@ -225,16 +318,16 @@ namespace SerialPlotDN_WPF.Model
         public string PortName { get; init; }
         public int BaudRate { get; init; }
         public int DataBits { get; init; }
-        //public Parity Parity { get; init; }
+        public Parity Parity { get; init; }
         public DataSource Source { get; init; }
         public string? AudioDeviceName { get; init; }
 
-        public SourceSetting(string portName, int baudRate, int dataBits)
+        public SourceSetting(string portName, int baudRate, int dataBits, Parity parity)
         {
 
             PortName = portName;
             BaudRate = baudRate;
-            //Parity = parity;
+            Parity = parity;
             DataBits = dataBits;
             AudioDeviceName = null;
             Source = DataSource.Serial;

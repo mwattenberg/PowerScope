@@ -47,14 +47,12 @@
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="280"/>
                 <ColumnDefinition Width="150"/>
-                <ColumnDefinition Width="280"/>
                 <ColumnDefinition Width="100"/>
             </Grid.ColumnDefinitions>
             <UserControls:ChannelControlBar Grid.Column="0" x:Name="ChannelControlBar" VerticalAlignment="Top"/>
             <UserControls:HorizontalControl Grid.Column="1" x:Name="HorizontalControl" VerticalAlignment="Top"/>
             <UserControls:VerticalControl Grid.Column="2" x:Name="VerticalControl" VerticalAlignment="Top"/>
-            <UserControls:AquisitionControl Grid.Column="3" x:Name="AquisitionControl" VerticalAlignment="Top"/>
-            <UserControls:RunControl Grid.Column="4" x:Name="RunControl" VerticalAlignment="Center" HorizontalAlignment="Right"/>
+            <UserControls:RunControl Grid.Column="3" x:Name="RunControl" VerticalAlignment="Center" HorizontalAlignment="Right"/>
         </Grid>
     </Grid>
 </Window>

@@ -1,5 +1,6 @@
 ﻿using System.Collections.ObjectModel;
 using System.Windows.Controls;
+using System.Windows.Media;
 
 namespace SerialPlotDN_WPF.View.UserControls
 {
@@ -26,6 +27,59 @@ namespace SerialPlotDN_WPF.View.UserControls
         public void RemoveChannel(ChannelControl control)
         {
             Channels.Remove(control);
+        }
+
+        /// <summary>
+        /// Updates the channel controls based on the total number of channels from active streams
+        /// </summary>
+        /// <param name="totalChannels">Total number of channels needed</param>
+        /// <param name="channelColors">Array of colors for each channel (optional)</param>
+        public void UpdateChannels(int totalChannels, Color[] channelColors = null)
+        {
+            // Remove excess channels
+            while (Channels.Count > totalChannels)
+            {
+                Channels.RemoveAt(Channels.Count - 1);
+            }
+
+            // Add missing channels
+            while (Channels.Count < totalChannels)
+            {
+                var channelIndex = Channels.Count;
+                var channel = new ChannelControl
+                {
+                    Label = $"CH{channelIndex + 1}",
+                    Gain = 1.0,
+                    Offset = 0.0
+                };
+
+                // Set color if provided, otherwise use default color scheme
+                if (channelColors != null && channelIndex < channelColors.Length)
+                {
+                    channel.Color = channelColors[channelIndex];
+                }
+                else
+                {
+                    // Use a default color scheme if no colors provided
+                    var defaultColors = new Color[]
+                    {
+                        Colors.Red, Colors.Green, Colors.Blue, Colors.Orange,
+                        Colors.Purple, Colors.Brown, Colors.Pink, Colors.Gray,
+                        Colors.Yellow, Colors.Cyan, Colors.Magenta, Colors.Lime
+                    };
+                    channel.Color = defaultColors[channelIndex % defaultColors.Length];
+                }
+
+                Channels.Add(channel);
+            }
+        }
+
+        /// <summary>
+        /// Clears all channel controls
+        /// </summary>
+        public void ClearChannels()
+        {
+            Channels.Clear();
         }
     }
 }

@@ -2,6 +2,7 @@
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
+using System.IO.Ports; // Add for Parity enum
 using System.Management;
 using System.Timers;
 using System.Windows;
@@ -26,24 +27,27 @@ namespace SerialPlotDN_WPF
         // Configurable display settings - use DataStream's ring buffer capacity
         public int DisplayElements { get; set; } = 3000; // Number of elements to display
 
-        //Debug just data parsing and plotting
-        private SerialDataStream dataStream;
         
 
         public MainWindow()
         {
             InitializeComponent();
-            InitializeDataStream();
+            //InitializeDataStream();
 
-            _plotManager = new PlotManager(WpfPlot1, ChannelControlBar, VerticalControl, HorizontalControl, dataStream);
+            _plotManager = new PlotManager(WpfPlot1, VerticalControl, HorizontalControl);
             _plotManager.InitializePlot();
-            _plotManager.InitializeChannelControlBar();
             _plotManager.SetupPlotUserInput();
             
             InitializeHorizontalControl();
             InitializeVerticalControl();
             readSettingsXML();
             InitializeEventHandlers();
+            
+            // Initialize channel display based on current streams
+            var totalChannels = DataStreamBar.GetTotalChannelCount();
+            _plotManager.SetDataStreams(DataStreamBar.GetConnectedStreams());
+            ChannelControlBar.UpdateChannels(totalChannels);
+            _plotManager.UpdateChannelDisplay(totalChannels);
         }
 
         void InitializeHorizontalControl()
@@ -54,8 +58,8 @@ namespace SerialPlotDN_WPF
 
         void InitializeVerticalControl()
         {
-            VerticalControl.Max = Ymax; // Set initial max value
-            VerticalControl.Min = Ymin; // Set initial min value
+            VerticalControl.Max = 4000; // Set initial max value
+            VerticalControl.Min = 0; // Set initial min value
         }
 
         private void InitializeEventHandlers()
@@ -65,30 +69,51 @@ namespace SerialPlotDN_WPF
             VerticalControl.MaxValueChanged += (s, v) => _plotManager.SetYLimits(_plotManager.Ymin, v);
             VerticalControl.AutoScaleChanged += (s, isAutoScale) => { if (!isAutoScale) _plotManager.SetYLimits(_plotManager.Ymin, _plotManager.Ymax); };
             RunControl.RunStateChanged += RunControl_RunStateChanged;
+            
+            // Wire up DataStreamBar channel changes to both ChannelControlBar and PlotManager
+            DataStreamBar.ChannelsChanged += (totalChannels) => 
+            {
+                // Update plot manager with current connected streams
+                _plotManager.SetDataStreams(DataStreamBar.GetConnectedStreams());
+                
+                // Get colors from plot manager for consistency
+                var colors = _plotManager.GetSignalColors(totalChannels);
+                
+                // Update both UI components
+                ChannelControlBar.UpdateChannels(totalChannels, colors);
+                _plotManager.UpdateChannelDisplay(totalChannels, colors);
+            };
         }
 
         private void RunControl_RunStateChanged(object? sender, RunControl.RunStates newState)
         {
             if (newState == RunControl.RunStates.Running)
             {
-                dataStream.Start();
+                // Start all connected streams
+                foreach (var stream in DataStreamBar.GetConnectedStreams())
+                {
+                    stream.SerialDataStream?.Start();
+                }
                 _plotManager.startAutoUpdate();
             }
             else
             {
-                dataStream.Stop();
+                // Stop all connected streams
+                foreach (var stream in DataStreamBar.GetConnectedStreams())
+                {
+                    stream.SerialDataStream?.Stop();
+                }
                 _plotManager.stopAutoUpdate();
             }
         }
 
-        private void InitializeDataStream()
-        {
-            SourceSetting sourceSetting = new SourceSetting("COM22", 1000000, 9);
-            byte[] startbytes = new byte[] { 0xAA, 0xAA };
-            dataStream = new SerialDataStream(sourceSetting, new DataParser(DataParser.BinaryFormat.uint16_t, 8, startbytes));
-            AquisitionControl.Baudrate = sourceSetting.BaudRate;
-            
-        }
+        //private void InitializeDataStream()
+        //{
+        //    SourceSetting sourceSetting = new SourceSetting("COM22", 1000000, 9, Parity.None);
+        //    byte[] startbytes = new byte[] { 0xAA, 0xAA };
+        //    _dataStream = new SerialDataStream(sourceSetting, new DataParser(DataParser.BinaryFormat.uint16_t, 8, startbytes));
+        //    AquisitionControl.Baudrate = sourceSetting.BaudRate;
+        //}
 
 
 
@@ -98,8 +123,7 @@ namespace SerialPlotDN_WPF
         private void writeSettingsToXML()
         {
             string filePath = Path.Combine(Directory.GetCurrentDirectory(), "Settings.xml");
-
-            Serializer.WriteSettingsToXML(filePath, _plotManager, dataStream, ChannelControlBar, VerticalControl, Ymin, Ymax, DataStreamBar._dataStreamModels);
+            Serializer.WriteSettingsToXML(filePath, _plotManager, null, ChannelControlBar, VerticalControl, DataStreamBar._dataStreamModels);
         }
 
         /// <summary>
@@ -108,26 +132,28 @@ namespace SerialPlotDN_WPF
         private void readSettingsXML()
         {
             string filePath = Path.Combine(Directory.GetCurrentDirectory(), "Settings.xml");
-            Serializer.ReadSettingsFromXML(filePath, _plotManager, dataStream, ChannelControlBar, VerticalControl, (ymin, ymax) => {
-                Ymin = ymin;
-                Ymax = ymax;
-            });
-
+            var loadedStreams = Serializer.ReadSettingsFromXML(filePath, _plotManager, null, ChannelControlBar, VerticalControl);
             
+            // Add loaded streams to DataStreamBar
+            foreach (var stream in loadedStreams)
+            {
+                DataStreamBar.AddStreamFromSettings(stream);
+            }
         }
 
         protected override void OnClosed(EventArgs e)
         {
             writeSettingsToXML(); // Save settings on exit
             
-            dataStream?.Dispose();
+            // Dispose DataStreamBar which will handle all stream disposal
+            DataStreamBar.Dispose();
             base.OnClosed(e);
         }
 
         private void closing(object sender, CancelEventArgs e)
         {
-            
-            dataStream?.Dispose();
+            // Dispose DataStreamBar which will handle all stream disposal
+            DataStreamBar.Dispose();
         }
 
         private void WpfPlot1_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -148,7 +174,10 @@ namespace SerialPlotDN_WPF
             int currentFPS = _plotManager.CurrentPlotUpdateRateFPS;
             int currentLineWidth = _plotManager.CurrentLineWidth;
             bool currentAntiAliasing = _plotManager.CurrentAntiAliasing;
-            settingsWindow.InitializeFromMainWindow(currentFPS, dataStream.SerialPortUpdateRateHz, currentLineWidth, currentAntiAliasing, WpfPlot1.Plot.Benchmark.IsVisible);
+            
+            // Use default serial port update rate since we now have multiple streams
+            int defaultSerialUpdateRate = 1000;
+            settingsWindow.InitializeFromMainWindow(currentFPS, defaultSerialUpdateRate, currentLineWidth, currentAntiAliasing, WpfPlot1.Plot.Benchmark.IsVisible);
             settingsWindow.OnSettingsApplied += (settings) => ApplyPlotSettings(settings);
             settingsWindow.Show();
         }
