@@ -27,14 +27,14 @@
                 <ColumnDefinition Width="200" MinWidth="200"/>
             </Grid.ColumnDefinitions>
             <!-- DataStreamBar (left) -->
-            <UserControls:DataStreamBar Grid.Column="0" x:Name="StreamBar"/>
+            <UserControls:DataStreamBar Grid.Column="0" x:Name="DataStreamBar"/>
             <!-- Plot area (center) -->
             <Grid Grid.Column="1" Background="{DynamicResource PlotSettings_BackgroundBrush}">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="*"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
-                <ScottPlot:WpfPlotGL x:Name="WpfPlot1" Grid.Row="0" MouseLeftButtonDown="WpfPlot1_MouseLeftButtonDown" MouseRightButtonDown="WpfPlot1_MouseRightButtonDown" MouseDoubleClick="WpfPlot1_MouseDoubleCLick" Margin="10,10,10,10"/>
+                <ScottPlot:WpfPlotGL x:Name="WpfPlot1" Grid.Row="0" MouseLeftButtonDown="WpfPlot1_MouseLeftButtonDown" MouseRightButtonDown="WpfPlot1_MouseRightButtonDown" Margin="10,10,10,10"/>
                 <Button x:Name="Button_ConfigPlot" Panel.ZIndex="1" Height="20" Width="20" HorizontalAlignment="Right" VerticalAlignment="Top" Content="🔨" Margin="5,5,5,5" Click="Button_ConfigPlot_Click" Grid.Row="0"/>
                 <ScrollBar x:Name="PlotScrollBar" Grid.Row="1" Orientation="Horizontal" Height="6" Margin="0,2,0,0" Background="{DynamicResource PlotSettings_BackgroundBrush}" Maximum="100" SmallChange="0.5" Value="100" Cursor="ScrollWE" ViewportSize="5" Foreground="Black" BorderBrush="{DynamicResource PlotSettings_BorderBrush}" Scroll="Scrollbar_ValueChanged"/>
             </Grid>

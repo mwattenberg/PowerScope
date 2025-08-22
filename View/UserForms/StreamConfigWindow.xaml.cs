@@ -27,8 +27,7 @@ namespace SerialPlotDN_WPF.View.UserForms
             this.DataContext = ViewModel;
             Loaded += SerialConfigWindow_Loaded;
             Loaded += SerialConfigWindow_Loaded_AudioDevices;
-            Radio_RawBinary.Checked += DataFormatRadio_Checked;
-            Radio_ASCII.Checked += DataFormatRadio_Checked;
+            ComboBox_DataFormat.SelectionChanged += DataFormatCombo_SelectionChanged;
             SetRawBinaryPanelVisibility();
             SetASCIIPanelVisibility();
         }
@@ -264,7 +263,7 @@ namespace SerialPlotDN_WPF.View.UserForms
             Close();
         }
 
-        private void DataFormatRadio_Checked(object sender, RoutedEventArgs e)
+        private void DataFormatCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             SetRawBinaryPanelVisibility();
             SetASCIIPanelVisibility();
@@ -273,13 +272,13 @@ namespace SerialPlotDN_WPF.View.UserForms
         private void SetRawBinaryPanelVisibility()
         {
             if (Panel_RawBinary != null)
-                Panel_RawBinary.Visibility = Radio_RawBinary.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
+                Panel_RawBinary.Visibility = ViewModel.DataFormat == DataFormatType.RawBinary ? Visibility.Visible : Visibility.Collapsed;
         }
 
         private void SetASCIIPanelVisibility()
         {
             if (Panel_ASCII != null)
-                Panel_ASCII.Visibility = Radio_ASCII.IsChecked == true ? Visibility.Visible : Visibility.Collapsed;
+                Panel_ASCII.Visibility = ViewModel.DataFormat == DataFormatType.ASCII ? Visibility.Visible : Visibility.Collapsed;
         }
     }
 

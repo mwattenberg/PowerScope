@@ -2,26 +2,27 @@
 
 namespace SerialPlotDN_WPF.Model
 {
-    public class DataStream : IDisposable
+    public class SerialDataStream : IDisposable
     {
 
         private readonly System.IO.Ports.SerialPort _port;
-
         private byte[] _residue;
         private readonly byte[] _readBuffer;
         private readonly byte[] _workingBuffer;
-
-        public enum Baudrates { Baud_9600 = 9600, Baud_19200 = 19200, Baud_57600 = 57600, Baud_115200 = 115200, Baud_256000 = 256000 };
+                
         public long TotalSamples { get; private set; }
         public long TotalBits { get; private set; }
         private RingBuffer<double>[] ReceivedData { get; set; }
         private int[] _lastReadPositions;
         public bool IsRunning { get; private set; }
         public DataParser Parser { get; init; }
-        public int SerialPortUpdateRateHz { get; set; } = 1000; // Default update rate in Hz
+        public int SerialPortUpdateRateHz { get; set; } = 200; // Default update rate in Hz
 
-        public DataStream(SourceSetting source, DataParser dataParser)
+        public SourceSetting SourceSetting { get; init; }
+
+        public SerialDataStream(SourceSetting source, DataParser dataParser)
         {
+            SourceSetting = source;
             Parser = dataParser;
             _port = new System.IO.Ports.SerialPort(source.PortName, source.BaudRate, System.IO.Ports.Parity.None, 8);
             _port.Encoding = Encoding.ASCII;

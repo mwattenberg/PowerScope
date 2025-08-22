@@ -1,14 +1,20 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Windows.Input;
-using System.ComponentModel;
+﻿using System.ComponentModel;
 using System.IO.Ports; // Add for Parity enum
 
 namespace SerialPlotDN_WPF.Model
 {
+    public enum DataFormatType
+    {
+        RawBinary,
+        ASCII
+    }
+
+    public enum StreamSource
+    {
+        SerialPort,
+        AudioInput
+    }
+
     public class DataStreamViewModel : INotifyPropertyChanged
     {
         private string port;
@@ -22,30 +28,33 @@ namespace SerialPlotDN_WPF.Model
         private int audioDeviceIndex;
         private int sampleRate;
         private bool enableChecksum;
+        private DataFormatType _dataFormat;
+        private StreamSource _streamSource;
+
+        public DataStreamViewModel()
+        {
+            StatusMessage = "Disconnected";
+            DataBits = 8;
+            StopBits = 1;
+            Parity = Parity.None;
+            NumberOfChannels = 8;
+            DataFormat = DataFormatType.RawBinary;
+        }
 
         // Dataformat Tab properties
-        private bool _isRawBinary;
-        public bool IsRawBinary
+        public DataFormatType DataFormat
         {
-            get => _isRawBinary;
+            get => _dataFormat;
             set
             {
-                if (_isRawBinary != value)
+                if (_dataFormat != value)
                 {
-                    _isRawBinary = value;
-                    OnPropertyChanged(nameof(IsRawBinary));
-                    OnPropertyChanged(nameof(IsASCII));
+                    _dataFormat = value;
+                    OnPropertyChanged(nameof(DataFormat));
                 }
             }
         }
-        public bool IsASCII
-        {
-            get => !_isRawBinary;
-            set
-            {
-                IsRawBinary = !value;
-            }
-        }
+
         private int numberOfChannels;
         private string numberType; // "Uint8", "Uint16", etc.
         private string endianness; // "LittleEndian", "BigEndian"

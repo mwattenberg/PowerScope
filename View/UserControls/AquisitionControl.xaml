@@ -5,7 +5,8 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:SerialPlotDN_WPF.View.UserControls"
              mc:Ignorable="d" 
-             Width="280" Height="150">
+             Width="280" Height="150"
+             Unloaded="AquisitionControl_Unloaded">
     <UserControl.Resources>
         <!-- Styles copied from HorizontalControl -->
         <Style TargetType="Button">

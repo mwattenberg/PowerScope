@@ -41,6 +41,10 @@
                 <MenuItem Header="Grid"/>
                 <MenuItem Header="Minor Grid"/>
             </MenuItem>
+            <MenuItem Header="Help">
+                <MenuItem Header="About"/>
+                <MenuItem Header="Software releases"/>
+            </MenuItem>
         </Menu>
     </Border>
 </UserControl>

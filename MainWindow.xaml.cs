@@ -8,6 +8,7 @@ using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Xml.Linq;
+using ScottPlot.Plottables;
 using SerialPlotDN_WPF.Model;
 using SerialPlotDN_WPF.View.UserControls;
 
@@ -20,35 +21,25 @@ namespace SerialPlotDN_WPF
     /// </summary> 　
     public partial class MainWindow : Window
     {
-        private DataAndPlotManager _plotManager;
-        private readonly System.Timers.Timer _updateAquisitionTimer = new() { Interval = 1000, Enabled = true, AutoReset = true }; // 500 ms
-        
-        private TimeSpan _prevCpuTime = TimeSpan.Zero;
-        private readonly Stopwatch _cpuStopwatch = Stopwatch.StartNew();
-        private long _prevCpuStopwatchMs = 0;
-        private long _prevSampleCount = 0;
-        private long _totalBits = 0;
-           
+        private PlotManager _plotManager;
 
         // Configurable display settings - use DataStream's ring buffer capacity
         public int DisplayElements { get; set; } = 3000; // Number of elements to display
 
         //Debug just data parsing and plotting
-        private DataStream dataStream;
-
-        // Y-axis range properties for plot
-        public int Ymin { get; set; } = -200;
-        public int Ymax { get; set; } = 4000;
+        private SerialDataStream dataStream;
+        
 
         public MainWindow()
         {
             InitializeComponent();
-            _plotManager = new DataAndPlotManager(WpfPlot1, ChannelControlBar, VerticalControl, HorizontalControl);
+            InitializeDataStream();
+
+            _plotManager = new PlotManager(WpfPlot1, ChannelControlBar, VerticalControl, HorizontalControl, dataStream);
             _plotManager.InitializePlot();
             _plotManager.InitializeChannelControlBar();
             _plotManager.SetupPlotUserInput();
-            InitializeDataStream();
-            InitializeTimer();
+            
             InitializeHorizontalControl();
             InitializeVerticalControl();
             readSettingsXML();
@@ -69,7 +60,7 @@ namespace SerialPlotDN_WPF
 
         private void InitializeEventHandlers()
         {
-            HorizontalControl.WindowSizeChanged += _plotManager.OnWindowSizeChanged;
+            HorizontalControl.WindowSizeChanged += _plotManager.updateHorizontalScale;
             VerticalControl.MinValueChanged += (s, v) => _plotManager.SetYLimits(v, _plotManager.Ymax);
             VerticalControl.MaxValueChanged += (s, v) => _plotManager.SetYLimits(_plotManager.Ymin, v);
             VerticalControl.AutoScaleChanged += (s, isAutoScale) => { if (!isAutoScale) _plotManager.SetYLimits(_plotManager.Ymin, _plotManager.Ymax); };
@@ -81,12 +72,12 @@ namespace SerialPlotDN_WPF
             if (newState == RunControl.RunStates.Running)
             {
                 dataStream.Start();
-                _plotManager.StartPlotTimer();
+                _plotManager.startAutoUpdate();
             }
             else
             {
                 dataStream.Stop();
-                _plotManager.StopPlotTimer();
+                _plotManager.stopAutoUpdate();
             }
         }
 
@@ -94,93 +85,21 @@ namespace SerialPlotDN_WPF
         {
             SourceSetting sourceSetting = new SourceSetting("COM22", 1000000, 9);
             byte[] startbytes = new byte[] { 0xAA, 0xAA };
-            dataStream = new DataStream(sourceSetting, new DataParser(DataParser.BinaryFormat.uint16_t, 8, startbytes));
+            dataStream = new SerialDataStream(sourceSetting, new DataParser(DataParser.BinaryFormat.uint16_t, 8, startbytes));
             AquisitionControl.Baudrate = sourceSetting.BaudRate;
             
         }
 
-        private void InitializeTimer()
-        {
-            _updateAquisitionTimer.Elapsed += UpdateAquisition;
-        }
 
-        private void UpdateAquisition(object sender, ElapsedEventArgs e)
-        {
-            // Ensure up-to-date data
-            var process = Process.GetCurrentProcess();
-            process.Refresh();
-            
-            //Update CPU usage
-            TimeSpan cpuTime = process.TotalProcessorTime;
-            long currentMs = _cpuStopwatch.ElapsedMilliseconds;           
-
-            double cpuUsedMs = (cpuTime - _prevCpuTime).TotalMilliseconds;
-            long elapsedMs = currentMs - _prevCpuStopwatchMs;
-
-            _prevCpuStopwatchMs = currentMs;
-            _prevCpuTime = cpuTime;
-
-            if (elapsedMs < _updateAquisitionTimer.Interval)
-                return; // Avoid division by zero if timer interval is too short
-
-            double cpuUsagePercent = (cpuUsedMs / (elapsedMs * Environment.ProcessorCount)) * 1000;
-
-            //Update memory usage
-            long memoryBytes = Process.GetCurrentProcess().WorkingSet64;
-            double memoryMB = memoryBytes / (1024.0 * 1024.0);
-
-            //Serial port samples
-            long samplesPerSecond = (dataStream.TotalSamples - _prevSampleCount) / (elapsedMs / 1000); 
-            _prevSampleCount = dataStream.TotalSamples;
-
-            //Bits per second
-            long bitsPerSecond = (dataStream.TotalBits - _totalBits) / (elapsedMs / 1000);
-            _totalBits = dataStream.TotalBits;
-
-            Application.Current.Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Normal, new Action(() =>
-            {
-                if (AquisitionControl != null && AquisitionControl.IsLoaded)
-                {
-                    // Update AquisitionControl
-                    AquisitionControl.TotalMemorySize = (long)memoryMB;
-                    AquisitionControl.CPULoad = cpuUsagePercent;
-                    AquisitionControl.SamplesPerSecond = samplesPerSecond;
-                    AquisitionControl.BitsPerSecond = bitsPerSecond;
-                }
-            }));
-        }
 
         /// <summary>
         /// Writes current plot settings to an XML file in the application directory.
         /// </summary>
         private void writeSettingsToXML()
         {
-            var channelLabels = new XElement("ChannelLabels");
-            foreach (ChannelControl channel in ChannelControlBar.Channels)
-            {
-
-                channelLabels.Add(new XElement("Label", channel.Label));
-            }
-
-            int plotUpdateRateFPS = _plotManager.CurrentPlotUpdateRateFPS;
-            int serialPortUpdateRateHz = dataStream?.SerialPortUpdateRateHz ?? 1000;
-            int lineWidth = _plotManager.CurrentLineWidth;
-            bool antiAliasing = _plotManager.CurrentAntiAliasing;
-            bool showRenderTime = WpfPlot1.Plot.Benchmark.IsVisible;
-            bool autoScale = VerticalControl.IsAutoScale;
-            var settingsXml = new XElement("PlotSettings",
-                new XElement("PlotUpdateRateFPS", plotUpdateRateFPS),
-                new XElement("SerialPortUpdateRateHz", serialPortUpdateRateHz),
-                new XElement("LineWidth", lineWidth),
-                new XElement("AntiAliasing", antiAliasing),
-                new XElement("ShowRenderTime", showRenderTime),
-                new XElement("Ymin", Ymin),
-                new XElement("Ymax", Ymax),
-                new XElement("AutoScale", autoScale),
-                channelLabels
-            );
             string filePath = Path.Combine(Directory.GetCurrentDirectory(), "Settings.xml");
-            settingsXml.Save(filePath);
+
+            Serializer.WriteSettingsToXML(filePath, _plotManager, dataStream, ChannelControlBar, VerticalControl, Ymin, Ymax, DataStreamBar._dataStreamModels);
         }
 
         /// <summary>
@@ -189,56 +108,25 @@ namespace SerialPlotDN_WPF
         private void readSettingsXML()
         {
             string filePath = Path.Combine(Directory.GetCurrentDirectory(), "Settings.xml");
-            if (!File.Exists(filePath)) return;
-            try
-            {
-                var settingsXml = XElement.Load(filePath);
-                int plotUpdateRateFPS = int.Parse(settingsXml.Element("PlotUpdateRateFPS")?.Value ?? "30");
-                int serialPortUpdateRateHz = int.Parse(settingsXml.Element("SerialPortUpdateRateHz")?.Value ?? "1000");
-                int lineWidth = int.Parse(settingsXml.Element("LineWidth")?.Value ?? "1");
-                bool antiAliasing = bool.Parse(settingsXml.Element("AntiAliasing")?.Value ?? "false");
-                bool showRenderTime = bool.Parse(settingsXml.Element("ShowRenderTime")?.Value ?? "false");
-                int yMin = int.Parse(settingsXml.Element("Ymin")?.Value ?? "-200");
-                int yMax = int.Parse(settingsXml.Element("Ymax")?.Value ?? "4000");
-                bool autoScale = bool.Parse(settingsXml.Element("AutoScale")?.Value ?? "true");
-                Ymin = yMin;
-                Ymax = yMax;
-                VerticalControl.Min = Ymin;
-                VerticalControl.Max = Ymax;
-                VerticalControl.IsAutoScale = autoScale;
-                _plotManager.ApplyPlotSettings(plotUpdateRateFPS, lineWidth, antiAliasing, showRenderTime);
-                if (dataStream != null)
-                    dataStream.SerialPortUpdateRateHz = serialPortUpdateRateHz;
-                WpfPlot1.Plot.Axes.SetLimitsY(Ymin, Ymax);
-                var channelLabelElement = settingsXml.Element("ChannelLabels");
-                if (channelLabelElement != null)
-                {
-                    var labelElements = channelLabelElement.Elements("Label").ToList();
-                    int i = 0;
-                    foreach (ChannelControl channel in ChannelControlBar.Channels)
-                    {
-                        if (i < labelElements.Count)
-                        {
-                            channel.Label = labelElements[i].Value;
-                        }
-                        i++;
-                    }
-                }
-            }
-            catch { /* Ignore errors and use defaults */ }
+            Serializer.ReadSettingsFromXML(filePath, _plotManager, dataStream, ChannelControlBar, VerticalControl, (ymin, ymax) => {
+                Ymin = ymin;
+                Ymax = ymax;
+            });
+
+            
         }
 
         protected override void OnClosed(EventArgs e)
         {
             writeSettingsToXML(); // Save settings on exit
-            _updateAquisitionTimer?.Stop();
+            
             dataStream?.Dispose();
             base.OnClosed(e);
         }
 
         private void closing(object sender, CancelEventArgs e)
         {
-            _updateAquisitionTimer?.Stop();
+            
             dataStream?.Dispose();
         }
 
@@ -265,8 +153,9 @@ namespace SerialPlotDN_WPF
             settingsWindow.Show();
         }
 
+
         private void SetupPlotUserInput()
-        {  
+        {
             WpfPlot1.UserInputProcessor.Reset();
             WpfPlot1.UserInputProcessor.IsEnabled = false;
 
@@ -275,7 +164,6 @@ namespace SerialPlotDN_WPF
             var zoomRectangleResponse = new ScottPlot.Interactivity.UserActionResponses.MouseDragZoomRectangle(zoomRectangleButton);
             WpfPlot1.UserInputProcessor.UserActionResponses.Add(zoomRectangleResponse);
         }
-
 
 
 
@@ -289,9 +177,5 @@ namespace SerialPlotDN_WPF
             double test = e.NewValue;
         }
 
-        private void WpfPlot1_MouseDoubleCLick(object sender, MouseButtonEventArgs e)
-        {
-
-        }
     }
 }

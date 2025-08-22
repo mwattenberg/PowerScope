@@ -15,9 +15,7 @@ namespace SerialPlotDN_WPF.View.UserControls
 
     public partial class DataStreamBar : UserControl
     {
-        public List<DataStreamManager> DataStreamManagers { get; private set; } = new();
-
-        public bool IsRunning { get; set; }
+        public List<DataStreamViewModel> _dataStreamModels = new List<DataStreamViewModel>();
 
         public DataStreamBar()
         {
@@ -32,13 +30,13 @@ namespace SerialPlotDN_WPF.View.UserControls
             var configWindow = new SerialConfigWindow(vm);
             if (configWindow.ShowDialog() == true)
             {
-                var manager = new DataStreamManager();
-                DataStreamManagers.Add(manager);
-                manager.StreamViewModels.Add(vm);
+                _dataStreamModels.Add(vm);
+
+                
                 var panel = new StreamInfoPanel
                 {
                     DataContext = vm,
-                    Manager = manager
+                    
                 };
                 Panel_Streams.Children.Add(panel);
             }

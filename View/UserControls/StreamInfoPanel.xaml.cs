@@ -10,7 +10,7 @@ namespace SerialPlotDN_WPF.View.UserControls
     {
         public delegate void OnConnectedClicked(object sender, EventArgs e);
         public event OnConnectedClicked OnConnectClickedEvent;
-        public DataStreamManager Manager { get; set; }
+
 
         public StreamInfoPanel()
         {
@@ -28,17 +28,17 @@ namespace SerialPlotDN_WPF.View.UserControls
 
         private void Button_Connect_Click(object sender, RoutedEventArgs e)
         {
-            if (DataContext is DataStreamViewModel vm && Manager != null)
+            if (DataContext is DataStreamViewModel vm)
             {
                 if (vm.IsConnected)
                 {
-                    Manager.Disconnect(vm);
+
                     Button_Connect.Content = "Connect";
                     Button_Connect.Background = new SolidColorBrush(Colors.LightGreen);
                 }
                 else
                 {
-                    Manager.Connect(vm);
+                    
                     Button_Connect.Content = "Disconnect";
                     Button_Connect.Background = new SolidColorBrush(Colors.OrangeRed);   
                 }

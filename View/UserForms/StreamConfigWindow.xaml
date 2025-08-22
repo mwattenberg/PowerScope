@@ -345,11 +345,11 @@
                                 </StackPanel>
                                 <!-- Data format -->
                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
-                                    <Label Content="Data format:" VerticalAlignment="Center" ToolTip="Raw binary uses fewer bits per value but is harder to debug. ASCI is easy to debug but requires more bits per value." Width="80"/>
-                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                        <RadioButton x:Name="Radio_RawBinary" Content="Raw binary" GroupName="DataFormat" IsChecked="{Binding IsRawBinary, Mode=TwoWay}" Margin="0,0,10,0"/>
-                                        <RadioButton x:Name="Radio_ASCII" Content="ASCII" GroupName="DataFormat" IsChecked="{Binding IsASCII, Mode=TwoWay}"/>
-                                    </StackPanel>
+                                    <Label Content="Data format:" VerticalAlignment="Center" ToolTip="Raw binary uses fewer bits per value but is harder to debug. ASCII is easy to debug but requires more bits per value." Width="80"/>
+                                    <ComboBox x:Name="ComboBox_DataFormat" Width="200" SelectedValue="{Binding DataFormat, Mode=TwoWay}" SelectedValuePath="Tag">
+                                        <ComboBoxItem Content="Raw binary" Tag="RawBinary" />
+                                        <ComboBoxItem Content="ASCII" Tag="ASCII" />
+                                    </ComboBox>
                                 </StackPanel>
                                 <!-- Raw binary conditional controls -->
                                 <StackPanel x:Name="Panel_RawBinary" Visibility="Collapsed" Margin="0,0,0,5">
@@ -376,7 +376,11 @@
                                             <ComboBoxItem Content="Big Endian"/>
                                         </ComboBox>
                                     </StackPanel>
-                                    <CheckBox x:Name="CheckBox_EnableChecksum" Content="Enable Checksum" VerticalAlignment="Center" Margin="80,0,0,0" IsChecked="{Binding EnableChecksum, Mode=TwoWay}" />
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                                        <Label Content="Enable checksum:" VerticalAlignment="Center" ToolTip="Enable checksum for error detection." Width="80"/>
+                                        <CheckBox x:Name="CheckBox_EnableChecksum" Content="Enable Checksum" VerticalAlignment="Center" Margin="80,0,0,0" IsChecked="{Binding EnableChecksum, Mode=TwoWay}"/>
+                                    </StackPanel>
+                                    <!--<CheckBox x:Name="CheckBox_EnableChecksum" Content="Enable Checksum" VerticalAlignment="Center" Margin="80,0,0,0" IsChecked="{Binding EnableChecksum, Mode=TwoWay}" />-->
                                 </StackPanel>
                                 <!-- ASCII conditional controls -->
                                 <StackPanel x:Name="Panel_ASCII" Visibility="Collapsed" Margin="0,0,0,5">
