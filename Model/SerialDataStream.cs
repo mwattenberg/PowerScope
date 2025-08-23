@@ -59,7 +59,13 @@ namespace SerialPlotDN_WPF.Model
         public bool IsRunning { get; private set; }
         public DataParser Parser { get; init; }
         public int SerialPortUpdateRateHz { get; set; } = 200; // Default update rate in Hz
-        public int NumberOfChannels => Parser.NumberOfChannels;
+        public int NumberOfChannels 
+        { 
+            get 
+            { 
+                return Parser.NumberOfChannels; 
+            } 
+        }
         public SourceSetting SourceSetting { get; init; }
 
         public SerialDataStream(SourceSetting source, DataParser dataParser)
@@ -82,19 +88,22 @@ namespace SerialPlotDN_WPF.Model
             catch (UnauthorizedAccessException ex)
             {
                 // Port is already in use by another application
-                _port?.Dispose();
+                if (_port != null)
+                    _port.Dispose();
                 throw new PortAlreadyInUseException(source.PortName, ex);
             }
             catch (ArgumentException ex)
             {
                 // Invalid port name or parameters
-                _port?.Dispose();
+                if (_port != null)
+                    _port.Dispose();
                 throw new PortNotFoundException(source.PortName, ex);
             }
             catch (InvalidOperationException ex)
             {
                 // Port is already open or other operation issue
-                _port?.Dispose();
+                if (_port != null)
+                    _port.Dispose();
                 throw new PortAlreadyInUseException(source.PortName, ex);
             }
 
@@ -121,15 +130,25 @@ namespace SerialPlotDN_WPF.Model
         {
             if (string.IsNullOrWhiteSpace(portName))
             {
-                throw new PortNotFoundException(portName ?? "null");
+                string actualPortName = portName;
+                if (actualPortName == null)
+                    actualPortName = "null";
+                throw new PortNotFoundException(actualPortName);
             }
 
             // Get all available serial ports on the system
             string[] availablePorts = SerialPort.GetPortNames();
             
             // Check if the requested port exists (case-insensitive comparison)
-            bool portExists = availablePorts.Any(port => 
-                string.Equals(port, portName, StringComparison.OrdinalIgnoreCase));
+            bool portExists = false;
+            foreach (string port in availablePorts)
+            {
+                if (string.Equals(port, portName, StringComparison.OrdinalIgnoreCase))
+                {
+                    portExists = true;
+                    break;
+                }
+            }
 
             if (!portExists)
             {
@@ -198,7 +217,9 @@ namespace SerialPlotDN_WPF.Model
         public IEnumerable<double> GetNewData(int channel)
         {
             if (channel < 0 || channel >= ReceivedData.Length)
-                return Enumerable.Empty<double>();
+            {
+                return new List<double>();
+            }
 
             return ReceivedData[channel].GetNewData(ref _lastReadPositions[channel]);
         }
@@ -206,7 +227,9 @@ namespace SerialPlotDN_WPF.Model
         public IEnumerable<double> GetLatestData(int channel, int sampleCount)
         {
             if (channel < 0 || channel >= ReceivedData.Length)
-                return Enumerable.Empty<double>();
+            {
+                return new List<double>();
+            }
 
             return ReceivedData[channel].GetLatest(sampleCount);
         }
@@ -292,18 +315,24 @@ namespace SerialPlotDN_WPF.Model
             Stop();
             try
             {
-                if (_port?.IsOpen == true)
+                if (_port != null && _port.IsOpen == true)
                 {
                     _port.Close();
                 }
-                _port?.Dispose();
+                if (_port != null)
+                {
+                    _port.Dispose();
+                }
             }
             catch (Exception) { }
             if (ReceivedData != null)
             {
-                foreach (var ringBuffer in ReceivedData)
+                foreach (RingBuffer<double> ringBuffer in ReceivedData)
                 {
-                    ringBuffer?.Clear();
+                    if (ringBuffer != null)
+                    {
+                        ringBuffer.Clear();
+                    }
                 }
             }
             _lastReadPositions = null;

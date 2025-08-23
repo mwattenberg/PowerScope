@@ -53,7 +53,7 @@ namespace SerialPlotDN_WPF.Model
         /// <param name="connectedStreams">Currently connected streams</param>
         public void SetDataStreams(IEnumerable<DataStreamViewModel> connectedStreams)
         {
-            _connectedStreams = connectedStreams; ;
+            _connectedStreams = connectedStreams;
         }
 
         private void setDarkMode()
@@ -89,7 +89,7 @@ namespace SerialPlotDN_WPF.Model
 
         /// <summary>
         /// Updates the plot to display the specified number of channels
-        /// </summary>
+        /// /// </summary>
         /// <param name="channelCount">Number of channels to display</param>
         /// <param name="channelColors">Optional colors for each channel</param>
         public void UpdateChannelDisplay(int channelCount, Color[] channelColors = null)
@@ -115,7 +115,7 @@ namespace SerialPlotDN_WPF.Model
                 // Set color if provided, otherwise use palette
                 if (channelColors != null && i < channelColors.Length)
                 {
-                    var color = channelColors[i];
+                    Color color = channelColors[i];
                     _signals[i].Color = new ScottPlot.Color(color.R, color.G, color.B);
                 }
                 else
@@ -133,23 +133,23 @@ namespace SerialPlotDN_WPF.Model
 
         /// <summary>
         /// Gets the colors currently used by the plot signals
-        /// </summary>
+        /// /// </summary>
         /// <param name="channelCount">Number of channels to get colors for</param>
         /// <returns>Array of colors</returns>
         public Color[] GetSignalColors(int channelCount)
         {
-            var colors = new Color[channelCount];
+            Color[] colors = new Color[channelCount];
             for (int i = 0; i < channelCount && i < _maxChannels; i++)
             {
                 if (_signals[i] != null)
                 {
-                    var signalColor = _signals[i].Color;
+                    ScottPlot.Color signalColor = _signals[i].Color;
                     colors[i] = Color.FromArgb(signalColor.A, signalColor.R, signalColor.G, signalColor.B);
                 }
                 else
                 {
                     // Fallback to default colors
-                    var defaultColors = new Color[]
+                    Color[] defaultColors = new Color[]
                     {
                         System.Windows.Media.Colors.Red, System.Windows.Media.Colors.Green, System.Windows.Media.Colors.Blue, System.Windows.Media.Colors.Orange,
                         System.Windows.Media.Colors.Purple, System.Windows.Media.Colors.Brown, System.Windows.Media.Colors.Pink, System.Windows.Media.Colors.Gray,
@@ -161,8 +161,15 @@ namespace SerialPlotDN_WPF.Model
             return colors;
         }
 
-        public void startAutoUpdate() => _updatePlotTimer.Start();
-        public void stopAutoUpdate() => _updatePlotTimer.Stop();
+        public void startAutoUpdate()
+        {
+            _updatePlotTimer.Start();
+        }
+
+        public void stopAutoUpdate()
+        {
+            _updatePlotTimer.Stop();
+        }
 
         public void UpdatePlot(object? source, ElapsedEventArgs? e)
         {
@@ -211,9 +218,9 @@ namespace SerialPlotDN_WPF.Model
                 
                 if (_signals[i] != null)
                 {
-                    var colorOld = _signals[i].Color;
-                    var linewidthOld = _signals[i].LineWidth;
-                    var antiAliasingOld = _signals[i].LineStyle.AntiAlias;
+                    ScottPlot.Color colorOld = _signals[i].Color;
+                    float linewidthOld = _signals[i].LineWidth;
+                    bool antiAliasingOld = _signals[i].LineStyle.AntiAlias;
                     _plot.Plot.Remove(_signals[i]);
                     _signals[i] = _plot.Plot.Add.Signal(_data[i]);
                     _signals[i].Color = colorOld;
@@ -249,8 +256,8 @@ namespace SerialPlotDN_WPF.Model
         {
             _plot.UserInputProcessor.Reset();
             _plot.UserInputProcessor.IsEnabled = false;
-            var zoomRectangleButton = ScottPlot.Interactivity.StandardMouseButtons.Right;
-            var zoomRectangleResponse = new ScottPlot.Interactivity.UserActionResponses.MouseDragZoomRectangle(zoomRectangleButton);
+            ScottPlot.Interactivity.MouseButton zoomRectangleButton = ScottPlot.Interactivity.StandardMouseButtons.Right;
+            ScottPlot.Interactivity.UserActionResponses.MouseDragZoomRectangle zoomRectangleResponse = new ScottPlot.Interactivity.UserActionResponses.MouseDragZoomRectangle(zoomRectangleButton);
             _plot.UserInputProcessor.UserActionResponses.Add(zoomRectangleResponse);
         }
 
@@ -262,9 +269,36 @@ namespace SerialPlotDN_WPF.Model
             _plot.Refresh();
         }
 
-        public int CurrentPlotUpdateRateFPS => (int)(1000.0 / _updatePlotTimer.Interval);
-        public int CurrentLineWidth => (int)(_signals.FirstOrDefault(s => s != null)?.LineWidth ?? 1);
-        public bool CurrentAntiAliasing => _signals.FirstOrDefault(s => s != null)?.LineStyle.AntiAlias ?? false;
-        public bool ShowRenderTime => _plot.Plot.Benchmark.IsVisible;
+        public int CurrentPlotUpdateRateFPS
+        {
+            get
+            {
+                return (int)(1000.0 / _updatePlotTimer.Interval);
+            }
+        }
+
+        public int CurrentLineWidth
+        {
+            get
+            {
+                return (int)_signals[0].LineWidth;   
+            }
+        }
+
+        public bool CurrentAntiAliasing
+        {
+            get
+            {
+                return _signals[0].LineStyle.AntiAlias;   
+            }
+        }
+
+        public bool ShowRenderTime
+        {
+            get
+            {
+                return _plot.Plot.Benchmark.IsVisible;
+            }
+        }
     }
 }

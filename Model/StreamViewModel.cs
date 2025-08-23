@@ -67,7 +67,13 @@ namespace SerialPlotDN_WPF.Model
         /// <summary>
         /// Gets the current SerialDataStream instance (read-only)
         /// </summary>
-        public SerialDataStream SerialDataStream => _serialDataStream;
+        public SerialDataStream SerialDataStream 
+        { 
+            get 
+            { 
+                return _serialDataStream; 
+            } 
+        }
 
         /// <summary>
         /// Connects to the serial port using the current configuration
@@ -90,7 +96,7 @@ namespace SerialPlotDN_WPF.Model
             try
             {
                 // Create SourceSetting based on current properties
-                var sourceSetting = new SourceSetting(Port, Baud, DataBits, Parity);
+                SourceSetting sourceSetting = new SourceSetting(Port, Baud, DataBits, Parity);
 
                 // Create DataParser based on current configuration
                 DataParser dataParser;
@@ -130,7 +136,8 @@ namespace SerialPlotDN_WPF.Model
             catch (PortNotFoundException ex)
             {
                 StatusMessage = $"Could not find port: {ex.PortName}";
-                _serialDataStream?.Dispose();
+                if (_serialDataStream != null)
+                    _serialDataStream.Dispose();
                 _serialDataStream = null;
                 IsConnected = false;
                 return false;
@@ -138,7 +145,8 @@ namespace SerialPlotDN_WPF.Model
             catch (PortAlreadyInUseException ex)
             {
                 StatusMessage = $"Port already in use: {ex.PortName}";
-                _serialDataStream?.Dispose();
+                if (_serialDataStream != null)
+                    _serialDataStream.Dispose();
                 _serialDataStream = null;
                 IsConnected = false;
                 return false;
@@ -146,7 +154,8 @@ namespace SerialPlotDN_WPF.Model
             catch (Exception ex)
             {
                 StatusMessage = $"Connection failed: {ex.Message}";
-                _serialDataStream?.Dispose();
+                if (_serialDataStream != null)
+                    _serialDataStream.Dispose();
                 _serialDataStream = null;
                 IsConnected = false;
                 return false;
@@ -166,8 +175,10 @@ namespace SerialPlotDN_WPF.Model
             try
             {
                 // Stop and dispose the SerialDataStream
-                _serialDataStream?.Stop();
-                _serialDataStream?.Dispose();
+                if (_serialDataStream != null)
+                    _serialDataStream.Stop();
+                if (_serialDataStream != null)
+                    _serialDataStream.Dispose();
                 _serialDataStream = null;
 
                 // Update connection state
@@ -196,10 +207,10 @@ namespace SerialPlotDN_WPF.Model
             try
             {
                 // Try to parse as hex values (e.g., "AA AA" or "0xAA 0xAA")
-                var parts = frameStart.Split(new char[] { ' ', ',', ';' }, StringSplitOptions.RemoveEmptyEntries);
-                var bytes = new List<byte>();
+                string[] parts = frameStart.Split(new char[] { ' ', ',', ';' }, StringSplitOptions.RemoveEmptyEntries);
+                List<byte> bytes = new List<byte>();
                 
-                foreach (var part in parts)
+                foreach (string part in parts)
                 {
                     string cleanPart = part.Trim().Replace("0x", "").Replace("0X", "");
                     if (byte.TryParse(cleanPart, System.Globalization.NumberStyles.HexNumber, null, out byte b))
@@ -208,7 +219,10 @@ namespace SerialPlotDN_WPF.Model
                     }
                 }
 
-                return bytes.Count > 0 ? bytes.ToArray() : new byte[] { 0xAA, 0xAA };
+                if (bytes.Count > 0)
+                    return bytes.ToArray();
+                else
+                    return new byte[] { 0xAA, 0xAA };
             }
             catch
             {
@@ -239,7 +253,10 @@ namespace SerialPlotDN_WPF.Model
         // Dataformat Tab properties
         public DataFormatType DataFormat
         {
-            get => _dataFormat;
+            get 
+            { 
+                return _dataFormat; 
+            }
             set
             {
                 if (_dataFormat != value)
@@ -334,8 +351,15 @@ namespace SerialPlotDN_WPF.Model
 
         public bool EnableChecksum
         {
-            get => _enableChecksum;
-            set { _enableChecksum = value; OnPropertyChanged(nameof(EnableChecksum)); }
+            get 
+            { 
+                return _enableChecksum; 
+            }
+            set 
+            { 
+                _enableChecksum = value; 
+                OnPropertyChanged(nameof(EnableChecksum)); 
+            }
         }
 
         public bool IsConnected
@@ -372,35 +396,75 @@ namespace SerialPlotDN_WPF.Model
 
         public int NumberOfChannels
         {
-            get => _numberOfChannels;
-            set { _numberOfChannels = value; OnPropertyChanged(nameof(NumberOfChannels)); }
+            get 
+            { 
+                return _numberOfChannels; 
+            }
+            set 
+            { 
+                _numberOfChannels = value; 
+                OnPropertyChanged(nameof(NumberOfChannels)); 
+            }
         }
+        
         public NumberTypeEnum NumberType
         {
-            get => _numberType;
-            set { _numberType = value; OnPropertyChanged(nameof(NumberType)); }
+            get 
+            { 
+                return _numberType; 
+            }
+            set 
+            { 
+                _numberType = value; 
+                OnPropertyChanged(nameof(NumberType)); 
+            }
         }
+        
         public string Endianness
         {
-            get => _endianness;
-            set { _endianness = value; OnPropertyChanged(nameof(Endianness)); }
+            get 
+            { 
+                return _endianness; 
+            }
+            set 
+            { 
+                _endianness = value; 
+                OnPropertyChanged(nameof(Endianness)); 
+            }
         }
+        
         public string Delimiter
         {
-            get => _delimiter;
-            set { _delimiter = value; OnPropertyChanged(nameof(Delimiter)); }
+            get 
+            { 
+                return _delimiter; 
+            }
+            set 
+            { 
+                _delimiter = value; 
+                OnPropertyChanged(nameof(Delimiter)); 
+            }
         }
+        
         public string FrameStart
         {
-            get => _frameStart;
-            set { _frameStart = value; OnPropertyChanged(nameof(FrameStart)); }
+            get 
+            { 
+                return _frameStart; 
+            }
+            set 
+            { 
+                _frameStart = value; 
+                OnPropertyChanged(nameof(FrameStart)); 
+            }
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
 
         protected virtual void OnPropertyChanged(string propertyName)
         {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+            if (PropertyChanged != null)
+                PropertyChanged.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
 
         /// <summary>

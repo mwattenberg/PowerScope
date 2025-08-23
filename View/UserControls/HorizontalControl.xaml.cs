@@ -11,8 +11,8 @@ namespace SerialPlotDN_WPF.View.UserControls
     public partial class HorizontalControl : UserControl
     {
         // Events for button clicks
-        public event EventHandler<int>? BufferSizeChanged;
-        public event EventHandler<int>? WindowSizeChanged;
+        public event EventHandler<int> BufferSizeChanged;
+        public event EventHandler<int> WindowSizeChanged;
 
         // Properties
         private int _bufferSize = 1000;
@@ -20,23 +20,31 @@ namespace SerialPlotDN_WPF.View.UserControls
 
         public int BufferSize
         {
-            get => _bufferSize;
+            get 
+            { 
+                return _bufferSize; 
+            }
             set
             {
                 _bufferSize = Math.Clamp(value,1000,5000000);
                 BufferSizeTextBox.Text = _bufferSize.ToString();
-                BufferSizeChanged?.Invoke(this, _bufferSize);
+                if (BufferSizeChanged != null)
+                    BufferSizeChanged.Invoke(this, _bufferSize);
             }
         }
 
         public int WindowSize
         {
-            get => _windowSize;
+            get 
+            { 
+                return _windowSize; 
+            }
             set
             {
                 _windowSize = value;
                 WindowSizeTextBox.Text = value.ToString();
-                WindowSizeChanged?.Invoke(this, value);
+                if (WindowSizeChanged != null)
+                    WindowSizeChanged.Invoke(this, value);
             }
         }
 
@@ -64,7 +72,8 @@ namespace SerialPlotDN_WPF.View.UserControls
                 if (bufferSize != _bufferSize)
                 {
                     this.BufferSize = bufferSize;
-                    BufferSizeChanged?.Invoke(this, this.BufferSize);
+                    if (BufferSizeChanged != null)
+                        BufferSizeChanged.Invoke(this, this.BufferSize);
                 }
             }
         }
@@ -76,7 +85,8 @@ namespace SerialPlotDN_WPF.View.UserControls
                 if (windowSize != _windowSize)
                 {
                     _windowSize = windowSize;
-                    WindowSizeChanged?.Invoke(this, windowSize);
+                    if (WindowSizeChanged != null)
+                        WindowSizeChanged.Invoke(this, windowSize);
                 }
             }
         }

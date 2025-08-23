@@ -1,5 +1,4 @@
-﻿
-using SerialPlotDN_WPF.Model;
+﻿using SerialPlotDN_WPF.Model;
 using SerialPlotDN_WPF.View.UserForms;
 using System.Windows;
 using System.Windows.Controls;
@@ -28,8 +27,8 @@ namespace SerialPlotDN_WPF.View.UserControls
 
         private void Button_AddStream_Click(object sender, RoutedEventArgs e)
         {
-            var vm = new DataStreamViewModel();
-            var configWindow = new SerialConfigWindow(vm);
+            DataStreamViewModel vm = new DataStreamViewModel();
+            SerialConfigWindow configWindow = new SerialConfigWindow(vm);
             if (configWindow.ShowDialog() == true)
             {
                 DataStreams.Add(vm);
@@ -48,7 +47,7 @@ namespace SerialPlotDN_WPF.View.UserControls
 
         private void AddStreamInfoPanel(DataStreamViewModel viewModel)
         {
-            var panel = new StreamInfoPanel
+            StreamInfoPanel panel = new StreamInfoPanel
             {
                 DataContext = viewModel,
             };

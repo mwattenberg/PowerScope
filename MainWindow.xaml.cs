@@ -46,7 +46,7 @@ namespace SerialPlotDN_WPF
             
             
             // Initialize channel display based on current streams
-            var totalChannels = DataStreamBar.GetTotalChannelCount();
+            int totalChannels = DataStreamBar.GetTotalChannelCount();
             _plotManager.SetDataStreams(DataStreamBar.DataStreams);
             ChannelControlBar.UpdateChannels(totalChannels);
             _plotManager.UpdateChannelDisplay(totalChannels);
@@ -79,7 +79,7 @@ namespace SerialPlotDN_WPF
                 _plotManager.SetDataStreams(DataStreamBar.GetConnectedStreams());
                 
                 // Get colors from plot manager for consistency
-                var colors = _plotManager.GetSignalColors(totalChannels);
+                Color[] colors = _plotManager.GetSignalColors(totalChannels);
                 
                 // Update both UI components
                 ChannelControlBar.UpdateChannels(totalChannels, colors);
@@ -166,7 +166,7 @@ namespace SerialPlotDN_WPF
 
         private void Button_ConfigPlot_Click(object sender, RoutedEventArgs e)
         {
-            var settingsWindow = new View.UserForms.PlotSettingsWindow();
+            View.UserForms.PlotSettingsWindow settingsWindow = new View.UserForms.PlotSettingsWindow();
             int currentFPS = _plotManager.CurrentPlotUpdateRateFPS;
             int currentLineWidth = _plotManager.CurrentLineWidth;
             bool currentAntiAliasing = _plotManager.CurrentAntiAliasing;
@@ -185,8 +185,8 @@ namespace SerialPlotDN_WPF
             WpfPlot1.UserInputProcessor.IsEnabled = false;
 
             // right-click-drag zoom rectangle
-            var zoomRectangleButton = ScottPlot.Interactivity.StandardMouseButtons.Right;
-            var zoomRectangleResponse = new ScottPlot.Interactivity.UserActionResponses.MouseDragZoomRectangle(zoomRectangleButton);
+            ScottPlot.Interactivity.MouseButton zoomRectangleButton = ScottPlot.Interactivity.StandardMouseButtons.Right;
+            ScottPlot.Interactivity.UserActionResponses.MouseDragZoomRectangle zoomRectangleResponse = new ScottPlot.Interactivity.UserActionResponses.MouseDragZoomRectangle(zoomRectangleButton);
             WpfPlot1.UserInputProcessor.UserActionResponses.Add(zoomRectangleResponse);
         }
 

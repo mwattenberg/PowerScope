@@ -9,7 +9,7 @@ namespace SerialPlotDN_WPF.View.UserControls
     /// </summary>
     public partial class ChannelControlBar : UserControl
     {
-        public ObservableCollection<ChannelControl> Channels { get; } = new();
+        public ObservableCollection<ChannelControl> Channels { get; } = new ObservableCollection<ChannelControl>();
 
         public ChannelControlBar()
         {
@@ -45,8 +45,8 @@ namespace SerialPlotDN_WPF.View.UserControls
             // Add missing channels
             while (Channels.Count < totalChannels)
             {
-                var channelIndex = Channels.Count;
-                var channel = new ChannelControl
+                int channelIndex = Channels.Count;
+                ChannelControl channel = new ChannelControl
                 {
                     Label = $"CH{channelIndex + 1}",
                     Gain = 1.0,
@@ -61,7 +61,7 @@ namespace SerialPlotDN_WPF.View.UserControls
                 else
                 {
                     // Use a default color scheme if no colors provided
-                    var defaultColors = new Color[]
+                    Color[] defaultColors = new Color[]
                     {
                         Colors.Red, Colors.Green, Colors.Blue, Colors.Orange,
                         Colors.Purple, Colors.Brown, Colors.Pink, Colors.Gray,

@@ -1,0 +1,20 @@
+﻿Use these guide lines for code readably:
+- No tenary operators.
+- No null conditional operators.
+- explicit if-else statements.
+- Skip {} for single line if / else statements.
+- Do not use LINQ when a foreach loop is more readable.
+- Minimize use of Linq in general.
+- Clear getter and setter methods.
+- No expression bodied members.
+- Avoid chaining method calls.
+- The code can be verbose for the sake of clarity and readability.
+- Naming conventions:
+  - private fields: _camelCase
+  - public fields / properties: PascalCase
+  - local variables: camelCase
+  - method parameters: camelCase
+  - interfaces: IPascalCase
+  - classes: PascalCase
+  - methods: PascalCase
+  - No var keyword, always explicitly declare types.

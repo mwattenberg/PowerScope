@@ -68,19 +68,26 @@ namespace SerialPlotDN_WPF.View.UserControls
             if (DataContext is DataStreamViewModel vm)
             {
                 // Update button content
-                Button_Connect.Content = vm.IsConnected ? "Disconnect" : "Connect";
+                if (vm.IsConnected)
+                    Button_Connect.Content = "Disconnect";
+                else
+                    Button_Connect.Content = "Connect";
                 
                 // Update button background
-                Button_Connect.Background = vm.IsConnected ? 
-                    new SolidColorBrush(Colors.OrangeRed) : 
-                    new SolidColorBrush(Colors.LimeGreen);
+                if (vm.IsConnected)
+                    Button_Connect.Background = new SolidColorBrush(Colors.OrangeRed);
+                else
+                    Button_Connect.Background = new SolidColorBrush(Colors.LimeGreen);
             }
         }
 
         private void StreamInfoPanel_Unloaded(object sender, RoutedEventArgs e)
         {
-            _updateTimer?.Stop();
-            _updateTimer?.Dispose();
+            if (_updateTimer != null)
+            {
+                _updateTimer.Stop();
+                _updateTimer.Dispose();
+            }
             
             // Unsubscribe from property changes
             if (DataContext is DataStreamViewModel vm)
@@ -100,7 +107,7 @@ namespace SerialPlotDN_WPF.View.UserControls
                 {
                     try
                     {
-                        var dataStream = vm.SerialDataStream;
+                        SerialDataStream dataStream = vm.SerialDataStream;
                         
                         // Calculate samples per second
                         long currentSamples = dataStream.TotalSamples;
@@ -112,7 +119,11 @@ namespace SerialPlotDN_WPF.View.UserControls
                         long bitsPerSecond = currentBits - _prevBitsCount;
                         _prevBitsCount = currentBits;
                         
-                        double portUsagePercent = vm.Baud > 0 ? (double)bitsPerSecond / vm.Baud * 100.0 : 0.0;
+                        double portUsagePercent;
+                        if (vm.Baud > 0)
+                            portUsagePercent = (double)bitsPerSecond / vm.Baud * 100.0;
+                        else
+                            portUsagePercent = 0.0;
                         
                         // Update UI
                         SamplesPerSecondTextBlock.Text = samplesPerSecond.ToString();
@@ -146,7 +157,7 @@ namespace SerialPlotDN_WPF.View.UserControls
                     vm.Disconnect();
                 }
 
-                var configWindow = new SerialConfigWindow(vm);
+                SerialConfigWindow configWindow = new SerialConfigWindow(vm);
                 
                 if (configWindow.ShowDialog() == true)
                     vm.Connect();
@@ -169,7 +180,8 @@ namespace SerialPlotDN_WPF.View.UserControls
                 }
                 
                 // Fire the event for any external handlers
-                OnConnectClickedEvent?.Invoke(this, EventArgs.Empty);
+                if (OnConnectClickedEvent != null)
+                    OnConnectClickedEvent.Invoke(this, EventArgs.Empty);
             }
         }
 
@@ -180,7 +192,8 @@ namespace SerialPlotDN_WPF.View.UserControls
             //    vm.Disconnect();
             //    vm.Dispose();
             //}
-            OnRemoveClickedEvent?.Invoke(this, EventArgs.Empty);
+            if (OnRemoveClickedEvent != null)
+                OnRemoveClickedEvent.Invoke(this, EventArgs.Empty);
         }
     }
 }

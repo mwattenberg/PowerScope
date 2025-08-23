@@ -20,7 +20,10 @@ namespace SerialPlotDN_WPF.View.UserForms
 
         public int PlotUpdateRateFPS 
         { 
-            get => _plotUpdateRateFPS; 
+            get 
+            { 
+                return _plotUpdateRateFPS; 
+            } 
             set 
             { 
                 if (_plotUpdateRateFPS != value)
@@ -33,7 +36,10 @@ namespace SerialPlotDN_WPF.View.UserForms
 
         public int SerialPortUpdateRateHz 
         { 
-            get => _serialPortUpdateRateHz; 
+            get 
+            { 
+                return _serialPortUpdateRateHz; 
+            } 
             set 
             { 
                 if (_serialPortUpdateRateHz != value)
@@ -46,7 +52,10 @@ namespace SerialPlotDN_WPF.View.UserForms
 
         public int LineWidth 
         { 
-            get => _lineWidth; 
+            get 
+            { 
+                return _lineWidth; 
+            } 
             set 
             { 
                 if (_lineWidth != value)
@@ -59,7 +68,10 @@ namespace SerialPlotDN_WPF.View.UserForms
 
         public bool AntiAliasing 
         { 
-            get => _antiAliasing; 
+            get 
+            { 
+                return _antiAliasing; 
+            } 
             set 
             { 
                 if (_antiAliasing != value)
@@ -72,7 +84,10 @@ namespace SerialPlotDN_WPF.View.UserForms
 
         public bool ShowRenderTime
         {
-            get => _showRenderTime;
+            get 
+            { 
+                return _showRenderTime; 
+            }
             set
             {
                 if (_showRenderTime != value)
@@ -178,7 +193,8 @@ namespace SerialPlotDN_WPF.View.UserForms
 
         protected virtual void OnPropertyChanged(string propertyName)
         {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+            if (PropertyChanged != null)
+                PropertyChanged.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
 
         private bool ValidateInputs()

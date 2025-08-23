@@ -21,15 +21,20 @@ namespace SerialPlotDN_WPF.View.UserControls
 
         private RunStates _runstate;
         private RecordStates _recordstate;
+        
         public RunStates RunState
         {
-            get => _runstate;
+            get 
+            { 
+                return _runstate; 
+            }
             private set
             {
                 if (_runstate != value)
                 {
                     _runstate = value;
-                    RunStateChanged?.Invoke(this, _runstate);
+                    if (RunStateChanged != null)
+                        RunStateChanged.Invoke(this, _runstate);
                     UpdateRunButtonUI();
                 }
             }
@@ -37,20 +42,24 @@ namespace SerialPlotDN_WPF.View.UserControls
 
         public RecordStates RecordState
         {
-            get => _recordstate;
+            get 
+            { 
+                return _recordstate; 
+            }
             private set
             {
                 if (_recordstate != value)
                 {
                     _recordstate = value;
-                    RecordStateChanged?.Invoke(this, _recordstate);
+                    if (RecordStateChanged != null)
+                        RecordStateChanged.Invoke(this, _recordstate);
                     UpdateRecordButtonUI();
                 }
             }
         }
 
-        public event EventHandler<RunStates>? RunStateChanged;
-        public event EventHandler<RecordStates>? RecordStateChanged;
+        public event EventHandler<RunStates> RunStateChanged;
+        public event EventHandler<RecordStates> RecordStateChanged;
 
         public RunControl()
         {
@@ -77,7 +86,9 @@ namespace SerialPlotDN_WPF.View.UserControls
 
         private void UpdateRunButtonUI()
         {
-            if (RunButton == null) return;
+            if (RunButton == null) 
+                return;
+                
             if (RunState == RunStates.Running)
             {
                 RunButton.Content = "Stop";
@@ -92,7 +103,9 @@ namespace SerialPlotDN_WPF.View.UserControls
 
         private void UpdateRecordButtonUI()
         {
-            if (RecordButton == null) return;
+            if (RecordButton == null) 
+                return;
+                
             if (RecordState == RecordStates.Recording)
             {
                 RecordButton.Content = "Pause";
