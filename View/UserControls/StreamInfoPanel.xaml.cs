@@ -38,6 +38,9 @@ namespace SerialPlotDN_WPF.View.UserControls
 
         private void UpdatePortStatistics(object sender, ElapsedEventArgs e)
         {
+            if(Application.Current == null) 
+                return;
+
             Application.Current.Dispatcher.BeginInvoke(() =>
             {
                 if (DataContext is DataStreamViewModel vm && vm.IsConnected && vm.SerialDataStream != null)

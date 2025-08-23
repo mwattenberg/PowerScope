@@ -166,6 +166,9 @@ namespace SerialPlotDN_WPF.Model
 
         public void UpdatePlot(object? source, ElapsedEventArgs? e)
         {
+            if (Application.Current == null)
+                return;
+
             Application.Current.Dispatcher.BeginInvoke(() =>
             {
                 int channelIndex = 0;

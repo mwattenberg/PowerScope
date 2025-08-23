@@ -131,8 +131,7 @@ namespace SerialPlotDN_WPF.View.UserControls
         private void DataStreamViewModel_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
         {
             // Update channels when NumberOfChannels or IsConnected changes
-            if (e.PropertyName == nameof(DataStreamViewModel.NumberOfChannels) || 
-                e.PropertyName == nameof(DataStreamViewModel.IsConnected))
+            if (e.PropertyName == nameof(DataStreamViewModel.NumberOfChannels))
             {
                 UpdateChannels();
             }
