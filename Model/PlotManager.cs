@@ -34,7 +34,7 @@ namespace SerialPlotDN_WPF.Model
         public int Ymin { get; set; } = -200;
         public int Ymax { get; set; } = 4000;
 
-        public PlotManager(WpfPlotGL wpfPlot1, VerticalControl verticalControl, HorizontalControl horizontalControl, int maxChannels = 64)
+        public PlotManager(WpfPlotGL wpfPlot1, VerticalControl verticalControl, HorizontalControl horizontalControl, int maxChannels = 12)
         {
             _plot = wpfPlot1;
             _verticalControl = verticalControl;

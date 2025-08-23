@@ -107,7 +107,7 @@ namespace SerialPlotDN_WPF.Model
                 throw new PortAlreadyInUseException(source.PortName, ex);
             }
 
-            int ringBufferSize = Math.Max(500000, source.BaudRate / 10);
+            int ringBufferSize = Math.Max(200000, source.BaudRate / 10);
             
             ReceivedData = new RingBuffer<double>[dataParser.NumberOfChannels];
             _lastReadPositions = new int[dataParser.NumberOfChannels];
