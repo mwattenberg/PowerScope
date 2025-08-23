@@ -53,7 +53,7 @@ namespace SerialPlotDN_WPF.Model
         /// <param name="connectedStreams">Currently connected streams</param>
         public void SetDataStreams(IEnumerable<DataStreamViewModel> connectedStreams)
         {
-            _connectedStreams = connectedStreams ?? Enumerable.Empty<DataStreamViewModel>();
+            _connectedStreams = connectedStreams; ;
         }
 
         private void setDarkMode()

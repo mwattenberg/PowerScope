@@ -40,12 +40,14 @@ namespace SerialPlotDN_WPF
             
             InitializeHorizontalControl();
             InitializeVerticalControl();
-            readSettingsXML();
             InitializeEventHandlers();
+
+            readSettingsXML();
+            
             
             // Initialize channel display based on current streams
             var totalChannels = DataStreamBar.GetTotalChannelCount();
-            _plotManager.SetDataStreams(DataStreamBar.GetConnectedStreams());
+            _plotManager.SetDataStreams(DataStreamBar.DataStreams);
             ChannelControlBar.UpdateChannels(totalChannels);
             _plotManager.UpdateChannelDisplay(totalChannels);
         }

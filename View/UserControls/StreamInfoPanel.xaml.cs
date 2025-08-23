@@ -31,12 +31,62 @@ namespace SerialPlotDN_WPF.View.UserControls
             
             // Handle unloaded event to clean up timer
             Unloaded += StreamInfoPanel_Unloaded;
+            
+            // Subscribe to DataContext changes to handle property change notifications
+            DataContextChanged += StreamInfoPanel_DataContextChanged;
+        }
+
+        private void StreamInfoPanel_DataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
+        {
+            // Unsubscribe from old DataContext if it exists
+            if (e.OldValue is DataStreamViewModel oldVm)
+            {
+                oldVm.PropertyChanged -= ViewModel_PropertyChanged;
+            }
+            
+            // Subscribe to new DataContext if it exists
+            if (e.NewValue is DataStreamViewModel newVm)
+            {
+                newVm.PropertyChanged += ViewModel_PropertyChanged;
+                UpdateButtonAppearance(); // Update button immediately
+            }
+        }
+
+        private void ViewModel_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(DataStreamViewModel.IsConnected))
+            {
+                Application.Current.Dispatcher.BeginInvoke(() =>
+                {
+                    UpdateButtonAppearance();
+                });
+            }
+        }
+
+        private void UpdateButtonAppearance()
+        {
+            if (DataContext is DataStreamViewModel vm)
+            {
+                // Update button content
+                Button_Connect.Content = vm.IsConnected ? "Disconnect" : "Connect";
+                
+                // Update button background
+                Button_Connect.Background = vm.IsConnected ? 
+                    new SolidColorBrush(Colors.OrangeRed) : 
+                    new SolidColorBrush(Colors.LimeGreen);
+            }
         }
 
         private void StreamInfoPanel_Unloaded(object sender, RoutedEventArgs e)
         {
             _updateTimer?.Stop();
             _updateTimer?.Dispose();
+            
+            // Unsubscribe from property changes
+            if (DataContext is DataStreamViewModel vm)
+            {
+                vm.PropertyChanged -= ViewModel_PropertyChanged;
+            }
         }
 
         private void UpdatePortStatistics(object sender, ElapsedEventArgs e)

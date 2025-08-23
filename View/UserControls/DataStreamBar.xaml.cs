@@ -1,11 +1,9 @@
-﻿using System.Collections.Generic;
-using System.Linq;
+﻿
 using SerialPlotDN_WPF.Model;
 using SerialPlotDN_WPF.View.UserForms;
-using System.Timers;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Media;
+
 
 namespace SerialPlotDN_WPF.View.UserControls
 {
@@ -35,14 +33,8 @@ namespace SerialPlotDN_WPF.View.UserControls
             if (configWindow.ShowDialog() == true)
             {
                 DataStreams.Add(vm);
-
-                var panel = new StreamInfoPanel
-                {
-                    DataContext = vm,
-                };
-                panel.OnRemoveClickedEvent += (s, args) => RemoveStream(vm);
-                Panel_Streams.Children.Add(panel);
-
+                AddStreamInfoPanel(vm);
+                
                 // Subscribe to property changes to monitor NumberOfChannels and IsConnected
                 vm.PropertyChanged += DataStreamViewModel_PropertyChanged;
 
@@ -54,6 +46,16 @@ namespace SerialPlotDN_WPF.View.UserControls
             }
         }
 
+        private void AddStreamInfoPanel(DataStreamViewModel viewModel)
+        {
+            var panel = new StreamInfoPanel
+            {
+                DataContext = viewModel,
+            };
+            panel.OnRemoveClickedEvent += (s, args) => RemoveStream(viewModel);
+            Panel_Streams.Children.Add(panel);
+        }
+
         /// <summary>
         /// Adds a stream from settings without showing the configuration dialog
         /// </summary>
@@ -61,13 +63,7 @@ namespace SerialPlotDN_WPF.View.UserControls
         public void AddStreamFromSettings(DataStreamViewModel viewModel)
         {
             DataStreams.Add(viewModel);
-            
-            var panel = new StreamInfoPanel
-            {
-                DataContext = viewModel,
-            };
-            panel.OnRemoveClickedEvent += (s, args) => RemoveStream(viewModel);
-            Panel_Streams.Children.Add(panel);
+            AddStreamInfoPanel(viewModel);
 
             // Subscribe to property changes
             viewModel.PropertyChanged += DataStreamViewModel_PropertyChanged;
@@ -161,17 +157,26 @@ namespace SerialPlotDN_WPF.View.UserControls
         /// </summary>
         public int GetTotalChannelCount()
         {
-            return DataStreams
-                .Where(vm => vm.IsConnected)
-                .Sum(vm => vm.NumberOfChannels);
+            int totalChannels = 0;
+            foreach (var vm in DataStreams)
+            {
+                totalChannels = totalChannels + vm.NumberOfChannels;
+            }
+            return totalChannels;
         }
 
-        /// <summary>
-        /// Gets all connected streams
-        /// </summary>
+        ///// <summary>
+        ///// Gets all connected streams
+        ///// </summary>
         public IEnumerable<DataStreamViewModel> GetConnectedStreams()
         {
-            return DataStreams.Where(vm => vm.IsConnected);
+            List<DataStreamViewModel> connectedStreams = new List<DataStreamViewModel>();
+            foreach (var stream in DataStreams)
+            {
+                if (stream.IsConnected)
+                    connectedStreams.Add(stream);
+            }
+            return connectedStreams;
         }
     }
 }

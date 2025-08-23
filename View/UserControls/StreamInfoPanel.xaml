@@ -93,9 +93,7 @@
                 Height="20" 
                 VerticalAlignment="Center" 
                 Margin="4,2,4,2"
-                Click="Button_Connect_Click"
-                Content="{Binding ConnectButtonText}"
-                Background="{Binding ConnectButtonBackground}"/>
+                Click="Button_Connect_Click"/>
         
         <!-- Config button -->
         <Button x:Name="Button_Configure" 
@@ -106,6 +104,10 @@
                 Click="Button_Configure_Click" />
     </Grid>
 </UserControl>
+
+
+
+
 
 
 
