@@ -123,7 +123,7 @@ namespace SerialPlotDN_WPF
         private void writeSettingsToXML()
         {
             string filePath = Path.Combine(Directory.GetCurrentDirectory(), "Settings.xml");
-            Serializer.WriteSettingsToXML(filePath, _plotManager, null, ChannelControlBar, VerticalControl, DataStreamBar._dataStreamModels);
+            Serializer.WriteSettingsToXML(filePath, _plotManager, DataStreamBar, ChannelControlBar, VerticalControl);
         }
 
         /// <summary>
@@ -132,13 +132,7 @@ namespace SerialPlotDN_WPF
         private void readSettingsXML()
         {
             string filePath = Path.Combine(Directory.GetCurrentDirectory(), "Settings.xml");
-            var loadedStreams = Serializer.ReadSettingsFromXML(filePath, _plotManager, null, ChannelControlBar, VerticalControl);
-            
-            // Add loaded streams to DataStreamBar
-            foreach (var stream in loadedStreams)
-            {
-                DataStreamBar.AddStreamFromSettings(stream);
-            }
+            Serializer.ReadSettingsFromXML(filePath, _plotManager, DataStreamBar, ChannelControlBar, VerticalControl);
         }
 
         protected override void OnClosed(EventArgs e)
@@ -150,11 +144,11 @@ namespace SerialPlotDN_WPF
             base.OnClosed(e);
         }
 
-        private void closing(object sender, CancelEventArgs e)
-        {
-            // Dispose DataStreamBar which will handle all stream disposal
-            DataStreamBar.Dispose();
-        }
+        //private void closing(object sender, CancelEventArgs e)
+        //{
+        //    // Dispose DataStreamBar which will handle all stream disposal
+        //    DataStreamBar.Dispose();
+        //}
 
         private void WpfPlot1_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {

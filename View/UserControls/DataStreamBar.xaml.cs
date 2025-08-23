@@ -15,14 +15,15 @@ namespace SerialPlotDN_WPF.View.UserControls
 
     public partial class DataStreamBar : UserControl
     {
-        public List<DataStreamViewModel> _dataStreamModels = new List<DataStreamViewModel>();
-        
+        public List<DataStreamViewModel> DataStreams { get; private set; } = new List<DataStreamViewModel>();
+
         // Event to notify when channels need to be updated
         public event System.Action<int> ChannelsChanged;
 
         public DataStreamBar()
         {
             InitializeComponent();
+            
             // No need to initialize a single DataStreamManager
             //ItemsControl_Streams.ItemsSource = DataStreamManagers.SelectMany(m => m.StreamViewModels);
         }
@@ -33,7 +34,7 @@ namespace SerialPlotDN_WPF.View.UserControls
             var configWindow = new SerialConfigWindow(vm);
             if (configWindow.ShowDialog() == true)
             {
-                _dataStreamModels.Add(vm);
+                DataStreams.Add(vm);
 
                 var panel = new StreamInfoPanel
                 {
@@ -58,7 +59,7 @@ namespace SerialPlotDN_WPF.View.UserControls
         /// <param name="viewModel">The stream view model to add</param>
         public void AddStreamFromSettings(DataStreamViewModel viewModel)
         {
-            _dataStreamModels.Add(viewModel);
+            DataStreams.Add(viewModel);
             
             var panel = new StreamInfoPanel
             {
@@ -79,7 +80,7 @@ namespace SerialPlotDN_WPF.View.UserControls
         /// <param name="viewModel">The stream view model to remove</param>
         public void RemoveStream(DataStreamViewModel viewModel)
         {
-            if (_dataStreamModels.Contains(viewModel))
+            if (DataStreams.Contains(viewModel))
             {
                 // Unsubscribe from property changes
                 viewModel.PropertyChanged -= DataStreamViewModel_PropertyChanged;
@@ -89,7 +90,7 @@ namespace SerialPlotDN_WPF.View.UserControls
                 viewModel.Dispose();
                 
                 // Remove from collection
-                _dataStreamModels.Remove(viewModel);
+                DataStreams.Remove(viewModel);
                 
                 // Find and remove the corresponding panel
                 for (int i = Panel_Streams.Children.Count - 1; i >= 0; i--)
@@ -112,13 +113,13 @@ namespace SerialPlotDN_WPF.View.UserControls
         /// </summary>
         public void Dispose()
         {
-            foreach (var stream in _dataStreamModels.ToList())
+            foreach (var stream in DataStreams.ToList())
             {
                 stream.PropertyChanged -= DataStreamViewModel_PropertyChanged;
                 stream.Disconnect();
                 stream.Dispose();
             }
-            _dataStreamModels.Clear();
+            DataStreams.Clear();
             Panel_Streams.Children.Clear();
 
             // Clear all channels when disposing
@@ -143,7 +144,7 @@ namespace SerialPlotDN_WPF.View.UserControls
         private void UpdateChannels()
         {
             // Sum up channels from all connected streams
-            int totalChannels = _dataStreamModels
+            int totalChannels = DataStreams
                 .Where(vm => vm.IsConnected)
                 .Sum(vm => vm.NumberOfChannels);
 
@@ -156,7 +157,7 @@ namespace SerialPlotDN_WPF.View.UserControls
         /// </summary>
         public int GetTotalChannelCount()
         {
-            return _dataStreamModels
+            return DataStreams
                 .Where(vm => vm.IsConnected)
                 .Sum(vm => vm.NumberOfChannels);
         }
@@ -166,7 +167,7 @@ namespace SerialPlotDN_WPF.View.UserControls
         /// </summary>
         public IEnumerable<DataStreamViewModel> GetConnectedStreams()
         {
-            return _dataStreamModels.Where(vm => vm.IsConnected);
+            return DataStreams.Where(vm => vm.IsConnected);
         }
     }
 }
