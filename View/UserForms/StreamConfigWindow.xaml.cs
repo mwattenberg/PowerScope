@@ -83,7 +83,7 @@ namespace SerialPlotDN_WPF.View.UserForms
                 "9600", "19200", "57600", "115200", "256000"
             };
             ComboBox_Baud.IsEditable = true;
-            ComboBox_Baud.Text = "115200"; // Default value
+            //ComboBox_Baud.Text = "115200"; // Default value
         }
 
         private void SerialConfigWindow_Loaded_AudioDevices(object sender, RoutedEventArgs e)

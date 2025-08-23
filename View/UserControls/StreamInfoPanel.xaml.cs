@@ -94,7 +94,9 @@ namespace SerialPlotDN_WPF.View.UserControls
                 }
 
                 var configWindow = new SerialConfigWindow(vm);
-                configWindow.ShowDialog();
+                
+                if (configWindow.ShowDialog() == true)
+                    vm.Connect();
             }
         }
 

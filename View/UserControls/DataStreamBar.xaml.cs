@@ -144,10 +144,12 @@ namespace SerialPlotDN_WPF.View.UserControls
         private void UpdateChannels()
         {
             // Sum up channels from all connected streams
-            int totalChannels = DataStreams
-                .Where(vm => vm.IsConnected)
-                .Sum(vm => vm.NumberOfChannels);
-
+            int totalChannels = 0;
+            foreach(var vm in DataStreams)
+            {
+                totalChannels = totalChannels + vm.NumberOfChannels;
+            }
+            
             // Notify subscribers about the channel count change
             ChannelsChanged?.Invoke(totalChannels);
         }
