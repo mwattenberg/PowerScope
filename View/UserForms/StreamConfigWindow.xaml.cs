@@ -246,6 +246,27 @@ namespace SerialPlotDN_WPF.View.UserForms
             set { ComboBox_SampleRates.SelectedItem = value.ToString(); }
         }
 
+        public NumberTypeEnum SelectedNumberType
+        {
+            get
+            {
+                if (ComboBox_NumberType.SelectedItem is ComboBoxItem item && Enum.TryParse<NumberTypeEnum>(item.Tag.ToString(), out var type))
+                    return type;
+                return NumberTypeEnum.Uint16; // Default
+            }
+            set
+            {
+                foreach (var obj in ComboBox_NumberType.Items)
+                {
+                    if (obj is ComboBoxItem item && item.Tag.ToString() == value.ToString())
+                    {
+                        ComboBox_NumberType.SelectedItem = item;
+                        return;
+                    }
+                }
+            }
+        }
+
         private void Button_OK_Click(object sender, RoutedEventArgs e)
         {
             if (string.IsNullOrWhiteSpace(SelectedPort) || SelectedBaud == 0)

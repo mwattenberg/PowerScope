@@ -359,14 +359,14 @@
                                     </StackPanel>
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
                                         <Label Content="Number Type:" VerticalAlignment="Center" ToolTip="Select the type of numbers in the data stream." Width="80"/>
-                                        <ComboBox x:Name="ComboBox_NumberType" Width="200" SelectedValue="{Binding NumberType, Mode=TwoWay}" SelectedValuePath="Content">
-                                            <ComboBoxItem Content="uint8" IsSelected="True"/>
-                                            <ComboBoxItem Content="int8"/>
-                                            <ComboBoxItem Content="uint16"/>
-                                            <ComboBoxItem Content="int16"/>
-                                            <ComboBoxItem Content="uint32"/>
-                                            <ComboBoxItem Content="int32"/>
-                                            <ComboBoxItem Content="float"/>
+                                        <ComboBox x:Name="ComboBox_NumberType" Width="200" SelectedValue="{Binding NumberType, Mode=TwoWay}" SelectedValuePath="Tag">
+                                            <ComboBoxItem Content="Uint8" Tag="Uint8" />
+                                            <ComboBoxItem Content="Int8" Tag="Int8" />
+                                            <ComboBoxItem Content="Uint16" Tag="Uint16" />
+                                            <ComboBoxItem Content="Int16" Tag="Int16" />
+                                            <ComboBoxItem Content="Uint32" Tag="Uint32" />
+                                            <ComboBoxItem Content="Int32" Tag="Int32" />
+                                            <ComboBoxItem Content="Float" Tag="Float" />
                                         </ComboBox>
                                     </StackPanel>
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,5">

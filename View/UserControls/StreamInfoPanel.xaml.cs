@@ -13,6 +13,9 @@ namespace SerialPlotDN_WPF.View.UserControls
         public delegate void OnConnectedClicked(object sender, EventArgs e);
         public event OnConnectedClicked OnConnectClickedEvent;
 
+        public delegate void OnRemoveClicked(object sender, EventArgs e);
+        public event OnRemoveClicked OnRemoveClickedEvent;
+
         private readonly System.Timers.Timer _updateTimer;
         private long _prevSampleCount = 0;
         private long _prevBitsCount = 0;
@@ -118,6 +121,16 @@ namespace SerialPlotDN_WPF.View.UserControls
                 // Fire the event for any external handlers
                 OnConnectClickedEvent?.Invoke(this, EventArgs.Empty);
             }
+        }
+
+        private void Button_Close_Click(object sender, RoutedEventArgs e)
+        {
+            //if (DataContext is DataStreamViewModel vm)
+            //{
+            //    vm.Disconnect();
+            //    vm.Dispose();
+            //}
+            OnRemoveClickedEvent?.Invoke(this, EventArgs.Empty);
         }
     }
 }

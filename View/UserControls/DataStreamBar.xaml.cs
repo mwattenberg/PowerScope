@@ -40,6 +40,7 @@ namespace SerialPlotDN_WPF.View.UserControls
                 {
                     DataContext = vm,
                 };
+                panel.OnRemoveClickedEvent += (s, args) => RemoveStream(vm);
                 Panel_Streams.Children.Add(panel);
 
                 // Subscribe to property changes to monitor NumberOfChannels and IsConnected
@@ -65,6 +66,7 @@ namespace SerialPlotDN_WPF.View.UserControls
             {
                 DataContext = viewModel,
             };
+            panel.OnRemoveClickedEvent += (s, args) => RemoveStream(viewModel);
             Panel_Streams.Children.Add(panel);
 
             // Subscribe to property changes

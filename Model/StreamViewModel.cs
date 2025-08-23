@@ -18,6 +18,17 @@ namespace SerialPlotDN_WPF.Model
         AudioInput
     }
 
+    public enum NumberTypeEnum
+    {
+        Uint8,
+        Int8,
+        Uint16,
+        Int16,
+        Uint32,
+        Int32,
+        Float
+    }
+
     public class DataStreamViewModel : INotifyPropertyChanged, IDisposable
     {
         private string _port;
@@ -34,7 +45,7 @@ namespace SerialPlotDN_WPF.Model
         private DataFormatType _dataFormat;
         private StreamSource _streamSource;
         private int _numberOfChannels;
-        private string numberType; // "Uint8", "Uint16", etc.
+        private NumberTypeEnum _numberType; // enum property
         private string _endianness; // "LittleEndian", "BigEndian"
         private string _delimiter; // "Comma", "Space", "Tab", or custom
         private string _frameStart; // for CustomFrame
@@ -311,13 +322,13 @@ namespace SerialPlotDN_WPF.Model
             }
         }
 
-        public int SampleRate
+        public int AudioSampleRate
         {
             get { return _sampleRate; }
             set
             {
                 _sampleRate = value;
-                OnPropertyChanged(nameof(SampleRate));
+                OnPropertyChanged(nameof(AudioSampleRate));
             }
         }
 
@@ -334,16 +345,9 @@ namespace SerialPlotDN_WPF.Model
             {
                 _isConnected = value;
                 OnPropertyChanged(nameof(IsConnected));
-                OnPropertyChanged(nameof(ConnectButtonText));
-                OnPropertyChanged(nameof(ConnectButtonBackground));
-                UpdateStatusMessage();
+
             }
         }
-
-        public string ConnectButtonText => IsConnected ? "Disconnect" : "Connect";
-
-        public SolidColorBrush ConnectButtonBackground => 
-            IsConnected ? new SolidColorBrush(Colors.OrangeRed) : new SolidColorBrush(Colors.LimeGreen);
 
         public string StatusMessage
         {
@@ -355,17 +359,26 @@ namespace SerialPlotDN_WPF.Model
             }
         }
 
-        public string PortAndBaudDisplay => $"Port: {Port}\nBaud: {Baud}";
+        public string PortAndBaudDisplay
+        {
+            get
+            {
+                if (Port != null && Baud != 0)
+                    return $"Port: {Port}\nBaud: {Baud}";
+                else
+                    return "";
+            }
+        }
 
         public int NumberOfChannels
         {
             get => _numberOfChannels;
             set { _numberOfChannels = value; OnPropertyChanged(nameof(NumberOfChannels)); }
         }
-        public string NumberType
+        public NumberTypeEnum NumberType
         {
-            get => numberType;
-            set { numberType = value; OnPropertyChanged(nameof(NumberType)); }
+            get => _numberType;
+            set { _numberType = value; OnPropertyChanged(nameof(NumberType)); }
         }
         public string Endianness
         {
@@ -390,11 +403,6 @@ namespace SerialPlotDN_WPF.Model
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
 
-        private void UpdateStatusMessage()
-        {
-            StatusMessage = IsConnected ? "Connected" : "Disconnected";
-        }
-
         /// <summary>
         /// Disposes of the SerialDataStream resources
         /// </summary>
@@ -413,7 +421,8 @@ namespace SerialPlotDN_WPF.Model
             window.SelectedParity = this.Parity;
             window.SelectedAudioDevice = this.AudioDevice;
             window.SelectedAudioDeviceIndex = this.AudioDeviceIndex;
-            window.SelectedSampleRate = this.SampleRate;
+            window.SelectedSampleRate = this.AudioSampleRate;
+            window.SelectedNumberType = this.NumberType;
         }
 
         public void UpdateFromWindow(View.UserForms.SerialConfigWindow window)
@@ -425,7 +434,8 @@ namespace SerialPlotDN_WPF.Model
             this.Parity = window.SelectedParity;
             this.AudioDevice = window.SelectedAudioDevice;
             this.AudioDeviceIndex = window.SelectedAudioDeviceIndex;
-            this.SampleRate = window.SelectedSampleRate;
+            this.AudioSampleRate = window.SelectedSampleRate;
+            this.NumberType = window.SelectedNumberType;
         }
     }
 }
