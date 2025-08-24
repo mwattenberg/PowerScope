@@ -16,7 +16,12 @@ namespace SerialPlotDN_WPF.Model
         bool IsConnected { get;}
         //True when actively sampling from the data source
         bool IsStreaming { get;}
-
+        //Total number of samples acquired since the stream started
+        //Useful for calculating sampling rate
+        long TotalSamples { get;}
+        //Total number of bits acquired since the stream started
+        //Useful for calculating bus bandwidth
+        long TotalBits { get;}
         //Number of channels in the data stream
         int ChannelCount { get; }
         //Connect to the data source, i.e. open serial port, USB , audio, etc.

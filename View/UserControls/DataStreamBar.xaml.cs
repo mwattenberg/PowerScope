@@ -66,7 +66,7 @@ namespace SerialPlotDN_WPF.View.UserControls
                 dataParser = new DataParser(vm.NumberOfChannels, frameEnd, separator);
             }
             var stream = new SerialDataStream(sourceSetting, dataParser);
-            AddStreamInfoPanel(vm);
+            AddStreamInfoPanel(vm, stream);
             return stream;
         }
 
@@ -100,16 +100,13 @@ namespace SerialPlotDN_WPF.View.UserControls
             else return delimiter[0];
         }
 
-        private void AddStreamInfoPanel(StreamSettings viewModel)
+        private void AddStreamInfoPanel(StreamSettings viewModel, IDataStream datastream)
         {
-            StreamInfoPanel panel = new StreamInfoPanel
-            {
-                DataContext = viewModel,
-            };
+            StreamInfoPanel panel = new StreamInfoPanel(datastream, viewModel);
             panel.OnRemoveClickedEvent += (s, args) => RemoveStream(viewModel);
             Panel_Streams.Children.Add(panel);
         }
-
+                
         /// <summary>
         /// Removes a stream and disposes its resources
         /// </summary>

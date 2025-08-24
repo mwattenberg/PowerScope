@@ -119,7 +119,8 @@ namespace SerialPlotDN_WPF.Model
                 {
                     _signals[i].Color = _signals[i].Color.Lighten(0.2);
                 }
-                
+
+                _signals[i].MarkerShape = ScottPlot.MarkerShape.None;
                 _signals[i].Color = _signals[i].Color.WithOpacity(1.0);
                 _signals[i].LineWidth = 1;
                 _signals[i].LineStyle.AntiAlias = false;
@@ -215,6 +216,7 @@ namespace SerialPlotDN_WPF.Model
                     _signals[i] = _plot.Plot.Add.Signal(_data[i]);
                     _signals[i].Color = colorOld;
                     _signals[i].LineWidth = linewidthOld;
+                    _signals[i].MarkerShape = ScottPlot.MarkerShape.None;
                     _signals[i].LineStyle.AntiAlias = antiAliasingOld;
                 }
             }
@@ -236,6 +238,10 @@ namespace SerialPlotDN_WPF.Model
                 {
                     _signals[i].LineWidth = (float)lineWidth;
                     _signals[i].LineStyle.AntiAlias = antiAliasing;
+
+                    _signals[i].MarkerSize = 20;
+                    _signals[i].MarkerLineWidth = 5;
+                        
                 }
             }
             _plot.Plot.Benchmark.IsVisible = showRenderTime;
@@ -244,11 +250,27 @@ namespace SerialPlotDN_WPF.Model
 
         public void SetupPlotUserInput()
         {
-            _plot.UserInputProcessor.Reset();
-            _plot.UserInputProcessor.IsEnabled = false;
-            ScottPlot.Interactivity.MouseButton zoomRectangleButton = ScottPlot.Interactivity.StandardMouseButtons.Right;
+            //_plot.UserInputProcessor.Reset();
+            _plot.UserInputProcessor.RemoveAll<ScottPlot.Interactivity.IUserActionResponse>();
+            _plot.UserInputProcessor.IsEnabled = true;
+            ScottPlot.Interactivity.MouseButton zoomRectangleButton = ScottPlot.Interactivity.StandardMouseButtons.Left;
             ScottPlot.Interactivity.UserActionResponses.MouseDragZoomRectangle zoomRectangleResponse = new ScottPlot.Interactivity.UserActionResponses.MouseDragZoomRectangle(zoomRectangleButton);
             _plot.UserInputProcessor.UserActionResponses.Add(zoomRectangleResponse);
+
+            // Custom right-click auto-scale X only
+            _plot.MouseRightButtonUp += (s, e) =>
+            {
+                // Auto-scale X-axis only
+                _plot.Plot.Axes.AutoScaleX();
+                _plot.Refresh();
+            };
+
+            // Zoom with mouse wheel
+            ScottPlot.Interactivity.Key horizontalLock = ScottPlot.Interactivity.StandardKeys.Shift;
+            ScottPlot.Interactivity.Key verticalLock= ScottPlot.Interactivity.StandardKeys.Control;
+
+            var wheelZoomResponse = new ScottPlot.Interactivity.UserActionResponses.MouseWheelZoom(horizontalLock, verticalLock);
+            _plot.UserInputProcessor.UserActionResponses.Add(wheelZoomResponse);
         }
 
         public void SetYLimits(int ymin, int ymax)
