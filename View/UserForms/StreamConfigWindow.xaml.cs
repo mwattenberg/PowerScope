@@ -2,7 +2,7 @@
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
-using System.IO.Ports;
+using RJCP.IO.Ports; // Changed from System.IO.Ports to RJCP.IO.Ports
 using NAudio.Wave;
 using System.Management;
 using System.Collections.Generic;
@@ -187,24 +187,29 @@ namespace SerialPlotDN_WPF.View.UserForms
                     parityStr = item.Content.ToString();
                 else if (ComboBox_Parity.SelectedItem is string str)
                     parityStr = str;
-                return parityStr switch
-                {
-                    "None" => Parity.None,
-                    "Odd" => Parity.Odd,
-                    "Even" => Parity.Even,
-                    _ => Parity.None
-                };
+                    
+                if (parityStr == "None")
+                    return Parity.None;
+                else if (parityStr == "Odd")
+                    return Parity.Odd;
+                else if (parityStr == "Even")
+                    return Parity.Even;
+                else
+                    return Parity.None;
             }
             set
             {
-                string parityStr = value switch
-                {
-                    Parity.None => "None",
-                    Parity.Odd => "Odd",
-                    Parity.Even => "Even",
-                    _ => "None"
-                };
-                foreach (var obj in ComboBox_Parity.Items)
+                string parityStr;
+                if (value == Parity.None)
+                    parityStr = "None";
+                else if (value == Parity.Odd)
+                    parityStr = "Odd";
+                else if (value == Parity.Even)
+                    parityStr = "Even";
+                else
+                    parityStr = "None";
+                    
+                foreach (object obj in ComboBox_Parity.Items)
                 {
                     if (obj is ComboBoxItem item && item.Content.ToString() == parityStr)
                     {

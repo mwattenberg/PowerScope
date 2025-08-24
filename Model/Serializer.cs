@@ -5,6 +5,7 @@ using SerialPlotDN_WPF.View.UserControls;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows.Media;
+using RJCP.IO.Ports;
 
 namespace SerialPlotDN_WPF.Model
 {
@@ -200,10 +201,10 @@ namespace SerialPlotDN_WPF.Model
                     vm.StopBits = 1;
 
                 XElement parityElement = streamElement.Element("Parity");
-                if (parityElement != null && Enum.TryParse<System.IO.Ports.Parity>(parityElement.Value, out System.IO.Ports.Parity parity))
+                if (parityElement != null && Enum.TryParse<RJCP.IO.Ports.Parity>(parityElement.Value, out RJCP.IO.Ports.Parity parity))
                     vm.Parity = parity;
                 else
-                    vm.Parity = System.IO.Ports.Parity.None;
+                    vm.Parity = RJCP.IO.Ports.Parity.None;
 
                 XElement audioDeviceElement = streamElement.Element("AudioDevice");
                 if (audioDeviceElement != null)

@@ -1,5 +1,5 @@
 ﻿using System.ComponentModel;
-using System.IO.Ports; // Add for Parity enum
+using RJCP.IO.Ports; // Changed from System.IO.Ports to RJCP.IO.Ports for Parity enum
 using System.Windows.Media; // Add for SolidColorBrush and Colors
 using System; // Add for IDisposable
 using System.Collections.Generic; // Add for List<T>
@@ -240,14 +240,17 @@ namespace SerialPlotDN_WPF.Model
                 return ','; // Default comma
             }
 
-            return delimiter.ToLower() switch
-            {
-                "comma" or "," => ',',
-                "space" or " " => ' ',
-                "tab" or "\t" => '\t',
-                "semicolon" or ";" => ';',
-                _ => delimiter[0] // Use first character if not recognized
-            };
+            string lowerDelimiter = delimiter.ToLower();
+            if (lowerDelimiter == "comma" || lowerDelimiter == ",")
+                return ',';
+            else if (lowerDelimiter == "space" || lowerDelimiter == " ")
+                return ' ';
+            else if (lowerDelimiter == "tab" || lowerDelimiter == "\t")
+                return '\t';
+            else if (lowerDelimiter == "semicolon" || lowerDelimiter == ";")
+                return ';';
+            else
+                return delimiter[0]; // Use first character if not recognized
         }
 
         // Dataformat Tab properties
