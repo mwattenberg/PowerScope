@@ -1,8 +1,9 @@
-﻿using ScottPlot.DataViews;
-using SerialPlotDN_WPF.Model;
-using SerialPlotDN_WPF.View.UserForms;
+﻿using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using ScottPlot.DataViews;
+using SerialPlotDN_WPF.Model;
+using SerialPlotDN_WPF.View.UserForms;
 
 
 namespace SerialPlotDN_WPF.View.UserControls
@@ -13,7 +14,8 @@ namespace SerialPlotDN_WPF.View.UserControls
 
     public partial class DataStreamBar : UserControl
     {
-        public List<StreamViewModel> DataStreams { get; private set; } = new List<StreamViewModel>();
+        public List<StreamSettings> ConfiguredDataStreams { get; private set; } = new List<StreamSettings>();
+        public List<IDataStream> ConnectedDataStreams { get; } = new List<IDataStream>();
 
         // Event to notify when channels need to be updated
         public event System.Action<int> ChannelsChanged;
@@ -28,25 +30,77 @@ namespace SerialPlotDN_WPF.View.UserControls
 
         private void Button_AddStream_Click(object sender, RoutedEventArgs e)
         {
-            StreamViewModel vm = new StreamViewModel();
-            SerialConfigWindow configWindow = new SerialConfigWindow(vm);
+            StreamSettings settings = new StreamSettings();
+            SerialConfigWindow configWindow = new SerialConfigWindow(settings);
             if (configWindow.ShowDialog() == true)
             {
-                DataStreams.Add(vm);
-                AddStreamInfoPanel(vm);
-                
-                // Subscribe to property changes to monitor NumberOfChannels and IsConnected
-                vm.PropertyChanged += DataStreamViewModel_PropertyChanged;
+                ConfiguredDataStreams.Add(settings);
+                // Create and connect IDataStream from config
+                var dataStream = CreateDataStreamFromUserInput(settings);
+                ConnectedDataStreams.Add(dataStream);
 
-                // Automatically connect the serial stream after successful configuration
-                vm.Connect();
+                dataStream.Connect();
+                dataStream.StartStreaming();
 
-                // Update channels after adding new stream
                 UpdateChannels();
             }
         }
 
-        private void AddStreamInfoPanel(StreamViewModel viewModel)
+        public IDataStream CreateDataStreamFromUserInput(StreamSettings vm)
+        {
+            // Only SerialDataStream for now, can be extended for other types
+            var sourceSetting = new SourceSetting(vm.Port, vm.Baud, vm.DataBits, vm.StopBits, vm.Parity);
+            DataParser dataParser;
+            if (vm.DataFormat == DataFormatType.RawBinary)
+            {
+                byte[] frameStartBytes = ParseFrameStartBytes(vm.FrameStart);
+                if (frameStartBytes != null && frameStartBytes.Length > 0)
+                    dataParser = new DataParser(DataParser.BinaryFormat.uint16_t, vm.NumberOfChannels, frameStartBytes);
+                else
+                    dataParser = new DataParser(DataParser.BinaryFormat.uint16_t, vm.NumberOfChannels);
+            }
+            else
+            {
+                char frameEnd = '\n';
+                char separator = ParseDelimiter(vm.Delimiter);
+                dataParser = new DataParser(vm.NumberOfChannels, frameEnd, separator);
+            }
+            var stream = new SerialDataStream(sourceSetting, dataParser);
+            AddStreamInfoPanel(vm);
+            return stream;
+        }
+
+        private byte[] ParseFrameStartBytes(string frameStart)
+        {
+            if (string.IsNullOrEmpty(frameStart))
+                return new byte[] { 0xAA, 0xAA };
+            try
+            {
+                string[] parts = frameStart.Split(new char[] { ' ', ',', ';' }, StringSplitOptions.RemoveEmptyEntries);
+                List<byte> bytes = new List<byte>();
+                foreach (string part in parts)
+                {
+                    string cleanPart = part.Trim().Replace("0x", "").Replace("0X", "");
+                    if (byte.TryParse(cleanPart, System.Globalization.NumberStyles.HexNumber, null, out byte b))
+                        bytes.Add(b);
+                }
+                return bytes.Count > 0 ? bytes.ToArray() : new byte[] { 0xAA, 0xAA };
+            }
+            catch { return new byte[] { 0xAA, 0xAA }; }
+        }
+
+        private char ParseDelimiter(string delimiter)
+        {
+            if (string.IsNullOrEmpty(delimiter)) return ',';
+            string lowerDelimiter = delimiter.ToLower();
+            if (lowerDelimiter == "comma" || lowerDelimiter == ",") return ',';
+            else if (lowerDelimiter == "space" || lowerDelimiter == " ") return ' ';
+            else if (lowerDelimiter == "tab" || lowerDelimiter == "\t") return '\t';
+            else if (lowerDelimiter == "semicolon" || lowerDelimiter == ";") return ';';
+            else return delimiter[0];
+        }
+
+        private void AddStreamInfoPanel(StreamSettings viewModel)
         {
             StreamInfoPanel panel = new StreamInfoPanel
             {
@@ -57,51 +111,32 @@ namespace SerialPlotDN_WPF.View.UserControls
         }
 
         /// <summary>
-        /// Adds a stream from settings without showing the configuration dialog
-        /// </summary>
-        /// <param name="viewModel">The stream view model to add</param>
-        public void AddStreamFromSettings(StreamViewModel viewModel)
-        {
-            DataStreams.Add(viewModel);
-            AddStreamInfoPanel(viewModel);
-
-            // Subscribe to property changes
-            viewModel.PropertyChanged += DataStreamViewModel_PropertyChanged;
-
-            // Update channels after adding stream from settings
-            UpdateChannels();
-        }
-
-        /// <summary>
         /// Removes a stream and disposes its resources
         /// </summary>
         /// <param name="viewModel">The stream view model to remove</param>
-        public void RemoveStream(StreamViewModel viewModel)
+        public void RemoveStream(StreamSettings viewModel)
         {
-            if (DataStreams.Contains(viewModel))
+            if (ConfiguredDataStreams.Contains(viewModel))
             {
-                // Unsubscribe from property changes
                 viewModel.PropertyChanged -= DataStreamViewModel_PropertyChanged;
-
-                // Disconnect and dispose the stream
-                viewModel.Disconnect();
-                viewModel.Dispose();
-                
-                // Remove from collection
-                DataStreams.Remove(viewModel);
-                
-                // Find and remove the corresponding panel
+                // Find and remove corresponding IDataStream
+                var streamToRemove = ConnectedDataStreams.FirstOrDefault(ds => ds != null && ds.StreamType == "Serial" && ds is SerialDataStream sds && sds.SourceSetting.PortName == viewModel.Port);
+                if (streamToRemove != null)
+                {
+                    streamToRemove.StopStreaming();
+                    streamToRemove.Disconnect();
+                    streamToRemove.Dispose();
+                    ConnectedDataStreams.Remove(streamToRemove);
+                }
+                ConfiguredDataStreams.Remove(viewModel);
                 for (int i = Panel_Streams.Children.Count - 1; i >= 0; i--)
                 {
-                    if (Panel_Streams.Children[i] is StreamInfoPanel panel && 
-                        panel.DataContext == viewModel)
+                    if (Panel_Streams.Children[i] is StreamInfoPanel panel && panel.DataContext == viewModel)
                     {
                         Panel_Streams.Children.RemoveAt(i);
                         break;
                     }
                 }
-
-                // Update channels after removing stream
                 UpdateChannels();
             }
         }
@@ -111,16 +146,19 @@ namespace SerialPlotDN_WPF.View.UserControls
         /// </summary>
         public void Dispose()
         {
-            foreach (var stream in DataStreams.ToList())
+            foreach (var ds in ConnectedDataStreams.ToList())
+            {
+                ds.StopStreaming();
+                ds.Disconnect();
+                ds.Dispose();
+            }
+            ConnectedDataStreams.Clear();
+            foreach (var stream in ConfiguredDataStreams.ToList())
             {
                 stream.PropertyChanged -= DataStreamViewModel_PropertyChanged;
-                stream.Disconnect();
-                stream.Dispose();
             }
-            DataStreams.Clear();
+            ConfiguredDataStreams.Clear();
             Panel_Streams.Children.Clear();
-
-            // Clear all channels when disposing
             ChannelsChanged?.Invoke(0);
         }
 
@@ -129,8 +167,8 @@ namespace SerialPlotDN_WPF.View.UserControls
         /// </summary>
         private void DataStreamViewModel_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
         {
-            // Update channels when NumberOfChannels or IsConnected changes
-            if (e.PropertyName == nameof(StreamViewModel.NumberOfChannels))
+            // Update channels when NumberOfChannels changes
+            if (e.PropertyName == nameof(StreamSettings.NumberOfChannels))
             {
                 UpdateChannels();
             }
@@ -143,7 +181,7 @@ namespace SerialPlotDN_WPF.View.UserControls
         {
             // Sum up channels from all connected streams
             int totalChannels = 0;
-            foreach(var vm in DataStreams)
+            foreach(var vm in ConfiguredDataStreams)
             {
                 totalChannels = totalChannels + vm.NumberOfChannels;
             }
@@ -158,25 +196,11 @@ namespace SerialPlotDN_WPF.View.UserControls
         public int GetTotalChannelCount()
         {
             int totalChannels = 0;
-            foreach (var vm in DataStreams)
+            foreach (var vm in ConfiguredDataStreams)
             {
                 totalChannels = totalChannels + vm.NumberOfChannels;
             }
             return totalChannels;
-        }
-
-        ///// <summary>
-        ///// Gets all connected streams
-        ///// </summary>
-        public IEnumerable<StreamViewModel> GetConnectedStreams()
-        {
-            List<StreamViewModel> connectedStreams = new List<StreamViewModel>();
-            foreach (var stream in DataStreams)
-            {
-                if (stream.IsConnected)
-                    connectedStreams.Add(stream);
-            }
-            return connectedStreams;
         }
     }
 }

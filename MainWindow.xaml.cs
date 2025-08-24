@@ -47,8 +47,7 @@ namespace SerialPlotDN_WPF
             
             // Initialize channel display based on current streams
             int totalChannels = DataStreamBar.GetTotalChannelCount();
-            
-            _plotManager.SetDataStreams(DataStreamBar.DataStreams);
+            _plotManager.SetDataStreams(DataStreamBar.ConnectedDataStreams);
             ChannelControlBar.UpdateChannels(totalChannels);
             _plotManager.UpdateChannelDisplay(totalChannels);
         }
@@ -72,18 +71,13 @@ namespace SerialPlotDN_WPF
             VerticalControl.MaxValueChanged += (s, v) => _plotManager.SetYLimits(_plotManager.Ymin, v);
             VerticalControl.AutoScaleChanged += (s, isAutoScale) => { if (!isAutoScale) _plotManager.SetYLimits(_plotManager.Ymin, _plotManager.Ymax); };
             RunControl.RunStateChanged += RunControl_RunStateChanged;
-            RunControl.ClearClicked += (s, e) => _plotManager.Clear();
+            // Remove ClearClicked event handler if not needed
+            // RunControl.ClearClicked += (s, e) => _plotManager.Clear();
 
-            // Wire up DataStreamBar channel changes to both ChannelControlBar and PlotManager
             DataStreamBar.ChannelsChanged += (totalChannels) => 
             {
-                // Update plot manager with current connected streams
-                _plotManager.SetDataStreams(DataStreamBar.GetConnectedStreams());
-                
-                // Get colors from plot manager for consistency
+                _plotManager.SetDataStreams(DataStreamBar.ConnectedDataStreams);
                 Color[] colors = _plotManager.GetSignalColors(totalChannels);
-                
-                // Update both UI components
                 ChannelControlBar.UpdateChannels(totalChannels, colors);
                 _plotManager.UpdateChannelDisplay(totalChannels, colors);
             };
@@ -91,7 +85,7 @@ namespace SerialPlotDN_WPF
 
         private void RunControl_RunStateChanged(object? sender, RunControl.RunStates newState)
         {
-            if (newState == RunControl.RunStates.Running
+            if (newState == RunControl.RunStates.Running)
                 _plotManager.startAutoUpdate();
             else
                 _plotManager.stopAutoUpdate();

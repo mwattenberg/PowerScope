@@ -182,7 +182,7 @@ namespace SerialPlotDN_WPF.Model
                 {
                     for (int streamChannel = 0; streamChannel < stream.ChannelCount; streamChannel++)
                     {
-                        stream.CopyLatestTo(streamChannel, _data[channelIndex], Xmax);
+                        stream.CopyLatestTo(streamChannel, _data[streamChannel], Xmax);
                     }
                 }
 

@@ -18,9 +18,9 @@ namespace SerialPlotDN_WPF.View.UserForms
     {
         private readonly int[] CommonAudioSampleRates = new int[] { 8000, 16000, 22050, 44100, 48000, 96000 };
         readonly List<PortInfo> ports = new List<PortInfo>();
-        public StreamViewModel ViewModel { get; }
+        public StreamSettings ViewModel { get; }
 
-        public SerialConfigWindow(StreamViewModel viewModel)
+        public SerialConfigWindow(StreamSettings viewModel)
         {
             InitializeComponent();
             ViewModel = viewModel;
@@ -32,7 +32,7 @@ namespace SerialPlotDN_WPF.View.UserForms
             SetASCIIPanelVisibility();
         }
 
-        public SerialConfigWindow() : this(new StreamViewModel()) { }
+        public SerialConfigWindow() : this(new StreamSettings()) { }
 
         // Custom window event handlers
         private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)

@@ -39,13 +39,13 @@ namespace SerialPlotDN_WPF.View.UserControls
         private void StreamInfoPanel_DataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
         {
             // Unsubscribe from old DataContext if it exists
-            if (e.OldValue is StreamViewModel oldVm)
+            if (e.OldValue is StreamSettings oldVm)
             {
                 oldVm.PropertyChanged -= ViewModel_PropertyChanged;
             }
             
             // Subscribe to new DataContext if it exists
-            if (e.NewValue is StreamViewModel newVm)
+            if (e.NewValue is StreamSettings newVm)
             {
                 newVm.PropertyChanged += ViewModel_PropertyChanged;
                 UpdateButtonAppearance(); // Update button immediately
@@ -54,31 +54,16 @@ namespace SerialPlotDN_WPF.View.UserControls
 
         private void ViewModel_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
         {
-            if (e.PropertyName == nameof(StreamViewModel.IsConnected))
-            {
-                Application.Current.Dispatcher.BeginInvoke(() =>
-                {
-                    UpdateButtonAppearance();
-                });
-            }
+            // Only update UI for configuration changes, not connection state
+            UpdateButtonAppearance();
         }
 
         private void UpdateButtonAppearance()
         {
-            if (DataContext is StreamViewModel vm)
-            {
-                // Update button content
-                if (vm.IsConnected)
-                    Button_Connect.Content = "Disconnect";
-                else
-                    Button_Connect.Content = "Connect";
-                
-                // Update button background
-                if (vm.IsConnected)
-                    Button_Connect.Background = new SolidColorBrush(Colors.OrangeRed);
-                else
-                    Button_Connect.Background = new SolidColorBrush(Colors.LimeGreen);
-            }
+            // This should be updated to use IDataStream state, not StreamSettings
+            // You will need to pass the IDataStream reference to the panel, or bind to its state
+            Button_Connect.Content = "Connect";
+            Button_Connect.Background = new SolidColorBrush(Colors.LimeGreen);
         }
 
         private void StreamInfoPanel_Unloaded(object sender, RoutedEventArgs e)
@@ -90,7 +75,7 @@ namespace SerialPlotDN_WPF.View.UserControls
             }
             
             // Unsubscribe from property changes
-            if (DataContext is StreamViewModel vm)
+            if (DataContext is StreamSettings vm)
             {
                 vm.PropertyChanged -= ViewModel_PropertyChanged;
             }
@@ -103,88 +88,26 @@ namespace SerialPlotDN_WPF.View.UserControls
 
             Application.Current.Dispatcher.BeginInvoke(() =>
             {
-                if (DataContext is StreamViewModel vm && vm.IsConnected && vm.SerialDataStream != null)
-                {
-                    try
-                    {
-                        SerialDataStream dataStream = vm.SerialDataStream as SerialDataStream;
-                        if (dataStream != null)
-                        {
-                            // Calculate samples per second
-                            long currentSamples = dataStream.TotalSamples;
-                            long samplesPerSecond = currentSamples - _prevSampleCount;
-                            _prevSampleCount = currentSamples;
-    
-                            // Calculate bits per second and port usage percentage
-                            long currentBits = dataStream.TotalBits;
-                            long bitsPerSecond = currentBits - _prevBitsCount;
-                            _prevBitsCount = currentBits;
-    
-                            double portUsagePercent;
-                            if (vm.Baud > 0)
-                                portUsagePercent = (double)bitsPerSecond / vm.Baud * 100.0;
-                            else
-                                portUsagePercent = 0.0;
-    
-                            // Update UI
-                            SamplesPerSecondTextBlock.Text = samplesPerSecond.ToString();
-                            PortUsageTextBlock.Text = $"{portUsagePercent:F1}%";
-                        }
-                    }
-                    catch
-                    {
-                        // Reset display on error
-                        SamplesPerSecondTextBlock.Text = "0";
-                        PortUsageTextBlock.Text = "0%";
-                    }
-                }
-                else
-                {
-                    // Reset counters and display when disconnected
-                    _prevSampleCount = 0;
-                    _prevBitsCount = 0;
-                    SamplesPerSecondTextBlock.Text = "0";
-                    PortUsageTextBlock.Text = "0%";
-                }
+                // This should be updated to use IDataStream reference, not StreamSettings
+                SamplesPerSecondTextBlock.Text = "0";
+                PortUsageTextBlock.Text = "0%";
             });
         }
 
         private void Button_Configure_Click(object sender, RoutedEventArgs e)
         {
-            if (DataContext is StreamViewModel vm)
+            if (DataContext is StreamSettings vm)
             {
-                // Disconnect the serial stream before configuring
-                if (vm.IsConnected)
-                {
-                    vm.Disconnect();
-                }
-
                 SerialConfigWindow configWindow = new SerialConfigWindow(vm);
-                
-                if (configWindow.ShowDialog() == true)
-                    vm.Connect();
+                configWindow.ShowDialog();
             }
         }
 
         private void Button_Connect_Click(object sender, RoutedEventArgs e)
         {
-            if (DataContext is StreamViewModel vm)
-            {
-                if (vm.IsConnected)
-                {
-                    // Disconnect
-                    vm.Disconnect();
-                }
-                else
-                {
-                    // Connect
-                    vm.Connect();
-                }
-                
-                // Fire the event for any external handlers
-                if (OnConnectClickedEvent != null)
-                    OnConnectClickedEvent.Invoke(this, EventArgs.Empty);
-            }
+            // Connection logic should be handled in DataStreamBar, not here
+            if (OnConnectClickedEvent != null)
+                OnConnectClickedEvent.Invoke(this, EventArgs.Empty);
         }
 
         private void Button_Close_Click(object sender, RoutedEventArgs e)

@@ -290,13 +290,13 @@ namespace SerialPlotDN_WPF.Model
                             ProcessReceivedData(_readBuffer, bytesRead, _workingBuffer);
                         }
                     }
-                    else
-                    {
+                    //else
+                    //{
                         int sleepTime = 1000 / SerialPortUpdateRateHz;
                         if (sleepTime < 1)
                             sleepTime = 1;
                         Thread.Sleep(sleepTime);
-                    }
+                    //}
                 }
                 catch (TimeoutException)
                 {
