@@ -49,7 +49,7 @@ namespace SerialPlotDN_WPF.Model
             XElement dataStreamsElement = new XElement("DataStreams");
             int globalChannelIndex = 0;
 
-            foreach (DataStreamViewModel vm in dataStreamBar.DataStreams)
+            foreach (StreamViewModel vm in dataStreamBar.DataStreams)
             {
                 XElement streamElement = new XElement("DataStream",
                     // Stream configuration
@@ -168,13 +168,13 @@ namespace SerialPlotDN_WPF.Model
             if (dataStreamsElement == null) 
                 return;
 
-            List<DataStreamViewModel> loadedStreams = new List<DataStreamViewModel>();
+            List<StreamViewModel> loadedStreams = new List<StreamViewModel>();
             List<ChannelSettings> channelSettings = new List<ChannelSettings>();
 
             foreach (XElement streamElement in dataStreamsElement.Elements("DataStream"))
             {
                 // Load stream configuration
-                DataStreamViewModel vm = new DataStreamViewModel();
+                StreamViewModel vm = new StreamViewModel();
                 
                 XElement portElement = streamElement.Element("Port");
                 if (portElement != null)
@@ -326,7 +326,7 @@ namespace SerialPlotDN_WPF.Model
             }
 
             // Add streams to DataStreamBar
-            foreach (DataStreamViewModel stream in loadedStreams)
+            foreach (StreamViewModel stream in loadedStreams)
             {
                 dataStreamBar.AddStreamFromSettings(stream);
             }

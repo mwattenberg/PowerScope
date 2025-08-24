@@ -1,9 +1,6 @@
-﻿using System;
-using System.Linq; // Add for LINQ methods
+﻿using System.Collections.Generic;
 using System.Timers;
 using System.Windows;
-using System.Windows.Media;
-using ScottPlot;
 using ScottPlot.Plottables;
 using ScottPlot.WPF;
 using SerialPlotDN_WPF.View.UserControls;
@@ -20,9 +17,9 @@ namespace SerialPlotDN_WPF.Model
         private readonly Signal[] _signals;
         private readonly double[][] _data;
         private readonly int _maxChannels;
-        
+
         // Stream management - simplified interface
-        private IEnumerable<DataStreamViewModel> _connectedStreams = Enumerable.Empty<DataStreamViewModel>();
+        private List<IDataStream> _connectedStreams;
 
         /// <summary>
         /// Current number of channels being plotted
@@ -51,7 +48,7 @@ namespace SerialPlotDN_WPF.Model
         /// Updates the data streams that provide data for plotting
         /// /// </summary>
         /// <param name="connectedStreams">Currently connected streams</param>
-        public void SetDataStreams(IEnumerable<DataStreamViewModel> connectedStreams)
+        public void SetDataStreams(List<IDataStream> connectedStreams)
         {
             _connectedStreams = connectedStreams;
         }
@@ -183,16 +180,9 @@ namespace SerialPlotDN_WPF.Model
                 // Iterate through all connected streams and their channels
                 foreach (var stream in _connectedStreams)
                 {
-                    if (stream.SerialDataStream != null)
+                    for (int streamChannel = 0; streamChannel < stream.ChannelCount; streamChannel++)
                     {
-                        for (int streamChannel = 0; streamChannel < stream.NumberOfChannels; streamChannel++)
-                        {
-                            if (channelIndex < NumberOfChannels)
-                            {
-                                stream.SerialDataStream.CopyLatestDataTo(streamChannel, _data[channelIndex], Xmax);
-                                channelIndex++;
-                            }
-                        }
+                        stream.CopyLatestTo(streamChannel, _data[channelIndex], Xmax);
                     }
                 }
 

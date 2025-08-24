@@ -21,7 +21,10 @@ namespace SerialPlotDN_WPF.View.UserControls
 
         private RunStates _runstate;
         private RecordStates _recordstate;
-        
+        public event EventHandler<RunStates> RunStateChanged;
+        public event EventHandler<RecordStates> RecordStateChanged;
+        public event EventHandler ClearClicked;
+
         public RunStates RunState
         {
             get 
@@ -58,8 +61,7 @@ namespace SerialPlotDN_WPF.View.UserControls
             }
         }
 
-        public event EventHandler<RunStates> RunStateChanged;
-        public event EventHandler<RecordStates> RecordStateChanged;
+
 
         public RunControl()
         {
@@ -120,9 +122,7 @@ namespace SerialPlotDN_WPF.View.UserControls
 
         private void ClearButton_Click(object sender, RoutedEventArgs e)
         {
-            // TODO: Add logic to clear relevant fields or reset controls
-
-            // You can add more clear/reset logic here as needed
+            ClearClicked?.Invoke(this, EventArgs.Empty);
         }
     }
 }

@@ -47,6 +47,7 @@ namespace SerialPlotDN_WPF
             
             // Initialize channel display based on current streams
             int totalChannels = DataStreamBar.GetTotalChannelCount();
+            
             _plotManager.SetDataStreams(DataStreamBar.DataStreams);
             ChannelControlBar.UpdateChannels(totalChannels);
             _plotManager.UpdateChannelDisplay(totalChannels);
@@ -71,7 +72,8 @@ namespace SerialPlotDN_WPF
             VerticalControl.MaxValueChanged += (s, v) => _plotManager.SetYLimits(_plotManager.Ymin, v);
             VerticalControl.AutoScaleChanged += (s, isAutoScale) => { if (!isAutoScale) _plotManager.SetYLimits(_plotManager.Ymin, _plotManager.Ymax); };
             RunControl.RunStateChanged += RunControl_RunStateChanged;
-            
+            RunControl.ClearClicked += (s, e) => _plotManager.Clear();
+
             // Wire up DataStreamBar channel changes to both ChannelControlBar and PlotManager
             DataStreamBar.ChannelsChanged += (totalChannels) => 
             {
@@ -89,24 +91,10 @@ namespace SerialPlotDN_WPF
 
         private void RunControl_RunStateChanged(object? sender, RunControl.RunStates newState)
         {
-            if (newState == RunControl.RunStates.Running)
-            {
-                // Start all connected streams
-                foreach (var stream in DataStreamBar.GetConnectedStreams())
-                {
-                    stream.SerialDataStream?.Start();
-                }
+            if (newState == RunControl.RunStates.Running
                 _plotManager.startAutoUpdate();
-            }
             else
-            {
-                // Stop all connected streams
-                foreach (var stream in DataStreamBar.GetConnectedStreams())
-                {
-                    stream.SerialDataStream?.Stop();
-                }
                 _plotManager.stopAutoUpdate();
-            }
         }
 
         //private void InitializeDataStream()

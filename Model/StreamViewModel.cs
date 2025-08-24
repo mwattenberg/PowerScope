@@ -15,7 +15,8 @@ namespace SerialPlotDN_WPF.Model
     public enum StreamSource
     {
         SerialPort,
-        AudioInput
+        AudioInput,
+        USB
     }
 
     public enum NumberTypeEnum
@@ -29,11 +30,11 @@ namespace SerialPlotDN_WPF.Model
         Float
     }
 
-    public class DataStreamViewModel : INotifyPropertyChanged, IDisposable
+    public class StreamViewModel : INotifyPropertyChanged, IDisposable
     {
         private string _port;
         private int _baud;
-        private bool _isConnected;
+        //private bool _isConnected;
         private string _statusMessage;
         private int _dataBits;
         private int _stopBits;
@@ -51,9 +52,9 @@ namespace SerialPlotDN_WPF.Model
         private string _frameStart; // for CustomFrame
 
         // SerialDataStream instance
-        private SerialDataStream _serialDataStream;
+        private IDataStream _dataStream;
 
-        public DataStreamViewModel()
+        public StreamViewModel()
         {
             StatusMessage = "Disconnected";
             DataBits = 8;
@@ -67,24 +68,21 @@ namespace SerialPlotDN_WPF.Model
         /// <summary>
         /// Gets the current SerialDataStream instance (read-only)
         /// </summary>
-        public SerialDataStream SerialDataStream 
+        public IDataStream SerialDataStream 
         { 
             get 
             { 
-                return _serialDataStream; 
+                return _dataStream; 
             } 
         }
 
         /// <summary>
         /// Connects to the serial port using the current configuration
-        /// </summary>
-        /// <returns>True if connection was successful, false otherwise</returns>
+        /// /// <returns>True if connection was successful, false otherwise</returns>
         public bool Connect()
         {
-            if (_isConnected)
-            {
+            if (_dataStream != null && _dataStream.IsConnected)
                 return true; // Already connected
-            }
 
             // Validate port name before attempting connection
             if (string.IsNullOrWhiteSpace(Port))
@@ -93,105 +91,62 @@ namespace SerialPlotDN_WPF.Model
                 return false;
             }
 
-            try
-            {
-                // Create SourceSetting based on current properties
-                SourceSetting sourceSetting = new SourceSetting(Port, Baud, DataBits, Parity);
+            // Create SourceSetting based on current properties
+            SourceSetting sourceSetting = new SourceSetting(Port, Baud, DataBits, StopBits, Parity);
 
-                // Create DataParser based on current configuration
-                DataParser dataParser;
-                if (DataFormat == DataFormatType.RawBinary)
+            // Create DataParser based on current configuration
+            DataParser dataParser;
+            if (DataFormat == DataFormatType.RawBinary)
+            {
+                // Create binary parser - using uint16_t as default, with frame start bytes
+                byte[] frameStartBytes = ParseFrameStartBytes(FrameStart);
+                if (frameStartBytes != null && frameStartBytes.Length > 0)
                 {
-                    // Create binary parser - using uint16_t as default, with frame start bytes
-                    byte[] frameStartBytes = ParseFrameStartBytes(FrameStart);
-                    if (frameStartBytes != null && frameStartBytes.Length > 0)
-                    {
-                        dataParser = new DataParser(DataParser.BinaryFormat.uint16_t, NumberOfChannels, frameStartBytes);
-                    }
-                    else
-                    {
-                        dataParser = new DataParser(DataParser.BinaryFormat.uint16_t, NumberOfChannels);
-                    }
+                    dataParser = new DataParser(DataParser.BinaryFormat.uint16_t, NumberOfChannels, frameStartBytes);
                 }
                 else
                 {
-                    // Create ASCII parser
-                    char frameEnd = '\n'; // Default line ending
-                    char separator = ParseDelimiter(Delimiter);
-                    dataParser = new DataParser(NumberOfChannels, frameEnd, separator);
+                    dataParser = new DataParser(DataParser.BinaryFormat.uint16_t, NumberOfChannels);
                 }
-
-                // Create and configure SerialDataStream
-                _serialDataStream = new SerialDataStream(sourceSetting, dataParser);
-                
-                // Start the data stream
-                _serialDataStream.Start();
-
-                // Update connection state
-                IsConnected = true;
-                StatusMessage = "Connected";
-
-                return true;
             }
-            catch (PortNotFoundException ex)
+            else
             {
-                StatusMessage = $"Could not find port: {ex.PortName}";
-                if (_serialDataStream != null)
-                    _serialDataStream.Dispose();
-                _serialDataStream = null;
-                IsConnected = false;
-                return false;
+                // Create ASCII parser
+                char frameEnd = '\n'; // Default line ending
+                char separator = ParseDelimiter(Delimiter);
+                dataParser = new DataParser(NumberOfChannels, frameEnd, separator);
             }
-            catch (PortAlreadyInUseException ex)
-            {
-                StatusMessage = $"Port already in use: {ex.PortName}";
-                if (_serialDataStream != null)
-                    _serialDataStream.Dispose();
-                _serialDataStream = null;
-                IsConnected = false;
-                return false;
-            }
-            catch (Exception ex)
-            {
-                StatusMessage = $"Connection failed: {ex.Message}";
-                if (_serialDataStream != null)
-                    _serialDataStream.Dispose();
-                _serialDataStream = null;
-                IsConnected = false;
-                return false;
-            }
+
+            // Create and configure SerialDataStream
+            _dataStream = new SerialDataStream(sourceSetting, dataParser);
+
+            _dataStream.Connect();
+            
+            // Start the data stream
+            _dataStream.StartStreaming();
+
+            // Update connection state
+            OnPropertyChanged(nameof(IsConnected));
+            OnPropertyChanged(nameof(StatusMessage));
+
+            return _dataStream.IsConnected;
         }
 
         /// <summary>
         /// Disconnects from the serial port and disposes resources
-        /// </summary>
+        /// /// </summary>
         public void Disconnect()
         {
-            if (!_isConnected)
-            {
+            if (_dataStream == null || !_dataStream.IsConnected)
                 return; // Already disconnected
-            }
 
-            try
-            {
-                // Stop and dispose the SerialDataStream
-                if (_serialDataStream != null)
-                    _serialDataStream.Stop();
-                if (_serialDataStream != null)
-                    _serialDataStream.Dispose();
-                _serialDataStream = null;
-
-                // Update connection state
-                IsConnected = false;
-                StatusMessage = "Disconnected";
-            }
-            catch (Exception ex)
-            {
-                StatusMessage = $"Disconnect error: {ex.Message}";
-                // Ensure cleanup even if there's an error
-                _serialDataStream = null;
-                IsConnected = false;
-            }
+            
+            _dataStream.StopStreaming();
+            _dataStream.Disconnect();
+            _dataStream.Dispose();
+            
+            OnPropertyChanged(nameof(IsConnected));
+            OnPropertyChanged(nameof(StatusMessage));
         }
 
         /// <summary>
@@ -277,7 +232,7 @@ namespace SerialPlotDN_WPF.Model
             {
                 _port = value;
                 OnPropertyChanged(nameof(Port));
-                OnPropertyChanged(nameof(PortAndBaudDisplay));
+                // Removed PortAndBaudDisplay notification
             }
         }
 
@@ -288,7 +243,7 @@ namespace SerialPlotDN_WPF.Model
             {
                 _baud = value;
                 OnPropertyChanged(nameof(Baud));
-                OnPropertyChanged(nameof(PortAndBaudDisplay));
+                // Removed PortAndBaudDisplay notification
             }
         }
 
@@ -367,46 +322,44 @@ namespace SerialPlotDN_WPF.Model
 
         public bool IsConnected
         {
-            get { return _isConnected; }
-            set
+            get
             {
-                _isConnected = value;
-                OnPropertyChanged(nameof(IsConnected));
-
+                if (_dataStream != null)
+                    return _dataStream.IsConnected;
+                else
+                    return false;
             }
+
         }
 
         public string StatusMessage
         {
-            get { return _statusMessage; }
-            set
-            {
-                _statusMessage = value;
-                OnPropertyChanged(nameof(StatusMessage));
-            }
-        }
-
-        public string PortAndBaudDisplay
-        {
             get
             {
-                if (Port != null && Baud != 0)
-                    return $"Port: {Port}\nBaud: {Baud}";
+                if (_dataStream != null)
+                    return _dataStream.StatusMessage;
                 else
-                    return "";
+                    return _statusMessage;
+            }
+            set
+            {
+                if (_dataStream == null)
+                    _statusMessage = value;
+
+                OnPropertyChanged(nameof(StatusMessage));
             }
         }
 
         public int NumberOfChannels
         {
-            get 
-            { 
-                return _numberOfChannels; 
+            get
+            {
+                return _numberOfChannels;
             }
-            set 
-            { 
-                _numberOfChannels = value; 
-                OnPropertyChanged(nameof(NumberOfChannels)); 
+            set
+            {
+                _numberOfChannels = value;
+                OnPropertyChanged(nameof(NumberOfChannels));
             }
         }
         
@@ -472,7 +425,7 @@ namespace SerialPlotDN_WPF.Model
 
         /// <summary>
         /// Disposes of the SerialDataStream resources
-        /// </summary>
+        /// /// </summary>
         public void Dispose()
         {
             Disconnect();

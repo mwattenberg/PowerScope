@@ -44,23 +44,25 @@ namespace SerialPlotDN_WPF.Model
         }
     }
 
-    public class SerialDataStream : IDisposable
+    public class SerialDataStream : IDataStream
     {
-        private readonly SerialPortStream _port; // Changed from System.IO.Ports.SerialPort to RJCP SerialPortStream
+        private readonly SerialPortStream _port;
         private byte[] _residue;
         private readonly byte[] _readBuffer;
         private readonly byte[] _workingBuffer;
         private Thread _readSerialPortThread;
         private bool _disposed = false;
+        private bool _isConnected;
+        private bool _isStreaming;
+        private string _statusMessage;
         public SourceSetting SourceSetting { get; init; }
         public long TotalSamples { get; private set; }
         public long TotalBits { get; private set; }
         private RingBuffer<double>[] ReceivedData { get; set; }
         private int[] _lastReadPositions;
-        public bool IsRunning { get; private set; }
         public DataParser Parser { get; init; }
-        public int SerialPortUpdateRateHz { get; set; } = 200; // Default update rate in Hz
-        public int NumberOfChannels 
+        public int SerialPortUpdateRateHz { get; set; } = 200;
+        public int ChannelCount 
         { 
             get 
             { 
@@ -68,37 +70,59 @@ namespace SerialPlotDN_WPF.Model
             } 
         }
 
+        public string StatusMessage
+        {
+            get { return _statusMessage; }
+            set { _statusMessage = value; }
+        }
+
+        public string StreamType
+        {
+            get { return "Serial"; }
+        }
+
+        public bool IsConnected
+        {
+            get { return _isConnected; }
+            set { _isConnected = value; }
+        }
+
+        public bool IsStreaming
+        {
+            get { return _isStreaming; }
+            set { _isStreaming = value; }
+        }
+
+
 
         public SerialDataStream(SourceSetting source, DataParser dataParser)
         {
             SourceSetting = source;
             Parser = dataParser;
-
-            // Validate that the port exists on the system
             ValidatePortExists(source.PortName);
-
-            // Create RJCP SerialPortStream with enhanced configuration
             _port = new SerialPortStream(source.PortName)
             {
                 BaudRate = source.BaudRate,
                 DataBits = source.DataBits,
                 Parity = source.Parity,
-                StopBits = ConvertStopBits(1), // Default stop bits, could be made configurable
                 Encoding = Encoding.ASCII,
-                ReadTimeout = 1000, // Increased timeout for better reliability
+                ReadTimeout = 1000,
                 WriteTimeout = 1000,
-                // Enhanced buffering for better performance
-                ReadBufferSize = 2048,//small buffer to reduce latency
+                ReadBufferSize = 2048,
                 WriteBufferSize = 8192,
-                // Flow control settings
                 Handshake = Handshake.None,
                 DtrEnable = false,
                 RtsEnable = false
             };
 
-            // Larger ring buffer for better performance with high-speed data
-            int ringBufferSize = Math.Max(500000, source.BaudRate / 5); // Increased buffer size
-            
+            if(source.StopBits == 1)
+                _port.StopBits = StopBits.One;
+            else if(source.StopBits == 2)
+                _port.StopBits = StopBits.Two;
+            else
+                _port.StopBits = StopBits.One; // Force stop bits to 1 to avoid compatibility issues
+
+            int ringBufferSize = Math.Max(500000, source.BaudRate / 5);
             ReceivedData = new RingBuffer<double>[dataParser.NumberOfChannels];
             _lastReadPositions = new int[dataParser.NumberOfChannels];
             for (int i = 0; i < dataParser.NumberOfChannels; i++)
@@ -106,34 +130,15 @@ namespace SerialPlotDN_WPF.Model
                 ReceivedData[i] = new RingBuffer<double>(ringBufferSize);
                 _lastReadPositions[i] = 0;
             }
-            
-            // Larger read buffers for better performance
-            int MaxReadSize = _port.ReadBufferSize / 2; // Use half of the port buffer size
+            int MaxReadSize = _port.ReadBufferSize / 2;
             _readBuffer = new byte[MaxReadSize];
-            _workingBuffer = new byte[MaxReadSize * 2]; // Working buffer can be larger
-
+            _workingBuffer = new byte[MaxReadSize * 2];
             _residue = new byte[20];
-            _readSerialPortThread = new Thread(ReadSerialData) { IsBackground = true };
+            _isConnected = false;
+            _isStreaming = false;
+            _statusMessage = "Disconnected";
         }
 
-        /// <summary>
-        /// Converts integer stop bits to RJCP StopBits enum
-        /// </summary>
-        private StopBits ConvertStopBits(int stopBits)
-        {
-            if (stopBits == 1)
-                return StopBits.One;
-            else if (stopBits == 2)
-                return StopBits.Two;
-            else
-                return StopBits.One;
-        }
-
-        /// <summary>
-        /// Validates that the specified port exists on the system
-        /// </summary>
-        /// <param name="portName">The port name to validate (e.g., "COM1")</param>
-        /// <exception cref="PortNotFoundException">Thrown when the port is not found</exception>
         private static void ValidatePortExists(string portName)
         {
             if (string.IsNullOrWhiteSpace(portName))
@@ -143,11 +148,7 @@ namespace SerialPlotDN_WPF.Model
                     actualPortName = "null";
                 throw new PortNotFoundException(actualPortName);
             }
-
-            // Get all available serial ports on the system - use System.IO.Ports for enumeration
             string[] availablePorts = System.IO.Ports.SerialPort.GetPortNames();
-            
-            // Check if the requested port exists (case-insensitive comparison)
             bool portExists = false;
             foreach (string port in availablePorts)
             {
@@ -157,75 +158,131 @@ namespace SerialPlotDN_WPF.Model
                     break;
                 }
             }
-
             if (!portExists)
             {
                 throw new PortNotFoundException(portName);
             }
         }
 
-        public void Start()
+        public void Connect()
         {
             try
             {
                 _port.Open();
+                _isConnected = true;
+                _statusMessage = "Connected";
             }
             catch (UnauthorizedAccessException ex)
             {
-                // Port is already in use by another application
                 if (_port != null)
                     _port.Dispose();
+                _statusMessage = "Port already in use";
+                _isConnected = false;
                 throw new PortAlreadyInUseException(SourceSetting.PortName, ex);
             }
             catch (ArgumentException ex)
             {
-                // Invalid port name or parameters
                 if (_port != null)
                     _port.Dispose();
+                _statusMessage = "Port not found";
+                _isConnected = false;
                 throw new PortNotFoundException(SourceSetting.PortName, ex);
             }
             catch (InvalidOperationException ex)
             {
-                // Port is already open or other operation issue
                 if (_port != null)
                     _port.Dispose();
+                _statusMessage = "Port already in use";
+                _isConnected = false;
                 throw new PortAlreadyInUseException(SourceSetting.PortName, ex);
             }
             catch (System.IO.IOException ex)
             {
-                // RJCP specific IO exceptions (port access issues)
                 if (_port != null)
                     _port.Dispose();
+                _statusMessage = "Port already in use";
+                _isConnected = false;
                 throw new PortAlreadyInUseException(SourceSetting.PortName, ex);
             }
-
-            IsRunning = true;
-            
-            _readSerialPortThread.Start();
         }
 
-        public void Stop()
+        public void Disconnect()
         {
-            IsRunning = false;
-            if (_readSerialPortThread != null && _readSerialPortThread.IsAlive)
+            StopStreaming();
+            if (_port != null && _port.IsOpen)
+                _port.Close();
+            _isConnected = false;
+            _statusMessage = "Disconnected";
+        }
+
+        public void StartStreaming()
+        {
+            if (!_isConnected || _isStreaming)
+                return;
+           
+            _isStreaming = true;
+            
+            //Not sure if I need this, but just in case
+            if ( _readSerialPortThread != null && _readSerialPortThread.IsAlive)
             {
-                _readSerialPortThread.Join(1000); // Increased timeout for cleaner shutdown
+                _isStreaming = false;
+                _readSerialPortThread.Join(1000);
             }
+
+            _readSerialPortThread = new Thread(ReadSerialData) { IsBackground = true };
+            _readSerialPortThread.Start();
+
+            _statusMessage = "Streaming";
+        }
+
+        public void StopStreaming()
+        {
+            if (!_isStreaming)
+                return;
+            _isStreaming = false;
+            if (_readSerialPortThread != null && _readSerialPortThread.IsAlive)
+                _readSerialPortThread.Join(1000);
+            _statusMessage = "Stopped";
+        }
+
+        public int CopyLatestTo(int channel, double[] destination, int n)
+        {
+            if (channel < 0)
+                return 0;
+            if (channel >= ReceivedData.Length)
+                return 0;
+            return ReceivedData[channel].CopyLatestTo(destination, n);
+        }
+
+        void clearData()
+        {
+            if (ReceivedData != null)
+            {
+                foreach (RingBuffer<double> ringBuffer in ReceivedData)
+                {
+                    if (ringBuffer != null)
+                        ringBuffer.Clear();
+                }
+            }
+            TotalSamples = 0;
+            TotalBits = 0;
+            _lastReadPositions = new int[Parser.NumberOfChannels];
         }
 
         private void ReadSerialData()
         {
-            int MinBytesThreshold = 100; // Reduced threshold for better responsiveness
+            int MinBytesThreshold = 100;
             int MaxReadSize = _readBuffer.Length;
-            
-            while (IsRunning && _port.IsOpen)
+            while (_isStreaming && _port.IsOpen)
             {
                 try
                 {
                     int bytesAvailable = _port.BytesToRead;
                     if (bytesAvailable >= MinBytesThreshold)
                     {
-                        int bytesToRead = Math.Min(bytesAvailable, MaxReadSize);
+                        int bytesToRead = MaxReadSize;
+                        if (bytesAvailable < MaxReadSize)
+                            bytesToRead = bytesAvailable;
                         int bytesRead = _port.Read(_readBuffer, 0, bytesToRead);
                         TotalBits = TotalBits + bytesRead * 8;
                         if (bytesRead > 0)
@@ -235,8 +292,9 @@ namespace SerialPlotDN_WPF.Model
                     }
                     else
                     {
-                        // Use more efficient timing based on expected data rate
-                        int sleepTime = Math.Max(1, 1000 / SerialPortUpdateRateHz);
+                        int sleepTime = 1000 / SerialPortUpdateRateHz;
+                        if (sleepTime < 1)
+                            sleepTime = 1;
                         Thread.Sleep(sleepTime);
                     }
                 }
@@ -248,89 +306,58 @@ namespace SerialPlotDN_WPF.Model
                 {
                     break;
                 }
-                catch (System.IO.IOException ex)
+                catch (System.IO.IOException)
                 {
-                    // RJCP specific IO exceptions
-                    System.Diagnostics.Debug.WriteLine($"Serial IO error: {ex.Message}");
                     Thread.Sleep(10);
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
-                    System.Diagnostics.Debug.WriteLine($"Serial read error: {ex.Message}");
                     Thread.Sleep(10);
                 }
             }
         }
 
-        /// <summary>
-        /// Efficiently copies the latest data to a pre-allocated array for the specified channel.
-        /// This method is optimized for plotting scenarios to avoid memory allocations.
-        /// </summary>
-        /// <param name="channel">Channel number</param>
-        /// <param name="destination">Pre-allocated array to copy data into</param>
-        /// <param name="sampleCount">Number of latest samples to copy</param>
-        /// <returns>Actual number of samples copied</returns>
-        public int CopyLatestDataTo(int channel, double[] destination, int sampleCount)
-        {
-            if (channel < 0 || channel >= ReceivedData.Length)
-                return 0;
-
-            return ReceivedData[channel].CopyLatestTo(destination, sampleCount);
-        }
-        
         private void ProcessReceivedData(byte[] readBuffer, int bytesRead, byte[] workingBuffer)
         {
             int totalDataLength = bytesRead;
             int workingBufferOffset = 0;
-
-            // Handle residue from previous parsing
             if (_residue != null && _residue.Length > 0)
             {
-                // Copy residue to working buffer first
                 _residue.CopyTo(workingBuffer, 0);
                 workingBufferOffset = _residue.Length;
                 totalDataLength += _residue.Length;
             }
-
-            // Copy new data after residue
             Array.Copy(readBuffer, 0, workingBuffer, workingBufferOffset, bytesRead);
-
             try
             {
-                // Parse the combined data
                 ParsedData parsedData = Parser.ParseData(workingBuffer.AsSpan(0, totalDataLength));
-
-                // Update residue for next iteration
                 _residue = parsedData.Residue;
-
-                // Add parsed data to ring buffers
                 if (parsedData.Data != null)
                 {
                     AddDataToRingBuffers(parsedData.Data);
                 }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                // Log parsing errors but continue
-                System.Diagnostics.Debug.WriteLine($"Data parsing error: {ex.Message}");
-                // Clear residue on parsing error to prevent corruption propagation
                 _residue = null;
             }
         }
 
         private void AddDataToRingBuffers(double[][] parsedData)
         {
-            int channelsToProcess = Math.Min(parsedData.Length, Parser.NumberOfChannels);
-
+            int channelsToProcess = parsedData.Length;
+            if (channelsToProcess > Parser.NumberOfChannels)
+                channelsToProcess = Parser.NumberOfChannels;
             for (int i = 0; i < channelsToProcess; i++)
             {
-                if (parsedData[i] != null && parsedData[i].Length > 0)
+                if (parsedData[i] != null)
                 {
-                    ReceivedData[i].AddRange(parsedData[i]);
+                    if (parsedData[i].Length > 0)
+                    {
+                        ReceivedData[i].AddRange(parsedData[i]);
+                    }
                 }
             }
-
-            // Update total samples count (using first channel as reference)
             if (channelsToProcess > 0)
             {
                 TotalSamples = TotalSamples + parsedData[0].Length;
@@ -341,36 +368,29 @@ namespace SerialPlotDN_WPF.Model
         {
             if (_disposed)
                 return;
-                
-            Stop();
-            try
-            {
-                if (_port != null && _port.IsOpen)
-                {
-                    _port.Close();
-                }
-                if (_port != null)
-                {
-                    _port.Dispose();
-                }
-            }
-            catch (Exception) { }
-            
+            if(_isStreaming)
+                StopStreaming();
+            if (_port != null && _port.IsOpen)
+                _port.Close();
+            if (_port != null)
+                _port.Dispose();
             if (ReceivedData != null)
             {
                 foreach (RingBuffer<double> ringBuffer in ReceivedData)
                 {
                     if (ringBuffer != null)
-                    {
                         ringBuffer.Clear();
-                    }
                 }
             }
-            
             _lastReadPositions = null;
             _residue = null;
             _disposed = true;
             GC.SuppressFinalize(this);
+        }
+
+        void IDataStream.clearData()
+        {
+            clearData();
         }
     }
 
@@ -380,16 +400,18 @@ namespace SerialPlotDN_WPF.Model
         public string PortName { get; init; }
         public int BaudRate { get; init; }
         public int DataBits { get; init; }
+        public int StopBits { get; init; }
         public Parity Parity { get; init; }
         public DataSource Source { get; init; }
         public string AudioDeviceName { get; init; }
 
-        public SourceSetting(string portName, int baudRate, int dataBits, Parity parity)
+        public SourceSetting(string portName, int baudRate, int dataBits, int stopBits, Parity parity)
         {
             PortName = portName;
             BaudRate = baudRate;
             Parity = parity;
             DataBits = dataBits;
+            StopBits = stopBits;
             AudioDeviceName = null;
             Source = DataSource.Serial;
         }

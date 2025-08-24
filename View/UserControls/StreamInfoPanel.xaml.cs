@@ -39,13 +39,13 @@ namespace SerialPlotDN_WPF.View.UserControls
         private void StreamInfoPanel_DataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
         {
             // Unsubscribe from old DataContext if it exists
-            if (e.OldValue is DataStreamViewModel oldVm)
+            if (e.OldValue is StreamViewModel oldVm)
             {
                 oldVm.PropertyChanged -= ViewModel_PropertyChanged;
             }
             
             // Subscribe to new DataContext if it exists
-            if (e.NewValue is DataStreamViewModel newVm)
+            if (e.NewValue is StreamViewModel newVm)
             {
                 newVm.PropertyChanged += ViewModel_PropertyChanged;
                 UpdateButtonAppearance(); // Update button immediately
@@ -54,7 +54,7 @@ namespace SerialPlotDN_WPF.View.UserControls
 
         private void ViewModel_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
         {
-            if (e.PropertyName == nameof(DataStreamViewModel.IsConnected))
+            if (e.PropertyName == nameof(StreamViewModel.IsConnected))
             {
                 Application.Current.Dispatcher.BeginInvoke(() =>
                 {
@@ -65,7 +65,7 @@ namespace SerialPlotDN_WPF.View.UserControls
 
         private void UpdateButtonAppearance()
         {
-            if (DataContext is DataStreamViewModel vm)
+            if (DataContext is StreamViewModel vm)
             {
                 // Update button content
                 if (vm.IsConnected)
@@ -90,7 +90,7 @@ namespace SerialPlotDN_WPF.View.UserControls
             }
             
             // Unsubscribe from property changes
-            if (DataContext is DataStreamViewModel vm)
+            if (DataContext is StreamViewModel vm)
             {
                 vm.PropertyChanged -= ViewModel_PropertyChanged;
             }
@@ -103,31 +103,33 @@ namespace SerialPlotDN_WPF.View.UserControls
 
             Application.Current.Dispatcher.BeginInvoke(() =>
             {
-                if (DataContext is DataStreamViewModel vm && vm.IsConnected && vm.SerialDataStream != null)
+                if (DataContext is StreamViewModel vm && vm.IsConnected && vm.SerialDataStream != null)
                 {
                     try
                     {
-                        SerialDataStream dataStream = vm.SerialDataStream;
-                        
-                        // Calculate samples per second
-                        long currentSamples = dataStream.TotalSamples;
-                        long samplesPerSecond = currentSamples - _prevSampleCount;
-                        _prevSampleCount = currentSamples;
-                        
-                        // Calculate bits per second and port usage percentage
-                        long currentBits = dataStream.TotalBits;
-                        long bitsPerSecond = currentBits - _prevBitsCount;
-                        _prevBitsCount = currentBits;
-                        
-                        double portUsagePercent;
-                        if (vm.Baud > 0)
-                            portUsagePercent = (double)bitsPerSecond / vm.Baud * 100.0;
-                        else
-                            portUsagePercent = 0.0;
-                        
-                        // Update UI
-                        SamplesPerSecondTextBlock.Text = samplesPerSecond.ToString();
-                        PortUsageTextBlock.Text = $"{portUsagePercent:F1}%";
+                        SerialDataStream dataStream = vm.SerialDataStream as SerialDataStream;
+                        if (dataStream != null)
+                        {
+                            // Calculate samples per second
+                            long currentSamples = dataStream.TotalSamples;
+                            long samplesPerSecond = currentSamples - _prevSampleCount;
+                            _prevSampleCount = currentSamples;
+    
+                            // Calculate bits per second and port usage percentage
+                            long currentBits = dataStream.TotalBits;
+                            long bitsPerSecond = currentBits - _prevBitsCount;
+                            _prevBitsCount = currentBits;
+    
+                            double portUsagePercent;
+                            if (vm.Baud > 0)
+                                portUsagePercent = (double)bitsPerSecond / vm.Baud * 100.0;
+                            else
+                                portUsagePercent = 0.0;
+    
+                            // Update UI
+                            SamplesPerSecondTextBlock.Text = samplesPerSecond.ToString();
+                            PortUsageTextBlock.Text = $"{portUsagePercent:F1}%";
+                        }
                     }
                     catch
                     {
@@ -149,7 +151,7 @@ namespace SerialPlotDN_WPF.View.UserControls
 
         private void Button_Configure_Click(object sender, RoutedEventArgs e)
         {
-            if (DataContext is DataStreamViewModel vm)
+            if (DataContext is StreamViewModel vm)
             {
                 // Disconnect the serial stream before configuring
                 if (vm.IsConnected)
@@ -166,7 +168,7 @@ namespace SerialPlotDN_WPF.View.UserControls
 
         private void Button_Connect_Click(object sender, RoutedEventArgs e)
         {
-            if (DataContext is DataStreamViewModel vm)
+            if (DataContext is StreamViewModel vm)
             {
                 if (vm.IsConnected)
                 {

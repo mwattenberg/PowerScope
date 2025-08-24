@@ -1,4 +1,5 @@
-﻿using SerialPlotDN_WPF.Model;
+﻿using ScottPlot.DataViews;
+using SerialPlotDN_WPF.Model;
 using SerialPlotDN_WPF.View.UserForms;
 using System.Windows;
 using System.Windows.Controls;
@@ -12,7 +13,7 @@ namespace SerialPlotDN_WPF.View.UserControls
 
     public partial class DataStreamBar : UserControl
     {
-        public List<DataStreamViewModel> DataStreams { get; private set; } = new List<DataStreamViewModel>();
+        public List<StreamViewModel> DataStreams { get; private set; } = new List<StreamViewModel>();
 
         // Event to notify when channels need to be updated
         public event System.Action<int> ChannelsChanged;
@@ -27,7 +28,7 @@ namespace SerialPlotDN_WPF.View.UserControls
 
         private void Button_AddStream_Click(object sender, RoutedEventArgs e)
         {
-            DataStreamViewModel vm = new DataStreamViewModel();
+            StreamViewModel vm = new StreamViewModel();
             SerialConfigWindow configWindow = new SerialConfigWindow(vm);
             if (configWindow.ShowDialog() == true)
             {
@@ -45,7 +46,7 @@ namespace SerialPlotDN_WPF.View.UserControls
             }
         }
 
-        private void AddStreamInfoPanel(DataStreamViewModel viewModel)
+        private void AddStreamInfoPanel(StreamViewModel viewModel)
         {
             StreamInfoPanel panel = new StreamInfoPanel
             {
@@ -59,7 +60,7 @@ namespace SerialPlotDN_WPF.View.UserControls
         /// Adds a stream from settings without showing the configuration dialog
         /// </summary>
         /// <param name="viewModel">The stream view model to add</param>
-        public void AddStreamFromSettings(DataStreamViewModel viewModel)
+        public void AddStreamFromSettings(StreamViewModel viewModel)
         {
             DataStreams.Add(viewModel);
             AddStreamInfoPanel(viewModel);
@@ -75,7 +76,7 @@ namespace SerialPlotDN_WPF.View.UserControls
         /// Removes a stream and disposes its resources
         /// </summary>
         /// <param name="viewModel">The stream view model to remove</param>
-        public void RemoveStream(DataStreamViewModel viewModel)
+        public void RemoveStream(StreamViewModel viewModel)
         {
             if (DataStreams.Contains(viewModel))
             {
@@ -129,7 +130,7 @@ namespace SerialPlotDN_WPF.View.UserControls
         private void DataStreamViewModel_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
         {
             // Update channels when NumberOfChannels or IsConnected changes
-            if (e.PropertyName == nameof(DataStreamViewModel.NumberOfChannels))
+            if (e.PropertyName == nameof(StreamViewModel.NumberOfChannels))
             {
                 UpdateChannels();
             }
@@ -167,9 +168,9 @@ namespace SerialPlotDN_WPF.View.UserControls
         ///// <summary>
         ///// Gets all connected streams
         ///// </summary>
-        public IEnumerable<DataStreamViewModel> GetConnectedStreams()
+        public IEnumerable<StreamViewModel> GetConnectedStreams()
         {
-            List<DataStreamViewModel> connectedStreams = new List<DataStreamViewModel>();
+            List<StreamViewModel> connectedStreams = new List<StreamViewModel>();
             foreach (var stream in DataStreams)
             {
                 if (stream.IsConnected)

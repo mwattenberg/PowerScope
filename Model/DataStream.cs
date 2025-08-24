@@ -9,13 +9,16 @@ namespace SerialPlotDN_WPF.Model
     public interface IDataStream:IDisposable
     {
         //Status message to be displayed in the UI, e.g. "Connected", "Disconnected", "Error: Port not found", etc.
-        string StatusMessage { get; set; }
+        string StatusMessage { get;}
         //Indicates the type of data stream, e.g. "Serial", "USB", "Audio", etc.
-        string StreamType { get; }
+        string StreamType { get;}
         //True when connected to the data source
-        bool IsConnected { get; set; }
+        bool IsConnected { get;}
         //True when actively sampling from the data source
-        bool IsStreaming { get; set; }
+        bool IsStreaming { get;}
+
+        //Number of channels in the data stream
+        int ChannelCount { get; }
         //Connect to the data source, i.e. open serial port, USB , audio, etc.
         void Connect();
         //disconnect from the data source, i.e. close serial port, USB , audio, etc.
@@ -26,6 +29,7 @@ namespace SerialPlotDN_WPF.Model
         void StopStreaming();
         //Returns the latest n samples from the specified channel
         int CopyLatestTo(int channel, double[] destination, int n);
+        void clearData();
 
     }
 }
