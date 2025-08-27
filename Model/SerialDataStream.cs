@@ -102,15 +102,17 @@ namespace SerialPlotDN_WPF.Model
             ValidatePortExists(source.PortName);
             _port = new SerialPortStream(source.PortName)
             {
+                DriverInQueue = 4096,
                 BaudRate = source.BaudRate,
                 DataBits = source.DataBits,
                 Parity = source.Parity,
                 Encoding = Encoding.ASCII,
                 ReadTimeout = 1000,
                 WriteTimeout = 1000,
-                ReadBufferSize = 2048,
+                ReadBufferSize = 8 * 2048,
                 WriteBufferSize = 8192,
                 Handshake = Handshake.None,
+
                 DtrEnable = false,
                 RtsEnable = false
             };

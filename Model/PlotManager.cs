@@ -21,15 +21,44 @@ namespace SerialPlotDN_WPF.Model
         // Stream management - simplified interface
         private List<IDataStream> _connectedStreams;
 
+        // Plot settings - centralized configuration
+        public PlotSettings Settings { get; private set; }
+
+        /// <summary>
+        /// Access to the underlying WpfPlotGL control
+        /// </summary>
+        public WpfPlotGL Plot => _plot;
+
         /// <summary>
         /// Current number of channels being plotted
         /// </summary>
         public int NumberOfChannels { get; private set; } = 0;
 
-        public int Xmin { get; set; } = 0;
-        public int Xmax { get; set; } = 3000;
-        public int Ymin { get; set; } = -200;
-        public int Ymax { get; set; } = 4000;
+        // Delegate X-axis properties to PlotSettings
+        public int Xmin 
+        { 
+            get => Settings.Xmin; 
+            set => Settings.Xmin = value; 
+        }
+
+        public int Xmax 
+        { 
+            get => Settings.Xmax; 
+            set => Settings.Xmax = value; 
+        }
+
+        // Delegate Y-axis properties to PlotSettings
+        public int Ymin 
+        { 
+            get => Settings.Ymin; 
+            set => Settings.Ymin = value; 
+        }
+
+        public int Ymax 
+        { 
+            get => Settings.Ymax; 
+            set => Settings.Ymax = value; 
+        }
 
         public PlotManager(WpfPlotGL wpfPlot1, VerticalControl verticalControl, HorizontalControl horizontalControl, int maxChannels = 12)
         {
@@ -39,9 +68,30 @@ namespace SerialPlotDN_WPF.Model
             _maxChannels = maxChannels;
             _signals = new Signal[_maxChannels];
             
+            // Initialize plot settings
+            Settings = new PlotSettings();
+            
             _data = new double[_maxChannels][];
-            _updatePlotTimer = new System.Timers.Timer(33) { Enabled = true, AutoReset = true };
+            _updatePlotTimer = new System.Timers.Timer(Settings.TimerInterval) { Enabled = true, AutoReset = true };
             _updatePlotTimer.Elapsed += UpdatePlot;
+
+            // Subscribe to settings changes to update timer interval and plot limits
+            Settings.PropertyChanged += (s, e) =>
+            {
+                if (e.PropertyName == nameof(PlotSettings.PlotUpdateRateFPS))
+                {
+                    _updatePlotTimer.Interval = Settings.TimerInterval;
+                }
+                else if (e.PropertyName == nameof(PlotSettings.Ymin) || e.PropertyName == nameof(PlotSettings.Ymax))
+                {
+                    // Update plot Y limits when settings change
+                    Application.Current?.Dispatcher.BeginInvoke(() =>
+                    {
+                        _plot.Plot.Axes.SetLimitsY(Settings.Ymin, Settings.Ymax);
+                        _plot.Refresh();
+                    });
+                }
+            };
         }
 
         /// <summary>
@@ -187,7 +237,8 @@ namespace SerialPlotDN_WPF.Model
                     }
                 }
 
-                if (_verticalControl.IsAutoScale)
+                // Use YAutoScale from Settings instead of VerticalControl
+                if (Settings.YAutoScale)
                     _plot.Plot.Axes.AutoScaleY();
 
                 _plot.Refresh();
@@ -228,29 +279,39 @@ namespace SerialPlotDN_WPF.Model
                 UpdatePlot(null, null);
         }
 
-        public void ApplyPlotSettings(int plotUpdateRateFPS, int lineWidth, bool antiAliasing, bool showRenderTime)
+        public void ApplyPlotSettings(double plotUpdateRateFPS, int lineWidth, bool antiAliasing, bool showRenderTime)
         {
-            _updatePlotTimer.Interval = 1000.0 / plotUpdateRateFPS;
-            _plot.Plot.Grid.LineWidth = (float)lineWidth / 2;
+            Settings.PlotUpdateRateFPS = plotUpdateRateFPS;
+            Settings.LineWidth = lineWidth;
+            Settings.AntiAliasing = antiAliasing;
+            Settings.ShowRenderTime = showRenderTime;
+
+            ApplyCurrentSettings();
+        }
+
+        /// <summary>
+        /// Apply current settings to the plot
+        /// </summary>
+        public void ApplyCurrentSettings()
+        {
+            _updatePlotTimer.Interval = Settings.TimerInterval;
+            _plot.Plot.Grid.LineWidth = (float)Settings.LineWidth / 2;
+            
             for (int i = 0; i < _signals.Length; i++)
             {
                 if (_signals[i] != null)
                 {
-                    _signals[i].LineWidth = (float)lineWidth;
-                    _signals[i].LineStyle.AntiAlias = antiAliasing;
-
-                    _signals[i].MarkerSize = 20;
-                    _signals[i].MarkerLineWidth = 5;
-                        
+                    _signals[i].LineWidth = (float)Settings.LineWidth;
+                    _signals[i].LineStyle.AntiAlias = Settings.AntiAliasing;
                 }
             }
-            _plot.Plot.Benchmark.IsVisible = showRenderTime;
+            
+            _plot.Plot.Benchmark.IsVisible = Settings.ShowRenderTime;
             _plot.Refresh();
         }
 
         public void SetupPlotUserInput()
         {
-            //_plot.UserInputProcessor.Reset();
             _plot.UserInputProcessor.RemoveAll<ScottPlot.Interactivity.IUserActionResponse>();
             _plot.UserInputProcessor.IsEnabled = true;
             ScottPlot.Interactivity.MouseButton zoomRectangleButton = ScottPlot.Interactivity.StandardMouseButtons.Left;
@@ -271,46 +332,6 @@ namespace SerialPlotDN_WPF.Model
 
             var wheelZoomResponse = new ScottPlot.Interactivity.UserActionResponses.MouseWheelZoom(horizontalLock, verticalLock);
             _plot.UserInputProcessor.UserActionResponses.Add(wheelZoomResponse);
-        }
-
-        public void SetYLimits(int ymin, int ymax)
-        {
-            Ymin = ymin;
-            Ymax = ymax;
-            _plot.Plot.Axes.SetLimitsY(Ymin, Ymax);
-            _plot.Refresh();
-        }
-
-        public int CurrentPlotUpdateRateFPS
-        {
-            get
-            {
-                return (int)(1000.0 / _updatePlotTimer.Interval);
-            }
-        }
-
-        public int CurrentLineWidth
-        {
-            get
-            {
-                return (int)_signals[0].LineWidth;   
-            }
-        }
-
-        public bool CurrentAntiAliasing
-        {
-            get
-            {
-                return _signals[0].LineStyle.AntiAlias;   
-            }
-        }
-
-        public bool ShowRenderTime
-        {
-            get
-            {
-                return _plot.Plot.Benchmark.IsVisible;
-            }
         }
     }
 }

@@ -12,6 +12,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
+using SerialPlotDN_WPF.Model;
 
 namespace SerialPlotDN_WPF.View.UserControls
 {
@@ -20,96 +21,134 @@ namespace SerialPlotDN_WPF.View.UserControls
     /// </summary>
     public partial class VerticalControl : UserControl
     {
-        private int _max = 1000;
+        /// <summary>
+        /// PlotSettings instance used as DataContext
+        /// </summary>
+        public PlotSettings Settings
+        {
+            get => DataContext as PlotSettings;
+            set => DataContext = value;
+        }
+
+        // Legacy properties for backward compatibility (delegate to PlotSettings when available)
         public int Max
         {
-            get => _max;
+            get => Settings?.Ymax ?? 1000;
             set
             {
-                if (_max != value)
-                {
-                    _max = value;
-                    if (MaxTextBox != null)
-                        MaxTextBox.Text = _max.ToString();
-                }
+                if (Settings != null)
+                    Settings.Ymax = value;
             }
         }
 
-        private int _min = -1000;
         public int Min
         {
-            get => _min;
+            get => Settings?.Ymin ?? -1000;
             set
             {
-                if (_min != value)
-                {
-                    _min = value;
-                    if (MinTextBox != null)
-                        MinTextBox.Text = _min.ToString();
-                }
+                if (Settings != null)
+                    Settings.Ymin = value;
             }
         }
 
-        private bool _isAutoScale;
         public bool IsAutoScale
         {
-            get => _isAutoScale;
+            get => Settings?.YAutoScale ?? false;
             set
             {
-                if (_isAutoScale != value)
-                {
-                    _isAutoScale = value;
-                    if (AutoScaleCheckBox != null)
-                        AutoScaleCheckBox.IsChecked = _isAutoScale;
-                }
+                if (Settings != null)
+                    Settings.YAutoScale = value;
             }
         }
 
+        // Events for backward compatibility
         public event EventHandler<int>? MaxValueChanged;
         public event EventHandler<int>? MinValueChanged;
         public event EventHandler<bool>? AutoScaleChanged;
+
         public VerticalControl()
         {
             InitializeComponent();
+            
+            // Subscribe to DataContext changes
+            DataContextChanged += VerticalControl_DataContextChanged;
+        }
+
+        private void VerticalControl_DataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
+        {
+            // Unsubscribe from old settings
+            if (e.OldValue is PlotSettings oldSettings)
+            {
+                oldSettings.PropertyChanged -= Settings_PropertyChanged;
+            }
+
+            // Subscribe to new settings
+            if (e.NewValue is PlotSettings newSettings)
+            {
+                newSettings.PropertyChanged += Settings_PropertyChanged;
+                UpdateUIFromSettings();
+            }
+        }
+
+        private void Settings_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(PlotSettings.Ymin) || 
+                e.PropertyName == nameof(PlotSettings.Ymax) || 
+                e.PropertyName == nameof(PlotSettings.YAutoScale))
+            {
+                Dispatcher.BeginInvoke(() => UpdateUIFromSettings());
+            }
+        }
+
+        private void UpdateUIFromSettings()
+        {
+            if (Settings != null)
+            {
+                // Update text boxes without triggering change events
+                if (MaxTextBox != null)
+                    MaxTextBox.Text = Settings.Ymax.ToString();
+                if (MinTextBox != null)
+                    MinTextBox.Text = Settings.Ymin.ToString();
+                if (AutoScaleCheckBox != null)
+                    AutoScaleCheckBox.IsChecked = Settings.YAutoScale;
+            }
         }
 
         private void MinTextBox_TextChanged(object sender, TextChangedEventArgs e)
         {
-            if (int.TryParse(MinTextBox.Text, out int minValue))
+            if (int.TryParse(MinTextBox.Text, out int minValue) && Settings != null)
             {
-                if (minValue != Min)
+                if (minValue != Settings.Ymin)
                 {
-                    Min = Math.Min(minValue, Max - 1); // Ensure Min is less than Max
-                    MinValueChanged?.Invoke(this, Min);
+                    Settings.Ymin = Math.Min(minValue, Settings.Ymax - 1); // Ensure Min is less than Max
+                    MinValueChanged?.Invoke(this, Settings.Ymin); // Fire legacy event
                 }
             }
         }
 
         private void MaxTextBox_TextChanged(object sender, TextChangedEventArgs e)
         {
-            if (int.TryParse(MaxTextBox.Text, out int maxValue))
+            if (int.TryParse(MaxTextBox.Text, out int maxValue) && Settings != null)
             {
-                if (maxValue != Max)
+                if (maxValue != Settings.Ymax)
                 {
-                    Max = Math.Max(maxValue, Min + 1); // Ensure Max is greater than Min
-                    MaxValueChanged?.Invoke(this, Max);
+                    Settings.Ymax = Math.Max(maxValue, Settings.Ymin + 1); // Ensure Max is greater than Min
+                    MaxValueChanged?.Invoke(this, Settings.Ymax); // Fire legacy event
                 }
             }
         }
 
         private void AutoScaleCheckBox_CheckedChanged(object sender, RoutedEventArgs e)
-        { 
-            bool? temp = AutoScaleCheckBox.IsChecked.Value;
-            if (temp == null)
+        {
+            if (Settings != null)
             {
-                IsAutoScale = false; // Default to false if unchecked
+                bool isChecked = AutoScaleCheckBox.IsChecked ?? false;
+                if (isChecked != Settings.YAutoScale)
+                {
+                    Settings.YAutoScale = isChecked;
+                    AutoScaleChanged?.Invoke(this, Settings.YAutoScale); // Fire legacy event
+                }
             }
-            else
-            {
-                IsAutoScale = AutoScaleCheckBox.IsChecked.Value;
-                AutoScaleChanged?.Invoke(this, IsAutoScale);
-            }
-            
         }
     }
 }

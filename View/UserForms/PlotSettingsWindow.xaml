@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:SerialPlotDN_WPF.View.UserForms"
         mc:Ignorable="d"
-        Title="Plot Settings" Height="350" Width="400" 
+        Title="Plot Settings" Height="500" Width="400" 
         WindowStyle="None"
         AllowsTransparency="True"
         ResizeMode="NoResize" 
@@ -135,7 +135,8 @@
                     
                     <Label Grid.Column="0" Content="Plot Update Rate (FPS):" VerticalAlignment="Center"/>
                     <TextBox x:Name="TextBoxPlotFPS" Grid.Column="1" VerticalAlignment="Center" 
-                             Text="{Binding PlotUpdateRateFPS, RelativeSource={RelativeSource AncestorType=Window}}"/>
+                             Text="{Binding PlotUpdateRateFPS}"
+                             PreviewTextInput="DecimalOnly_PreviewTextInput"/>
                     <StackPanel Grid.Column="2" Orientation="Vertical" Margin="5,0,0,0">
                         <Button x:Name="ButtonPlotFPSUp" Content="▲" Height="15" FontSize="8" 
                                 Click="ButtonPlotFPSUp_Click" Margin="0,0,0,1"/>
@@ -154,7 +155,8 @@
                     
                     <Label Grid.Column="0" Content="Serial Update Rate (Hz):" VerticalAlignment="Center"/>
                     <TextBox x:Name="TextBoxSerialHz" Grid.Column="1" VerticalAlignment="Center" 
-                             Text="{Binding SerialPortUpdateRateHz, RelativeSource={RelativeSource AncestorType=Window}}"/>
+                             Text="{Binding SerialPortUpdateRateHz}"
+                             PreviewTextInput="NumbersOnly_PreviewTextInput"/>
                     <StackPanel Grid.Column="2" Orientation="Vertical" Margin="5,0,0,0">
                         <Button x:Name="ButtonSerialHzUp" Content="▲" Height="15" FontSize="8" 
                                 Click="ButtonSerialHzUp_Click" Margin="0,0,0,1"/>
@@ -173,7 +175,8 @@
                     
                     <Label Grid.Column="0" Content="Line Width:" VerticalAlignment="Center"/>
                     <TextBox x:Name="TextBoxLineWidth" Grid.Column="1" VerticalAlignment="Center" 
-                             Text="{Binding LineWidth, RelativeSource={RelativeSource AncestorType=Window}}"/>
+                             Text="{Binding LineWidth}"
+                             PreviewTextInput="NumbersOnly_PreviewTextInput"/>
                     <StackPanel Grid.Column="2" Orientation="Vertical" Margin="5,0,0,0">
                         <Button x:Name="ButtonLineWidthUp" Content="▲" Height="15" FontSize="8" 
                                 Click="ButtonLineWidthUp_Click" Margin="0,0,0,1"/>
@@ -191,7 +194,7 @@
                     
                     <Label Grid.Column="0" Content="Anti-Aliasing:" VerticalAlignment="Center"/>
                     <CheckBox x:Name="CheckBoxAntiAliasing" Grid.Column="1" VerticalAlignment="Center" 
-                              IsChecked="{Binding AntiAliasing, RelativeSource={RelativeSource AncestorType=Window}}"/>
+                              IsChecked="{Binding AntiAliasing}"/>
                 </Grid>
                 
                 <!-- Show Render Time -->
@@ -203,14 +206,100 @@
                     
                     <Label Grid.Column="0" Content="Show Render Time:" VerticalAlignment="Center"/>
                     <CheckBox x:Name="CheckBoxShowRenderTime" Grid.Column="1" VerticalAlignment="Center" 
-                              IsChecked="{Binding ShowRenderTime, RelativeSource={RelativeSource AncestorType=Window}}"/>
+                              IsChecked="{Binding ShowRenderTime}"/>
                 </Grid>
-            </StackPanel>
-            
-            <!-- Buttons -->
-            <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="20,20,20,20">
-                <Button x:Name="ButtonApply" Content="Apply" Width="75" Margin="0,0,10,0" Click="ButtonApply_Click"/>
-                <Button x:Name="ButtonClose" Content="Close" Width="75" Click="ButtonClose_Click"/>
+
+                <!-- Y-Axis Auto Scale -->
+                <Grid Margin="0,0,0,15">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="150"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    
+                    <Label Grid.Column="0" Content="Y-Axis Auto Scale:" VerticalAlignment="Center"/>
+                    <CheckBox x:Name="CheckBoxYAutoScale" Grid.Column="1" VerticalAlignment="Center" 
+                              IsChecked="{Binding YAutoScale}"/>
+                </Grid>
+
+                <!-- X Min -->
+                <Grid Margin="0,0,0,15">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="150"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="60"/>
+                    </Grid.ColumnDefinitions>
+                    
+                    <Label Grid.Column="0" Content="X Min:" VerticalAlignment="Center"/>
+                    <TextBox x:Name="TextBoxXMin" Grid.Column="1" VerticalAlignment="Center" 
+                             Text="{Binding Xmin}"
+                             PreviewTextInput="NumbersOnly_PreviewTextInput"/>
+                    <StackPanel Grid.Column="2" Orientation="Vertical" Margin="5,0,0,0">
+                        <Button x:Name="ButtonXMinUp" Content="▲" Height="15" FontSize="8" 
+                                Click="ButtonXMinUp_Click" Margin="0,0,0,1"/>
+                        <Button x:Name="ButtonXMinDown" Content="▼" Height="15" FontSize="8" 
+                                Click="ButtonXMinDown_Click"/>
+                    </StackPanel>
+                </Grid>
+
+                <!-- X Max -->
+                <Grid Margin="0,0,0,15">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="150"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="60"/>
+                    </Grid.ColumnDefinitions>
+                    
+                    <Label Grid.Column="0" Content="X Max:" VerticalAlignment="Center"/>
+                    <TextBox x:Name="TextBoxXMax" Grid.Column="1" VerticalAlignment="Center" 
+                             Text="{Binding Xmax}"
+                             PreviewTextInput="NumbersOnly_PreviewTextInput"/>
+                    <StackPanel Grid.Column="2" Orientation="Vertical" Margin="5,0,0,0">
+                        <Button x:Name="ButtonXMaxUp" Content="▲" Height="15" FontSize="8" 
+                                Click="ButtonXMaxUp_Click" Margin="0,0,0,1"/>
+                        <Button x:Name="ButtonXMaxDown" Content="▼" Height="15" FontSize="8" 
+                                Click="ButtonXMaxDown_Click"/>
+                    </StackPanel>
+                </Grid>
+
+                <!-- Y Min -->
+                <Grid Margin="0,0,0,15">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="150"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="60"/>
+                    </Grid.ColumnDefinitions>
+                    
+                    <Label Grid.Column="0" Content="Y Min:" VerticalAlignment="Center"/>
+                    <TextBox x:Name="TextBoxYMin" Grid.Column="1" VerticalAlignment="Center" 
+                             Text="{Binding Ymin}"
+                             PreviewTextInput="SignedNumbersOnly_PreviewTextInput"/>
+                    <StackPanel Grid.Column="2" Orientation="Vertical" Margin="5,0,0,0">
+                        <Button x:Name="ButtonYMinUp" Content="▲" Height="15" FontSize="8" 
+                                Click="ButtonYMinUp_Click" Margin="0,0,0,1"/>
+                        <Button x:Name="ButtonYMinDown" Content="▼" Height="15" FontSize="8" 
+                                Click="ButtonYMinDown_Click"/>
+                    </StackPanel>
+                </Grid>
+
+                <!-- Y Max -->
+                <Grid Margin="0,0,0,15">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="150"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="60"/>
+                    </Grid.ColumnDefinitions>
+                    
+                    <Label Grid.Column="0" Content="Y Max:" VerticalAlignment="Center"/>
+                    <TextBox x:Name="TextBoxYMax" Grid.Column="1" VerticalAlignment="Center" 
+                             Text="{Binding Ymax}"
+                             PreviewTextInput="SignedNumbersOnly_PreviewTextInput"/>
+                    <StackPanel Grid.Column="2" Orientation="Vertical" Margin="5,0,0,0">
+                        <Button x:Name="ButtonYMaxUp" Content="▲" Height="15" FontSize="8" 
+                                Click="ButtonYMaxUp_Click" Margin="0,0,0,1"/>
+                        <Button x:Name="ButtonYMaxDown" Content="▼" Height="15" FontSize="8" 
+                                Click="ButtonYMaxDown_Click"/>
+                    </StackPanel>
+                </Grid>
             </StackPanel>
         </Grid>
     </Border>

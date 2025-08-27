@@ -77,7 +77,12 @@
                     <ColumnDefinition Width="80"/>
                 </Grid.ColumnDefinitions>
                 <TextBlock Grid.Column="0" Text="Max:" Style="{StaticResource LabelTextStyle}" VerticalAlignment="Center"/>
-                <TextBox Grid.Column="1" x:Name="MaxTextBox" Style="{StaticResource InputTextBoxStyle}" Width="80" HorizontalAlignment="Right" TextChanged="MaxTextBox_TextChanged"/>
+                <TextBox Grid.Column="1" x:Name="MaxTextBox" 
+                         Style="{StaticResource InputTextBoxStyle}" 
+                         Width="80" 
+                         HorizontalAlignment="Right" 
+                         Text="{Binding Ymax, UpdateSourceTrigger=PropertyChanged}"
+                         TextChanged="MaxTextBox_TextChanged"/>
             </Grid>
             <!-- Min row -->
             <Grid Margin="0,0,0,5">
@@ -86,7 +91,12 @@
                     <ColumnDefinition Width="80"/>
                 </Grid.ColumnDefinitions>
                 <TextBlock Grid.Column="0" Text="Min:" Style="{StaticResource LabelTextStyle}" VerticalAlignment="Center"/>
-                <TextBox Grid.Column="1" x:Name="MinTextBox" Style="{StaticResource InputTextBoxStyle}" Width="80" HorizontalAlignment="Right" TextChanged="MinTextBox_TextChanged"/>
+                <TextBox Grid.Column="1" x:Name="MinTextBox" 
+                         Style="{StaticResource InputTextBoxStyle}" 
+                         Width="80" 
+                         HorizontalAlignment="Right" 
+                         Text="{Binding Ymin, UpdateSourceTrigger=PropertyChanged}"
+                         TextChanged="MinTextBox_TextChanged"/>
             </Grid>
             <!-- Auto Scale row -->
             <Grid Margin="0,5,0,0">
@@ -95,7 +105,13 @@
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
                 <TextBlock Grid.Column="0" Text="Auto Scale" Style="{StaticResource LabelTextStyle}" VerticalAlignment="Center"/>
-                <CheckBox Grid.Column="1" x:Name="AutoScaleCheckBox" Foreground="White" FontSize="12" HorizontalAlignment="Right" Margin="10,0,0,0" Click="AutoScaleCheckBox_CheckedChanged" />
+                <CheckBox Grid.Column="1" x:Name="AutoScaleCheckBox" 
+                          Foreground="White" 
+                          FontSize="12" 
+                          HorizontalAlignment="Right" 
+                          Margin="10,0,0,0" 
+                          IsChecked="{Binding YAutoScale}"
+                          Click="AutoScaleCheckBox_CheckedChanged"/>
             </Grid>
         </StackPanel>
     </Border>

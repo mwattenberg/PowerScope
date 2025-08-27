@@ -77,7 +77,7 @@
             <Grid.RowDefinitions>
                 <RowDefinition Height="32"/>  <!-- Top color bar -->
                 <RowDefinition Height="40"/>  <!-- Buttons -->
-                <RowDefinition Height="*"/>  <!-- Window Size row -->
+                <RowDefinition Height="*"/>  <!-- Samples row -->
                 <RowDefinition Height="*"/>  <!-- Buffer Size row -->
             </Grid.RowDefinitions>
             
@@ -92,16 +92,17 @@
                 <Button x:Name="ButtonShrink" VerticalAlignment="Center" Width="120" Height="25" Margin="5" Content="~" FontSize="18" FontWeight="Bold" Click="ButtonShrink_Click"/>
             </StackPanel>
             
-            <!-- Window Size row with label on left and textbox on right -->
+            <!-- Samples row with label on left and textbox on right (bound to PlotSettings.Xmax) -->
             <Grid Grid.Row="2" Margin="5,2,5,2">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
                 
-                <TextBlock Grid.Column="0" Text="Default Window Size:" Style="{StaticResource LabelTextStyle}"/>
-                <TextBox Grid.Column="1" x:Name="WindowSizeTextBox" Style="{StaticResource InputTextBoxStyle}" 
-                         Text="500" Width="120" HorizontalAlignment="Right" Margin="5,0,0,0"/>
+                <TextBlock Grid.Column="0" Text="Samples:" Style="{StaticResource LabelTextStyle}"/>
+                <TextBox Grid.Column="1" x:Name="SamplesTextBox" Style="{StaticResource InputTextBoxStyle}" 
+                         Text="{Binding Xmax}" Width="120" HorizontalAlignment="Right" Margin="5,0,0,0" 
+                         TextChanged="SamplesTextBox_TextChanged"/>
             </Grid>
             
             <!-- Buffer Size row with label on left and textbox on right -->

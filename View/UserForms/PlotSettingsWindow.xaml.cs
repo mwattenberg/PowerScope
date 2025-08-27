@@ -1,136 +1,69 @@
 ﻿using System;
-using System.ComponentModel;
 using System.Windows;
-using System.Globalization;
 using System.Windows.Input;
+using System.Text.RegularExpressions;
+using SerialPlotDN_WPF.Model;
 
 namespace SerialPlotDN_WPF.View.UserForms
 {
     /// <summary>
     /// Interaction logic for PlotSettingsWindow.xaml
     /// </summary>
-    public partial class PlotSettingsWindow : Window, INotifyPropertyChanged
+    public partial class PlotSettingsWindow : Window
     {
-        // Settings properties that can be set from MainWindow
-        private int _plotUpdateRateFPS = 30;
-        private int _serialPortUpdateRateHz = 1000;
-        private int _lineWidth = 1;
-        private bool _antiAliasing = false;
-        private bool _showRenderTime = false;
-
-        public int PlotUpdateRateFPS 
-        { 
-            get 
-            { 
-                return _plotUpdateRateFPS; 
-            } 
-            set 
-            { 
-                if (_plotUpdateRateFPS != value)
-                {
-                    _plotUpdateRateFPS = Math.Max(1, Math.Min(120, value)); // Clamp between 1-120 FPS
-                    OnPropertyChanged(nameof(PlotUpdateRateFPS));
-                }
-            } 
-        }
-
-        public int SerialPortUpdateRateHz 
-        { 
-            get 
-            { 
-                return _serialPortUpdateRateHz; 
-            } 
-            set 
-            { 
-                if (_serialPortUpdateRateHz != value)
-                {
-                    _serialPortUpdateRateHz = Math.Max(1, Math.Min(10000, value)); // Clamp between 1-10000 Hz
-                    OnPropertyChanged(nameof(SerialPortUpdateRateHz));
-                }
-            } 
-        }
-
-        public int LineWidth 
-        { 
-            get 
-            { 
-                return _lineWidth; 
-            } 
-            set 
-            { 
-                if (_lineWidth != value)
-                {
-                    _lineWidth = Math.Max(1, Math.Min(10, value)); // Clamp between 1-10 (integer values)
-                    OnPropertyChanged(nameof(LineWidth));
-                }
-            } 
-        }
-
-        public bool AntiAliasing 
-        { 
-            get 
-            { 
-                return _antiAliasing; 
-            } 
-            set 
-            { 
-                if (_antiAliasing != value)
-                {
-                    _antiAliasing = value;
-                    OnPropertyChanged(nameof(AntiAliasing));
-                }
-            } 
-        }
-
-        public bool ShowRenderTime
-        {
-            get 
-            { 
-                return _showRenderTime; 
-            }
-            set
-            {
-                if (_showRenderTime != value)
-                {
-                    _showRenderTime = value;
-                    OnPropertyChanged(nameof(ShowRenderTime));
-                }
-            }
-        }
-
-        public bool DialogResult { get; private set; }
-
-        public event PropertyChangedEventHandler PropertyChanged;
-        
-        // Event for when settings are applied
-        public event Action<PlotSettingsWindow> OnSettingsApplied;
+        /// <summary>
+        /// PlotSettings instance used as DataContext - direct reference, no cloning
+        /// </summary>
+        public PlotSettings Settings => DataContext as PlotSettings;
 
         public PlotSettingsWindow()
         {
             InitializeComponent();
-            DataContext = this; // Set data context for binding
         }
 
-        private void ButtonOK_Click(object sender, RoutedEventArgs e)
+        /// <summary>
+        /// Constructor that accepts existing PlotSettings to edit directly
+        /// </summary>
+        /// <param name="existingSettings">Existing settings to edit directly</param>
+        public PlotSettingsWindow(PlotSettings existingSettings)
         {
-            DialogResult = true;
-            Close();
+            InitializeComponent();
+            DataContext = existingSettings;
         }
 
-        private void ButtonApply_Click(object sender, RoutedEventArgs e)
+        // Input validation handlers for numeric-only fields
+        private void NumbersOnly_PreviewTextInput(object sender, TextCompositionEventArgs e)
         {
-            // Validate inputs first
-            if (ValidateInputs())
-            {
-                // Trigger the apply event for MainWindow to handle
-                OnSettingsApplied?.Invoke(this);
-            }
+            e.Handled = !IsNumeric(e.Text);
         }
 
-        private void ButtonClose_Click(object sender, RoutedEventArgs e)
+        private void DecimalOnly_PreviewTextInput(object sender, TextCompositionEventArgs e)
         {
-            DialogResult = false;
-            Close();
+            var textBox = sender as System.Windows.Controls.TextBox;
+            var newText = textBox.Text.Insert(textBox.SelectionStart, e.Text);
+            e.Handled = !IsDecimal(newText);
+        }
+
+        private void SignedNumbersOnly_PreviewTextInput(object sender, TextCompositionEventArgs e)
+        {
+            var textBox = sender as System.Windows.Controls.TextBox;
+            var newText = textBox.Text.Insert(textBox.SelectionStart, e.Text);
+            e.Handled = !IsSignedNumeric(newText);
+        }
+
+        private static bool IsNumeric(string text)
+        {
+            return Regex.IsMatch(text, @"^[0-9]+$");
+        }
+
+        private static bool IsDecimal(string text)
+        {
+            return Regex.IsMatch(text, @"^[0-9]*\.?[0-9]*$") && text != "." && !text.EndsWith("..");
+        }
+
+        private static bool IsSignedNumeric(string text)
+        {
+            return Regex.IsMatch(text, @"^-?[0-9]*$") && text != "-";
         }
 
         // Custom window event handlers
@@ -144,103 +77,98 @@ namespace SerialPlotDN_WPF.View.UserForms
 
         private void CloseButton_Click(object sender, RoutedEventArgs e)
         {
-            DialogResult = false;
             Close();
         }
 
         // Plot FPS Up/Down button handlers
         private void ButtonPlotFPSUp_Click(object sender, RoutedEventArgs e)
         {
-            PlotUpdateRateFPS = Math.Min(120, PlotUpdateRateFPS + 1);
+            if (Settings != null)
+                Settings.PlotUpdateRateFPS = Math.Min(120, Settings.PlotUpdateRateFPS + 0.1);
         }
 
         private void ButtonPlotFPSDown_Click(object sender, RoutedEventArgs e)
         {
-            PlotUpdateRateFPS = Math.Max(1, PlotUpdateRateFPS - 1);
+            if (Settings != null)
+                Settings.PlotUpdateRateFPS = Math.Max(1, Settings.PlotUpdateRateFPS - 0.1);
         }
 
         // Serial Hz Up/Down button handlers
         private void ButtonSerialHzUp_Click(object sender, RoutedEventArgs e)
         {
-            SerialPortUpdateRateHz = Math.Min(10000, SerialPortUpdateRateHz + 100);
+            if (Settings != null)
+                Settings.SerialPortUpdateRateHz = Math.Min(10000, Settings.SerialPortUpdateRateHz + 100);
         }
 
         private void ButtonSerialHzDown_Click(object sender, RoutedEventArgs e)
         {
-            SerialPortUpdateRateHz = Math.Max(1, SerialPortUpdateRateHz - 100);
+            if (Settings != null)
+                Settings.SerialPortUpdateRateHz = Math.Max(1, Settings.SerialPortUpdateRateHz - 100);
         }
 
         // Line Width Up/Down button handlers
         private void ButtonLineWidthUp_Click(object sender, RoutedEventArgs e)
         {
-            LineWidth = Math.Min(10, LineWidth + 1);
+            if (Settings != null)
+                Settings.LineWidth = Math.Min(10, Settings.LineWidth + 1);
         }
 
         private void ButtonLineWidthDown_Click(object sender, RoutedEventArgs e)
         {
-            LineWidth = Math.Max(1, LineWidth - 1);
+            if (Settings != null)
+                Settings.LineWidth = Math.Max(1, Settings.LineWidth - 1);
         }
 
-        // Method to initialize values from MainWindow
-        public void InitializeFromMainWindow(int plotFPS, int serialHz, int lineWidth, bool antiAliasing, bool showRenderTime = false)
+        // X Min Up/Down button handlers
+        private void ButtonXMinUp_Click(object sender, RoutedEventArgs e)
         {
-            PlotUpdateRateFPS = plotFPS;
-            SerialPortUpdateRateHz = serialHz;
-            LineWidth = lineWidth;
-            AntiAliasing = antiAliasing;
-            ShowRenderTime = showRenderTime;
+            if (Settings != null)
+                Settings.Xmin = Math.Min(Settings.Xmax - 1, Settings.Xmin + 100);
         }
 
-        protected virtual void OnPropertyChanged(string propertyName)
+        private void ButtonXMinDown_Click(object sender, RoutedEventArgs e)
         {
-            if (PropertyChanged != null)
-                PropertyChanged.Invoke(this, new PropertyChangedEventArgs(propertyName));
+            if (Settings != null)
+                Settings.Xmin = Math.Max(0, Settings.Xmin - 100);
         }
 
-        private bool ValidateInputs()
+        // X Max Up/Down button handlers
+        private void ButtonXMaxUp_Click(object sender, RoutedEventArgs e)
         {
-            try
-            {
-                // Parse and validate PlotFPS
-                if (int.TryParse(TextBoxPlotFPS.Text, out int fps))
-                {
-                    PlotUpdateRateFPS = fps;
-                }
-                else
-                {
-                    MessageBox.Show("Invalid Plot Update Rate (FPS). Please enter a valid number.", "Validation Error", MessageBoxButton.OK, MessageBoxImage.Warning);
-                    return false;
-                }
+            if (Settings != null)
+                Settings.Xmax = Math.Min(100000, Settings.Xmax + 100);
+        }
 
-                // Parse and validate SerialHz
-                if (int.TryParse(TextBoxSerialHz.Text, out int hz))
-                {
-                    SerialPortUpdateRateHz = hz;
-                }
-                else
-                {
-                    MessageBox.Show("Invalid Serial Update Rate (Hz). Please enter a valid number.", "Validation Error", MessageBoxButton.OK, MessageBoxImage.Warning);
-                    return false;
-                }
+        private void ButtonXMaxDown_Click(object sender, RoutedEventArgs e)
+        {
+            if (Settings != null)
+                Settings.Xmax = Math.Max(Settings.Xmin + 1, Settings.Xmax - 100);
+        }
 
-                // Parse and validate LineWidth
-                if (int.TryParse(TextBoxLineWidth.Text, out int width))
-                {
-                    LineWidth = width;
-                }
-                else
-                {
-                    MessageBox.Show("Invalid Line Width. Please enter a valid number.", "Validation Error", MessageBoxButton.OK, MessageBoxImage.Warning);
-                    return false;
-                }
+        // Y Min Up/Down button handlers
+        private void ButtonYMinUp_Click(object sender, RoutedEventArgs e)
+        {
+            if (Settings != null)
+                Settings.Ymin = Math.Min(Settings.Ymax - 1, Settings.Ymin + 100);
+        }
 
-                return true;
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Validation error: {ex.Message}", "Validation Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                return false;
-            }
+        private void ButtonYMinDown_Click(object sender, RoutedEventArgs e)
+        {
+            if (Settings != null)
+                Settings.Ymin = Settings.Ymin - 100;
+        }
+
+        // Y Max Up/Down button handlers
+        private void ButtonYMaxUp_Click(object sender, RoutedEventArgs e)
+        {
+            if (Settings != null)
+                Settings.Ymax = Settings.Ymax + 100;
+        }
+
+        private void ButtonYMaxDown_Click(object sender, RoutedEventArgs e)
+        {
+            if (Settings != null)
+                Settings.Ymax = Math.Max(Settings.Ymin + 1, Settings.Ymax - 100);
         }
     }
 }

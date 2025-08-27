@@ -11,37 +11,39 @@ namespace SerialPlotDN_WPF.Model
 {
     public static class Serializer
     {
-        public static void WriteSettingsToXML(string filePath, PlotManager plotManager, DataStreamBar dataStreamBar, ChannelControlBar channelControlBar, VerticalControl verticalControl)
+        public static void WriteSettingsToXML(string filePath, PlotManager plotManager, DataStreamBar dataStreamBar, ChannelControlBar channelControlBar)
         {
             XElement settingsXml = new XElement("PlotSettings");
-            WritePlotSettings(settingsXml, plotManager, verticalControl);
+            WritePlotSettings(settingsXml, plotManager);
             WriteDataStreamsWithChannels(settingsXml, dataStreamBar, channelControlBar);
             settingsXml.Save(filePath);
         }
 
-        public static void ReadSettingsFromXML(string filePath, PlotManager plotManager, DataStreamBar dataStreamBar, ChannelControlBar channelControlBar, VerticalControl verticalControl)
+        public static void ReadSettingsFromXML(string filePath, PlotManager plotManager, DataStreamBar dataStreamBar, ChannelControlBar channelControlBar)
         {
             if (!File.Exists(filePath)) 
                 return;
             try
             {
                 XElement settingsXml = XElement.Load(filePath);
-                ReadPlotSettings(settingsXml, plotManager, verticalControl);
+                ReadPlotSettings(settingsXml, plotManager);
                 ReadDataStreamsWithChannels(settingsXml, dataStreamBar, channelControlBar);
             }
             catch { /* Ignore errors and use defaults */ }
         }
 
         // --- Private helpers ---
-        private static void WritePlotSettings(XElement parent, PlotManager plotManager, VerticalControl verticalControl)
+        private static void WritePlotSettings(XElement parent, PlotManager plotManager)
         {
-            parent.Add(new XElement("PlotUpdateRateFPS", plotManager.CurrentPlotUpdateRateFPS));
-            parent.Add(new XElement("LineWidth", plotManager.CurrentLineWidth));
-            parent.Add(new XElement("AntiAliasing", plotManager.CurrentAntiAliasing));
-            parent.Add(new XElement("ShowRenderTime", plotManager.ShowRenderTime));
-            parent.Add(new XElement("AutoScale", verticalControl.IsAutoScale));
-            parent.Add(new XElement("Ymin", plotManager.Ymin));
-            parent.Add(new XElement("Ymax", plotManager.Ymax));
+            parent.Add(new XElement("PlotUpdateRateFPS", plotManager.Settings.PlotUpdateRateFPS));
+            parent.Add(new XElement("LineWidth", plotManager.Settings.LineWidth));
+            parent.Add(new XElement("AntiAliasing", plotManager.Settings.AntiAliasing));
+            parent.Add(new XElement("ShowRenderTime", plotManager.Settings.ShowRenderTime));
+            parent.Add(new XElement("YAutoScale", plotManager.Settings.YAutoScale));
+            parent.Add(new XElement("Xmin", plotManager.Settings.Xmin));
+            parent.Add(new XElement("Xmax", plotManager.Settings.Xmax));
+            parent.Add(new XElement("Ymin", plotManager.Settings.Ymin));
+            parent.Add(new XElement("Ymax", plotManager.Settings.Ymax));
         }
 
         private static void WriteDataStreamsWithChannels(XElement parent, DataStreamBar dataStreamBar, ChannelControlBar channelControlBar)
@@ -97,15 +99,15 @@ namespace SerialPlotDN_WPF.Model
             parent.Add(dataStreamsElement);
         }
 
-        private static void ReadPlotSettings(XElement settingsXml, PlotManager plotManager, VerticalControl verticalControl)
+        private static void ReadPlotSettings(XElement settingsXml, PlotManager plotManager)
         {
             XElement plotUpdateElement = settingsXml.Element("PlotUpdateRateFPS");
             string plotUpdateValue;
             if (plotUpdateElement != null)
                 plotUpdateValue = plotUpdateElement.Value;
             else
-                plotUpdateValue = "30";
-            int plotUpdateRateFPS = int.Parse(plotUpdateValue);
+                plotUpdateValue = "30.0";
+            double plotUpdateRateFPS = double.Parse(plotUpdateValue);
 
             XElement lineWidthElement = settingsXml.Element("LineWidth");
             string lineWidthValue;
@@ -131,6 +133,30 @@ namespace SerialPlotDN_WPF.Model
                 showRenderTimeValue = "false";
             bool showRenderTime = bool.Parse(showRenderTimeValue);
 
+            XElement yAutoScaleElement = settingsXml.Element("YAutoScale");
+            string yAutoScaleValue;
+            if (yAutoScaleElement != null)
+                yAutoScaleValue = yAutoScaleElement.Value;
+            else
+                yAutoScaleValue = "true";
+            bool yAutoScale = bool.Parse(yAutoScaleValue);
+
+            XElement xMinElement = settingsXml.Element("Xmin");
+            string xMinValue;
+            if (xMinElement != null)
+                xMinValue = xMinElement.Value;
+            else
+                xMinValue = "0";
+            int xMin = int.Parse(xMinValue);
+
+            XElement xMaxElement = settingsXml.Element("Xmax");
+            string xMaxValue;
+            if (xMaxElement != null)
+                xMaxValue = xMaxElement.Value;
+            else
+                xMaxValue = "3000";
+            int xMax = int.Parse(xMaxValue);
+
             XElement yMinElement = settingsXml.Element("Ymin");
             string yMinValue;
             if (yMinElement != null)
@@ -146,20 +172,22 @@ namespace SerialPlotDN_WPF.Model
             else
                 yMaxValue = "4000";
             int yMax = int.Parse(yMaxValue);
-
-            XElement autoScaleElement = settingsXml.Element("AutoScale");
-            string autoScaleValue;
-            if (autoScaleElement != null)
-                autoScaleValue = autoScaleElement.Value;
-            else
-                autoScaleValue = "true";
-            bool autoScale = bool.Parse(autoScaleValue);
             
-            verticalControl.Min = yMin;
-            verticalControl.Max = yMax;
-            verticalControl.IsAutoScale = autoScale;
-            plotManager.ApplyPlotSettings(plotUpdateRateFPS, lineWidth, antiAliasing, showRenderTime);
-            plotManager.SetYLimits(yMin, yMax);
+            // Apply settings to PlotManager.Settings (this will automatically update VerticalControl via DataBinding)
+            plotManager.Settings.PlotUpdateRateFPS = plotUpdateRateFPS;
+            plotManager.Settings.LineWidth = lineWidth;
+            plotManager.Settings.AntiAliasing = antiAliasing;
+            plotManager.Settings.ShowRenderTime = showRenderTime;
+            plotManager.Settings.YAutoScale = yAutoScale;
+            plotManager.Settings.Xmin = xMin;
+            plotManager.Settings.Xmax = xMax;
+            plotManager.Settings.Ymin = yMin;
+            plotManager.Settings.Ymax = yMax;
+            
+            // Apply the settings to the plot
+            plotManager.ApplyCurrentSettings();
+            plotManager.Plot.Plot.Axes.SetLimitsY(yMin, yMax);
+            plotManager.Plot.Refresh();
         }
 
         private static void ReadDataStreamsWithChannels(XElement settingsXml, DataStreamBar dataStreamBar, ChannelControlBar channelControlBar)
