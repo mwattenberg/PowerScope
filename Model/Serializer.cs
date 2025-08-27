@@ -76,18 +76,18 @@ namespace SerialPlotDN_WPF.Model
                 XElement channelsElement = new XElement("Channels");
                 for (int i = 0; i < vm.NumberOfChannels; i++)
                 {
-                    if (globalChannelIndex < channelControlBar.Channels.Count)
+                    if (globalChannelIndex < channelControlBar.ChannelSettings.Count)
                     {
-                        ChannelControl channelControl = channelControlBar.Channels[globalChannelIndex];
+                        ChannelSettings channelSettings = channelControlBar.ChannelSettings[globalChannelIndex];
                         XElement channelElement = new XElement("Channel",
                             new XElement("Index", i),
-                            new XElement("Label", channelControl.Label),
-                            new XElement("Color", channelControl.Color.ToString()),
-                            new XElement("IsEnabled", channelControl.IsEnabled),
-                            new XElement("Gain", channelControl.Gain),
-                            new XElement("Offset", channelControl.Offset),
-                            new XElement("Coupling", channelControl.Coupling.ToString()),
-                            new XElement("Filter", channelControl.Filter.ToString())
+                            new XElement("Label", channelSettings.Label),
+                            new XElement("Color", channelSettings.Color.ToString()),
+                            new XElement("IsEnabled", channelSettings.IsEnabled),
+                            new XElement("Gain", channelSettings.Gain),
+                            new XElement("Offset", channelSettings.Offset),
+                            new XElement("Coupling", channelSettings.Coupling.ToString()),
+                            new XElement("Filter", channelSettings.Filter.ToString())
                         );
                         channelsElement.Add(channelElement);
                     }
@@ -384,31 +384,12 @@ namespace SerialPlotDN_WPF.Model
 
         private static void ApplyChannelSettings(ChannelControlBar channelControlBar, List<ChannelSettings> channelSettings)
         {
-            for (int i = 0; i < Math.Min(channelControlBar.Channels.Count, channelSettings.Count); i++)
+            // Clear existing settings and add loaded ones
+            channelControlBar.ChannelSettings.Clear();
+            foreach (ChannelSettings setting in channelSettings)
             {
-                ChannelSettings setting = channelSettings[i];
-                ChannelControl channel = channelControlBar.Channels[i];
-                
-                channel.Label = setting.Label;
-                channel.Color = setting.Color;
-                channel.IsEnabled = setting.IsEnabled;
-                channel.Gain = setting.Gain;
-                channel.Offset = setting.Offset;
-                channel.Coupling = setting.Coupling;
-                channel.Filter = setting.Filter;
+                channelControlBar.ChannelSettings.Add(setting);
             }
-        }
-
-        // Helper class to store channel settings during deserialization
-        private class ChannelSettings
-        {
-            public string Label { get; set; } = "";
-            public Color Color { get; set; } = Colors.Blue;
-            public bool IsEnabled { get; set; } = true;
-            public double Gain { get; set; } = 1.0;
-            public double Offset { get; set; } = 0.0;
-            public ChannelControl.CouplingMode Coupling { get; set; } = ChannelControl.CouplingMode.DC;
-            public ChannelControl.FilterMode Filter { get; set; } = ChannelControl.FilterMode.None;
         }
     }
 }

@@ -2,7 +2,7 @@
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
-
+using SerialPlotDN_WPF.Model;
 
 namespace SerialPlotDN_WPF.View.UserControls
 {
@@ -27,47 +27,80 @@ namespace SerialPlotDN_WPF.View.UserControls
         private static readonly Color DisabledColor = Colors.Gray;
         private static readonly Brush SelectedBrush = new SolidColorBrush(Colors.LimeGreen);
         private static readonly Brush DefaultBrush = new SolidColorBrush(DisabledColor);
-       
-        
-        public double _gain = 1.0;
-        public double _offset = 0.0;
-        private CouplingMode _coupling;
-        private FilterMode _filter;
 
-        private Color _color;
+        /// <summary>
+        /// Gets the ChannelSettings from DataContext
+        /// </summary>
+        public ChannelSettings Settings => DataContext as ChannelSettings;
+
+        // Legacy properties for backward compatibility
         public Color Color
         {
-            get => _color;
+            get => Settings?.Color ?? Colors.Gray;
             set
             {
-                _color = value;
-                UpdateColorBarBackground();
+                if (Settings != null)
+                    Settings.Color = value;
             }
         }
 
-        private bool _isEnabled = true;
         public bool IsEnabled
         {
-            get => _isEnabled;
+            get => Settings?.IsEnabled ?? true;
             set
             {
-                _isEnabled = value;
-                UpdateColorBarBackground();
-                ChannelEnabledChanged?.Invoke(this, new RoutedEventArgs());
+                if (Settings != null)
+                    Settings.IsEnabled = value;
             }
         }
 
         public string Label
         {
-            get => ChannelLabelTextBox.Text;
+            get => Settings?.Label ?? "Channel";
             set
             {
-                if (ChannelLabelTextBox.Text != value)
-                {
-                    ChannelLabelTextBox.Text = value;
-                    if (ChannelLabelTextBox != null)
-                        ChannelLabelTextBox.Text = ChannelLabelTextBox.Text;
-                }
+                if (Settings != null)
+                    Settings.Label = value;
+            }
+        }
+
+        public CouplingMode Coupling
+        {
+            get => Settings?.Coupling ?? CouplingMode.DC;
+            set
+            {
+                if (Settings != null)
+                    Settings.Coupling = value;
+            }
+        }
+
+        public FilterMode Filter
+        {
+            get => Settings?.Filter ?? FilterMode.None;
+            set
+            {
+                if (Settings != null)
+                    Settings.Filter = value;
+            }
+        }
+
+        public double Gain
+        {
+            get => Settings?.Gain ?? 1.0;
+            set
+            {
+                if (Settings != null)
+                    Settings.Gain = value;
+            }
+        }
+
+        public double Offset
+        {
+            get => Settings?.Offset ?? 0.0;
+            set
+            {
+                if (Settings != null)
+                    Settings.Offset = value;
             }
         }
 
@@ -78,111 +111,140 @@ namespace SerialPlotDN_WPF.View.UserControls
         public ChannelControl()
         {
             InitializeComponent();
-            UpdateGainOffsetDisplay();
-            this.Coupling = CouplingMode.DC; // Default mode
-            this.Filter = FilterMode.None; // Default filter mode
-            this.Color = Colors.Gray; // Default color
-            this.Label = "Channel"; // Default label
+            
+            // Subscribe to DataContext changes
+            DataContextChanged += ChannelControl_DataContextChanged;
         }
 
-        public CouplingMode Coupling
+        private void ChannelControl_DataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
         {
-            get => _coupling;
-            set
+            // Unsubscribe from old settings
+            if (e.OldValue is ChannelSettings oldSettings)
             {
-                _coupling = value;
-                // Reset all button backgrounds to default
-                DC.Background = DefaultBrush;
-                AC.Background = DefaultBrush;
-                // Set selected button background
-                switch (_coupling)
+                oldSettings.PropertyChanged -= Settings_PropertyChanged;
+            }
+
+            // Subscribe to new settings
+            if (e.NewValue is ChannelSettings newSettings)
+            {
+                newSettings.PropertyChanged += Settings_PropertyChanged;
+                UpdateUIFromSettings();
+            }
+        }
+
+        private void Settings_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            Dispatcher.BeginInvoke(() => 
+            {
+                switch (e.PropertyName)
                 {
-                    case CouplingMode.DC:
-                        DC.Background = SelectedBrush;
+                    case nameof(ChannelSettings.Color):
+                    case nameof(ChannelSettings.IsEnabled):
+                        UpdateColorBarBackground();
+                        if (e.PropertyName == nameof(ChannelSettings.IsEnabled))
+                            ChannelEnabledChanged?.Invoke(this, new RoutedEventArgs());
                         break;
-                    case CouplingMode.AC:
-                        AC.Background = SelectedBrush;
+                    case nameof(ChannelSettings.Coupling):
+                        UpdateCouplingButtons();
+                        break;
+                    case nameof(ChannelSettings.Filter):
+                        UpdateFilterButtons();
+                        break;
+                    case nameof(ChannelSettings.Gain):
+                        GainChanged?.Invoke(this, new RoutedEventArgs());
+                        break;
+                    case nameof(ChannelSettings.Label):
+                        UpdateLabel();
                         break;
                 }
-            }
+            });
         }
 
-        public FilterMode Filter
+        private void UpdateUIFromSettings()
         {
-            get => _filter;
-            set
+            if (Settings != null)
             {
-                _filter = value;
-                // Reset all button backgrounds to default
-                LPF.Background = DefaultBrush;
-                HPF.Background = DefaultBrush;
-                ABS.Background = DefaultBrush;
-                Squared.Background = DefaultBrush;
-                // Set selected button background
-                switch (_filter)
-                {
-                    case FilterMode.LPF:
-                        LPF.Background = SelectedBrush;
-                        break;
-                    case FilterMode.HPF:
-                        HPF.Background = SelectedBrush;
-                        break;
-                    case FilterMode.ABS:
-                        ABS.Background = SelectedBrush;
-                        break;
-                    case FilterMode.Squared:
-                        Squared.Background = SelectedBrush;
-                        break;
-                    case FilterMode.None: //nothing for this mode
-                    default:
-                        break;
-                }
+                UpdateColorBarBackground();
+                UpdateCouplingButtons();
+                UpdateFilterButtons();
+                UpdateLabel();
             }
         }
-
-        // Gain property
-        public double Gain
-        {
-            get => _gain;
-            set
-            {
-                _gain = value;
-                UpdateGainOffsetDisplay();
-                GainChanged?.Invoke(this, new RoutedEventArgs());
-            }
-        }
-
-        // Offset property
-        public double Offset
-        {
-            get => _offset;
-            set
-            {
-                _offset = value;
-                UpdateGainOffsetDisplay();
-            }
-        }
-
-
 
         private void UpdateColorBarBackground()
         {
-            TopColorBar.Background = new SolidColorBrush(_isEnabled ? _color : DisabledColor);
+            if (TopColorBar != null && Settings != null)
+            {
+                TopColorBar.Background = new SolidColorBrush(Settings.IsEnabled ? Settings.Color : DisabledColor);
+            }
         }
 
-        private void UpdateGainOffsetDisplay()
+        private void UpdateLabel()
         {
-            if(_offset > 0)
-                GainOffsetText.Text = $"= y * {_gain:F2} + {_offset:F2}";
-            else
-                GainOffsetText.Text = $"= y *{_gain:F2} - {_offset:F2}";
+            if (ChannelLabelTextBox != null && Settings != null)
+            {
+                ChannelLabelTextBox.Text = Settings.Label;
+            }
+        }
+
+        private void UpdateCouplingButtons()
+        {
+            if (Settings == null) return;
+
+            // Reset all button backgrounds to default
+            DC.Background = DefaultBrush;
+            AC.Background = DefaultBrush;
             
+            // Set selected button background
+            switch (Settings.Coupling)
+            {
+                case CouplingMode.DC:
+                    DC.Background = SelectedBrush;
+                    break;
+                case CouplingMode.AC:
+                    AC.Background = SelectedBrush;
+                    break;
+            }
+        }
+
+        private void UpdateFilterButtons()
+        {
+            if (Settings == null) return;
+
+            // Reset all button backgrounds to default
+            LPF.Background = DefaultBrush;
+            HPF.Background = DefaultBrush;
+            ABS.Background = DefaultBrush;
+            Squared.Background = DefaultBrush;
+            
+            // Set selected button background
+            switch (Settings.Filter)
+            {
+                case FilterMode.LPF:
+                    LPF.Background = SelectedBrush;
+                    break;
+                case FilterMode.HPF:
+                    HPF.Background = SelectedBrush;
+                    break;
+                case FilterMode.ABS:
+                    ABS.Background = SelectedBrush;
+                    break;
+                case FilterMode.Squared:
+                    Squared.Background = SelectedBrush;
+                    break;
+                case FilterMode.None:
+                default:
+                    break;
+            }
         }
 
         private void TopColorBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             // Toggle the enabled state
-            IsEnabled = !IsEnabled;
+            if (Settings != null)
+            {
+                Settings.IsEnabled = !Settings.IsEnabled;
+            }
 
             // Prevent the event from bubbling up to RootGrid
             e.Handled = true;
@@ -190,32 +252,42 @@ namespace SerialPlotDN_WPF.View.UserControls
 
         private void ButtonGainUp_Click(object sender, RoutedEventArgs e)
         {
-            Gain = Math.Min(Gain * 2,16); // Increment gain by 0.1
+            if (Settings != null)
+            {
+                Settings.Gain = Math.Min(Settings.Gain * 2, 16); // Double gain, max 16
+            }
         }
 
         private void ButtonGainDown_Click(object sender, RoutedEventArgs e)
         {
-            Gain = Math.Max(Gain/ 2, 0.125); // Decrement gain by 0.1, minimum 0.1
+            if (Settings != null)
+            {
+                Settings.Gain = Math.Max(Settings.Gain / 2, 0.125); // Halve gain, minimum 0.125
+            }
         }
 
         private void CouplingMode_Click(object sender, RoutedEventArgs e)
         {
+            if (Settings == null) return;
+
             if (sender == DC)
-                this.Coupling = CouplingMode.DC;
+                Settings.Coupling = CouplingMode.DC;
             else if (sender == AC)
-                this.Coupling = CouplingMode.AC;
+                Settings.Coupling = CouplingMode.AC;
         }
 
         private void FilterMode_Click(object sender, RoutedEventArgs e)
         {
+            if (Settings == null) return;
+
             if (sender == LPF)
-                this.Filter = FilterMode.LPF;
+                Settings.Filter = FilterMode.LPF;
             else if (sender == HPF)
-                this.Filter = FilterMode.HPF;
+                Settings.Filter = FilterMode.HPF;
             else if (sender == ABS)
-                this.Filter = FilterMode.ABS;
+                Settings.Filter = FilterMode.ABS;
             else if (sender == Squared)
-                this.Filter = FilterMode.Squared;
+                Settings.Filter = FilterMode.Squared;
         }
     }
 }

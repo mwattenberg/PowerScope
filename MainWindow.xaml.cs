@@ -72,11 +72,10 @@ namespace SerialPlotDN_WPF
 
         private void InitializeEventHandlers()
         {
-            HorizontalControl.WindowSizeChanged += _plotManager.updateHorizontalScale;
+            // HorizontalControl changes are now handled directly by PlotManager via PlotSettings.PropertyChanged
             
             // Note: VerticalControl now updates PlotSettings directly via data binding
             // The PlotManager automatically handles Y-axis limit updates via its PropertyChanged subscription
-            // Legacy events are still fired for backward compatibility if needed
             
             RunControl.RunStateChanged += RunControl_RunStateChanged;
 

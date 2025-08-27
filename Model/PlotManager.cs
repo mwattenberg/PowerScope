@@ -91,6 +91,14 @@ namespace SerialPlotDN_WPF.Model
                         _plot.Refresh();
                     });
                 }
+                else if (e.PropertyName == nameof(PlotSettings.Xmax))
+                {
+                    // Update horizontal scale when Xmax changes
+                    Application.Current?.Dispatcher.BeginInvoke(() =>
+                    {
+                        updateHorizontalScale(null, Settings.Xmax);
+                    });
+                }
             };
         }
 

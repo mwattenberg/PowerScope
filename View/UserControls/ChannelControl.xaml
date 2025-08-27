@@ -57,7 +57,7 @@
         </Grid.RowDefinitions>
         <!-- Top color bar with channel label -->
         <Border x:Name="TopColorBar" Grid.Row="0" Background="Gray" CornerRadius="2" Height="20" MouseLeftButtonDown="TopColorBar_MouseLeftButtonDown">
-            <TextBox x:Name="ChannelLabelTextBox" Text="CH1" Style="{StaticResource ChannelLabelTextBoxStyle}"/>
+            <TextBox x:Name="ChannelLabelTextBox" Text="{Binding Label}" Style="{StaticResource ChannelLabelTextBoxStyle}"/>
         </Border>
         <!-- Gain control buttons -->
         <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
@@ -69,7 +69,7 @@
         <!-- Middle: Gain and offset display -->
         <Border Grid.Row="2" Background="{DynamicResource PlotSettings_TextBoxBackgroundBrush}" CornerRadius="2" Margin="4">
             <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                <TextBlock x:Name="GainOffsetText" Text="x0.127 + 412" Style="{StaticResource GainOffsetTextStyle}"/>
+                <TextBlock x:Name="GainOffsetText" Text="{Binding GainOffsetDisplayText}" Style="{StaticResource GainOffsetTextStyle}"/>
             </StackPanel>
         </Border>
         <!-- Bottom: Math function textbox -->
