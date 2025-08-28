@@ -35,7 +35,8 @@ namespace SerialPlotDN_WPF.Model
         // --- Private helpers ---
         private static void WritePlotSettings(XElement parent, PlotManager plotManager)
         {
-            parent.Add(new XElement("PlotUpdateRateFPS", plotManager.Settings.PlotUpdateRateFPS));
+            parent.Add(new XElement("PlotUpdateRateFPS", plotManager.Settings.PlotUpdateRateFPS.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+            parent.Add(new XElement("SerialPortUpdateRateHz", plotManager.Settings.SerialPortUpdateRateHz));
             parent.Add(new XElement("LineWidth", plotManager.Settings.LineWidth));
             parent.Add(new XElement("AntiAliasing", plotManager.Settings.AntiAliasing));
             parent.Add(new XElement("ShowRenderTime", plotManager.Settings.ShowRenderTime));
@@ -107,7 +108,15 @@ namespace SerialPlotDN_WPF.Model
                 plotUpdateValue = plotUpdateElement.Value;
             else
                 plotUpdateValue = "30.0";
-            double plotUpdateRateFPS = double.Parse(plotUpdateValue);
+            double plotUpdateRateFPS = double.Parse(plotUpdateValue, System.Globalization.CultureInfo.InvariantCulture);
+
+            XElement serialPortUpdateRateHzElement = settingsXml.Element("SerialPortUpdateRateHz");
+            string serialPortUpdateRateHzValue;
+            if (serialPortUpdateRateHzElement != null)
+                serialPortUpdateRateHzValue = serialPortUpdateRateHzElement.Value;
+            else
+                serialPortUpdateRateHzValue = "1000";
+            int serialPortUpdateRateHz = int.Parse(serialPortUpdateRateHzValue);
 
             XElement lineWidthElement = settingsXml.Element("LineWidth");
             string lineWidthValue;
@@ -175,6 +184,7 @@ namespace SerialPlotDN_WPF.Model
             
             // Apply settings to PlotManager.Settings (this will automatically update VerticalControl via DataBinding)
             plotManager.Settings.PlotUpdateRateFPS = plotUpdateRateFPS;
+            plotManager.Settings.SerialPortUpdateRateHz = serialPortUpdateRateHz;
             plotManager.Settings.LineWidth = lineWidth;
             plotManager.Settings.AntiAliasing = antiAliasing;
             plotManager.Settings.ShowRenderTime = showRenderTime;
@@ -359,8 +369,8 @@ namespace SerialPlotDN_WPF.Model
                 var dataStream = dataStreamBar.CreateDataStreamFromUserInput(stream);
                 dataStreamBar.ConfiguredDataStreams.Add(stream);
                 dataStreamBar.ConnectedDataStreams.Add(dataStream);
-                dataStream.Connect();
-                dataStream.StartStreaming();
+                //dataStream.Connect();
+                //dataStream.StartStreaming();
             }
 
             // Apply channel settings once all channels are created

@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Input;
 using System.Text.RegularExpressions;
 using SerialPlotDN_WPF.Model;
+using System.Windows.Threading;
 
 namespace SerialPlotDN_WPF.View.UserForms
 {
@@ -16,9 +17,46 @@ namespace SerialPlotDN_WPF.View.UserForms
         /// </summary>
         public PlotSettings Settings => DataContext as PlotSettings;
 
+        private readonly DispatcherTimer _fpsUpTimer;
+        private readonly DispatcherTimer _fpsDownTimer;
+        private const int FpsStepIntervalMs = 100; // Adjustable speed (ms)
+
+        private readonly DispatcherTimer _serialHzUpTimer;
+        private readonly DispatcherTimer _serialHzDownTimer;
+        private const int SerialHzStepIntervalMs = 100; // Adjustable speed (ms)
+        private const int SerialHzStep = 10; // Step size for SerialPortUpdateRateHz
+
         public PlotSettingsWindow()
         {
             InitializeComponent();
+
+            _fpsUpTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(FpsStepIntervalMs) };
+            _fpsUpTimer.Tick += (s, e) => ButtonPlotFPSUp_Click(null, null);
+
+            _fpsDownTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(FpsStepIntervalMs) };
+            _fpsDownTimer.Tick += (s, e) => ButtonPlotFPSDown_Click(null, null);
+
+            ButtonPlotFPSUp.PreviewMouseLeftButtonDown += ButtonPlotFPSUp_PreviewMouseLeftButtonDown;
+            ButtonPlotFPSUp.PreviewMouseLeftButtonUp += ButtonPlotFPSUp_PreviewMouseLeftButtonUp;
+            ButtonPlotFPSUp.MouseLeave += ButtonPlotFPSUp_MouseLeave;
+
+            ButtonPlotFPSDown.PreviewMouseLeftButtonDown += ButtonPlotFPSDown_PreviewMouseLeftButtonDown;
+            ButtonPlotFPSDown.PreviewMouseLeftButtonUp += ButtonPlotFPSDown_PreviewMouseLeftButtonUp;
+            ButtonPlotFPSDown.MouseLeave += ButtonPlotFPSDown_MouseLeave;
+
+            _serialHzUpTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(SerialHzStepIntervalMs) };
+            _serialHzUpTimer.Tick += (s, e) => ButtonSerialHzUp_Click(null, null);
+
+            _serialHzDownTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(SerialHzStepIntervalMs) };
+            _serialHzDownTimer.Tick += (s, e) => ButtonSerialHzDown_Click(null, null);
+
+            ButtonSerialHzUp.PreviewMouseLeftButtonDown += ButtonSerialHzUp_PreviewMouseLeftButtonDown;
+            ButtonSerialHzUp.PreviewMouseLeftButtonUp += ButtonSerialHzUp_PreviewMouseLeftButtonUp;
+            ButtonSerialHzUp.MouseLeave += ButtonSerialHzUp_MouseLeave;
+
+            ButtonSerialHzDown.PreviewMouseLeftButtonDown += ButtonSerialHzDown_PreviewMouseLeftButtonDown;
+            ButtonSerialHzDown.PreviewMouseLeftButtonUp += ButtonSerialHzDown_PreviewMouseLeftButtonUp;
+            ButtonSerialHzDown.MouseLeave += ButtonSerialHzDown_MouseLeave;
         }
 
         /// <summary>
@@ -29,6 +67,34 @@ namespace SerialPlotDN_WPF.View.UserForms
         {
             InitializeComponent();
             DataContext = existingSettings;
+
+            _fpsUpTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(FpsStepIntervalMs) };
+            _fpsUpTimer.Tick += (s, e) => ButtonPlotFPSUp_Click(null, null);
+
+            _fpsDownTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(FpsStepIntervalMs) };
+            _fpsDownTimer.Tick += (s, e) => ButtonPlotFPSDown_Click(null, null);
+
+            ButtonPlotFPSUp.PreviewMouseLeftButtonDown += ButtonPlotFPSUp_PreviewMouseLeftButtonDown;
+            ButtonPlotFPSUp.PreviewMouseLeftButtonUp += ButtonPlotFPSUp_PreviewMouseLeftButtonUp;
+            ButtonPlotFPSUp.MouseLeave += ButtonPlotFPSUp_MouseLeave;
+
+            ButtonPlotFPSDown.PreviewMouseLeftButtonDown += ButtonPlotFPSDown_PreviewMouseLeftButtonDown;
+            ButtonPlotFPSDown.PreviewMouseLeftButtonUp += ButtonPlotFPSDown_PreviewMouseLeftButtonUp;
+            ButtonPlotFPSDown.MouseLeave += ButtonPlotFPSDown_MouseLeave;
+
+            _serialHzUpTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(SerialHzStepIntervalMs) };
+            _serialHzUpTimer.Tick += (s, e) => ButtonSerialHzUp_Click(null, null);
+
+            _serialHzDownTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(SerialHzStepIntervalMs) };
+            _serialHzDownTimer.Tick += (s, e) => ButtonSerialHzDown_Click(null, null);
+
+            ButtonSerialHzUp.PreviewMouseLeftButtonDown += ButtonSerialHzUp_PreviewMouseLeftButtonDown;
+            ButtonSerialHzUp.PreviewMouseLeftButtonUp += ButtonSerialHzUp_PreviewMouseLeftButtonUp;
+            ButtonSerialHzUp.MouseLeave += ButtonSerialHzUp_MouseLeave;
+
+            ButtonSerialHzDown.PreviewMouseLeftButtonDown += ButtonSerialHzDown_PreviewMouseLeftButtonDown;
+            ButtonSerialHzDown.PreviewMouseLeftButtonUp += ButtonSerialHzDown_PreviewMouseLeftButtonUp;
+            ButtonSerialHzDown.MouseLeave += ButtonSerialHzDown_MouseLeave;
         }
 
         // Input validation handlers for numeric-only fields
@@ -97,13 +163,13 @@ namespace SerialPlotDN_WPF.View.UserForms
         private void ButtonSerialHzUp_Click(object sender, RoutedEventArgs e)
         {
             if (Settings != null)
-                Settings.SerialPortUpdateRateHz = Math.Min(10000, Settings.SerialPortUpdateRateHz + 100);
+                Settings.SerialPortUpdateRateHz = Math.Min(10000, Settings.SerialPortUpdateRateHz + SerialHzStep);
         }
 
         private void ButtonSerialHzDown_Click(object sender, RoutedEventArgs e)
         {
             if (Settings != null)
-                Settings.SerialPortUpdateRateHz = Math.Max(1, Settings.SerialPortUpdateRateHz - 100);
+                Settings.SerialPortUpdateRateHz = Math.Max(1, Settings.SerialPortUpdateRateHz - SerialHzStep);
         }
 
         // Line Width Up/Down button handlers
@@ -169,6 +235,66 @@ namespace SerialPlotDN_WPF.View.UserForms
         {
             if (Settings != null)
                 Settings.Ymax = Math.Max(Settings.Ymin + 1, Settings.Ymax - 100);
+        }
+
+        // FPS Up continuous handlers
+        private void ButtonPlotFPSUp_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            ButtonPlotFPSUp_Click(sender, e);
+            _fpsUpTimer.Start();
+        }
+        private void ButtonPlotFPSUp_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            _fpsUpTimer.Stop();
+        }
+        private void ButtonPlotFPSUp_MouseLeave(object sender, MouseEventArgs e)
+        {
+            _fpsUpTimer.Stop();
+        }
+
+        // FPS Down continuous handlers
+        private void ButtonPlotFPSDown_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            ButtonPlotFPSDown_Click(sender, e);
+            _fpsDownTimer.Start();
+        }
+        private void ButtonPlotFPSDown_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            _fpsDownTimer.Stop();
+        }
+        private void ButtonPlotFPSDown_MouseLeave(object sender, MouseEventArgs e)
+        {
+            _fpsDownTimer.Stop();
+        }
+
+        // Serial Hz Up continuous handlers
+        private void ButtonSerialHzUp_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            ButtonSerialHzUp_Click(sender, e);
+            _serialHzUpTimer.Start();
+        }
+        private void ButtonSerialHzUp_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            _serialHzUpTimer.Stop();
+        }
+        private void ButtonSerialHzUp_MouseLeave(object sender, MouseEventArgs e)
+        {
+            _serialHzUpTimer.Stop();
+        }
+
+        // Serial Hz Down continuous handlers
+        private void ButtonSerialHzDown_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            ButtonSerialHzDown_Click(sender, e);
+            _serialHzDownTimer.Start();
+        }
+        private void ButtonSerialHzDown_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            _serialHzDownTimer.Stop();
+        }
+        private void ButtonSerialHzDown_MouseLeave(object sender, MouseEventArgs e)
+        {
+            _serialHzDownTimer.Stop();
         }
     }
 }

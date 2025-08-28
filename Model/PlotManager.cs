@@ -72,7 +72,7 @@ namespace SerialPlotDN_WPF.Model
             Settings = new PlotSettings();
             
             _data = new double[_maxChannels][];
-            _updatePlotTimer = new System.Timers.Timer(Settings.TimerInterval) { Enabled = true, AutoReset = true };
+            _updatePlotTimer = new System.Timers.Timer(Settings.TimerInterval) { Enabled = false, AutoReset = true };
             _updatePlotTimer.Elapsed += UpdatePlot;
 
             // Subscribe to settings changes to update timer interval and plot limits
@@ -84,7 +84,6 @@ namespace SerialPlotDN_WPF.Model
                 }
                 else if (e.PropertyName == nameof(PlotSettings.Ymin) || e.PropertyName == nameof(PlotSettings.Ymax))
                 {
-                    // Update plot Y limits when settings change
                     Application.Current?.Dispatcher.BeginInvoke(() =>
                     {
                         _plot.Plot.Axes.SetLimitsY(Settings.Ymin, Settings.Ymax);
@@ -93,11 +92,30 @@ namespace SerialPlotDN_WPF.Model
                 }
                 else if (e.PropertyName == nameof(PlotSettings.Xmax))
                 {
-                    // Update horizontal scale when Xmax changes
                     Application.Current?.Dispatcher.BeginInvoke(() =>
                     {
                         updateHorizontalScale(null, Settings.Xmax);
                     });
+                }
+                else if (e.PropertyName == nameof(PlotSettings.SerialPortUpdateRateHz))
+                {
+                    // Propagate update rate to all connected serial streams
+                    if (_connectedStreams != null)
+                    {
+                        foreach (var stream in _connectedStreams)
+                        {
+                            if (stream is SerialDataStream serialStream)
+                            {
+                                serialStream.SerialPortUpdateRateHz = Settings.SerialPortUpdateRateHz;
+                            }
+                        }
+                    }
+                }
+                else if (e.PropertyName == nameof(PlotSettings.LineWidth) ||
+                         e.PropertyName == nameof(PlotSettings.AntiAliasing) ||
+                         e.PropertyName == nameof(PlotSettings.ShowRenderTime))
+                {
+                    ApplyCurrentSettings(); // Update line width, anti-aliasing, and render time for all signals
                 }
             };
         }
@@ -303,7 +321,7 @@ namespace SerialPlotDN_WPF.Model
         public void ApplyCurrentSettings()
         {
             _updatePlotTimer.Interval = Settings.TimerInterval;
-            _plot.Plot.Grid.LineWidth = (float)Settings.LineWidth / 2;
+            _plot.Plot.Grid.LineWidth = (float)Settings.LineWidth;
             
             for (int i = 0; i < _signals.Length; i++)
             {
