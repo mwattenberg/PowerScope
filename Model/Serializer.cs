@@ -86,9 +86,7 @@ namespace SerialPlotDN_WPF.Model
                             new XElement("Color", channelSettings.Color.ToString()),
                             new XElement("IsEnabled", channelSettings.IsEnabled),
                             new XElement("Gain", channelSettings.Gain),
-                            new XElement("Offset", channelSettings.Offset),
-                            new XElement("Coupling", channelSettings.Coupling.ToString()),
-                            new XElement("Filter", channelSettings.Filter.ToString())
+                            new XElement("Offset", channelSettings.Offset)
                         );
                         channelsElement.Add(channelElement);
                     }
@@ -345,18 +343,6 @@ namespace SerialPlotDN_WPF.Model
                             setting.Offset = offset;
                         else
                             setting.Offset = 0.0;
-
-                        XElement couplingElement = channelElement.Element("Coupling");
-                        if (couplingElement != null && Enum.TryParse<ChannelControl.CouplingMode>(couplingElement.Value, out ChannelControl.CouplingMode coupling))
-                            setting.Coupling = coupling;
-                        else
-                            setting.Coupling = ChannelControl.CouplingMode.DC;
-
-                        XElement filterElement = channelElement.Element("Filter");
-                        if (filterElement != null && Enum.TryParse<ChannelControl.FilterMode>(filterElement.Value, out ChannelControl.FilterMode filter))
-                            setting.Filter = filter;
-                        else
-                            setting.Filter = ChannelControl.FilterMode.None;
 
                         channelSettings.Add(setting);
                     }

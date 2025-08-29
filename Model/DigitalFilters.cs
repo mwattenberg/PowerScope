@@ -8,6 +8,8 @@ namespace SerialPlotDN_WPF.Model
     {
         double Filter(double input);
         void Reset();
+        string GetFilterType();
+        Dictionary<string, double> GetFilterParameters();
     }
 
     /// <summary>
@@ -58,6 +60,26 @@ namespace SerialPlotDN_WPF.Model
             _initialized = false;
             _lastOutput = 0.0;
         }
+
+        /// <summary>
+        /// Returns the filter type as a string
+        /// </summary>
+        /// <returns>Filter type name</returns>
+        public string GetFilterType()
+        {
+            return "Exponential Low Pass";
+        }
+
+        /// <summary>
+        /// Returns all filter parameters as a dictionary
+        /// </summary>
+        /// <returns>Dictionary containing filter parameters</returns>
+        public Dictionary<string, double> GetFilterParameters()
+        {
+            Dictionary<string, double> parameters = new Dictionary<string, double>();
+            parameters.Add("Alpha", Alpha);
+            return parameters;
+        }
     }
 
     /// <summary>
@@ -75,8 +97,14 @@ namespace SerialPlotDN_WPF.Model
         /// </summary>
         public double Alpha
         {
-            get => _lowPass.Alpha;
-            set => _lowPass.Alpha = value;
+            get 
+            { 
+                return _lowPass.Alpha; 
+            }
+            set 
+            { 
+                _lowPass.Alpha = value; 
+            }
         }
 
         /// <summary>
@@ -114,12 +142,32 @@ namespace SerialPlotDN_WPF.Model
             _lastInput = 0.0;
             _lastOutput = 0.0;
         }
+
+        /// <summary>
+        /// Returns the filter type as a string
+        /// </summary>
+        /// <returns>Filter type name</returns>
+        public string GetFilterType()
+        {
+            return "Exponential High Pass";
+        }
+
+        /// <summary>
+        /// Returns all filter parameters as a dictionary
+        /// </summary>
+        /// <returns>Dictionary containing filter parameters</returns>
+        public Dictionary<string, double> GetFilterParameters()
+        {
+            Dictionary<string, double> parameters = new Dictionary<string, double>();
+            parameters.Add("Alpha", Alpha);
+            return parameters;
+        }
     }
 
     public class MovingAverageFilter : IDigitalFilter
     {
-        private readonly Queue<double> _window;
-        private readonly int _windowSize;
+        private Queue<double> _window;
+        private int _windowSize;
         private double _sum;
 
         public MovingAverageFilter(int windowSize)
@@ -145,12 +193,32 @@ namespace SerialPlotDN_WPF.Model
             _window.Clear();
             _sum = 0.0;
         }
+
+        /// <summary>
+        /// Returns the filter type as a string
+        /// </summary>
+        /// <returns>Filter type name</returns>
+        public string GetFilterType()
+        {
+            return "Moving Average";
+        }
+
+        /// <summary>
+        /// Returns all filter parameters as a dictionary
+        /// </summary>
+        /// <returns>Dictionary containing filter parameters</returns>
+        public Dictionary<string, double> GetFilterParameters()
+        {
+            Dictionary<string, double> parameters = new Dictionary<string, double>();
+            parameters.Add("WindowSize", _windowSize);
+            return parameters;
+        }
     }
 
     public class MedianFilter : IDigitalFilter
     {
-        private readonly Queue<double> _window;
-        private readonly int _windowSize;
+        private Queue<double> _window;
+        private int _windowSize;
 
         public MedianFilter(int windowSize)
         {
@@ -165,25 +233,57 @@ namespace SerialPlotDN_WPF.Model
             _window.Enqueue(input);
             if (_window.Count > _windowSize)
                 _window.Dequeue();
-            var sorted = _window.OrderBy(x => x).ToArray();
-            int n = sorted.Length;
+            
+            double[] sortedArray = new double[_window.Count];
+            int index = 0;
+            foreach (double value in _window)
+            {
+                sortedArray[index] = value;
+                index++;
+            }
+            Array.Sort(sortedArray);
+            
+            int n = sortedArray.Length;
             if (n % 2 == 1)
-                return sorted[n / 2];
+                return sortedArray[n / 2];
             else
-                return (sorted[n / 2 - 1] + sorted[n / 2]) / 2.0;
+                return (sortedArray[n / 2 - 1] + sortedArray[n / 2]) / 2.0;
         }
 
         public void Reset()
         {
             _window.Clear();
         }
+
+        /// <summary>
+        /// Returns the filter type as a string
+        /// </summary>
+        /// <returns>Filter type name</returns>
+        public string GetFilterType()
+        {
+            return "Median";
+        }
+
+        /// <summary>
+        /// Returns all filter parameters as a dictionary
+        /// </summary>
+        /// <returns>Dictionary containing filter parameters</returns>
+        public Dictionary<string, double> GetFilterParameters()
+        {
+            Dictionary<string, double> parameters = new Dictionary<string, double>();
+            parameters.Add("WindowSize", _windowSize);
+            return parameters;
+        }
     }
 
     public class NotchFilter : IDigitalFilter
     {
         private readonly double _omega;
-        private readonly double _r;
+        private double _r;
         private double _x1, _x2, _y1, _y2;
+        private readonly double _notchFreq;
+        private readonly double _sampleRate;
+        private double _bandwidth;
 
         /// <summary>
         /// Create a basic recursive notch filter
@@ -195,6 +295,9 @@ namespace SerialPlotDN_WPF.Model
         {
             if (notchFreq <= 0 || sampleRate <= 0)
                 throw new ArgumentOutOfRangeException("Frequencies must be positive.");
+            _notchFreq = notchFreq;
+            _sampleRate = sampleRate;
+            _bandwidth = bandwidth;
             _omega = 2 * Math.PI * notchFreq / sampleRate;
             _r = 1 - 3 * bandwidth / sampleRate;
             _x1 = _x2 = _y1 = _y2 = 0.0;
@@ -202,8 +305,6 @@ namespace SerialPlotDN_WPF.Model
 
         public double Filter(double input)
         {
-            // Basic IIR notch filter (biquad)
-            // y[n] = x[n] - 2*cos(omega)*x[n-1] + x[n-2] + 2*r*cos(omega)*y[n-1] - r^2*y[n-2]
             double y = input - 2 * Math.Cos(_omega) * _x1 + _x2
                 + 2 * _r * Math.Cos(_omega) * _y1 - _r * _r * _y2;
             _x2 = _x1;
@@ -216,6 +317,24 @@ namespace SerialPlotDN_WPF.Model
         public void Reset()
         {
             _x1 = _x2 = _y1 = _y2 = 0.0;
+        }
+
+        public string GetFilterType()
+        {
+            return "Notch";
+        }
+
+        /// <summary>
+        /// Returns all filter parameters as a dictionary
+        /// </summary>
+        /// <returns>Dictionary containing filter parameters</returns>
+        public Dictionary<string, double> GetFilterParameters()
+        {
+            Dictionary<string, double> parameters = new Dictionary<string, double>();
+            parameters.Add("NotchFreq", _notchFreq);
+            parameters.Add("SampleRate", _sampleRate);
+            parameters.Add("Bandwidth", _bandwidth);
+            return parameters;
         }
     }
 }

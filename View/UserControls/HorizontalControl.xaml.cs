@@ -15,8 +15,14 @@ namespace SerialPlotDN_WPF.View.UserControls
         /// </summary>
         public PlotSettings Settings
         {
-            get => DataContext as PlotSettings;
-            set => DataContext = value;
+            get 
+            { 
+                return DataContext as PlotSettings; 
+            }
+            set 
+            { 
+                DataContext = value; 
+            }
         }
 
         // Events
@@ -27,12 +33,16 @@ namespace SerialPlotDN_WPF.View.UserControls
 
         public int BufferSize
         {
-            get => _bufferSize;
+            get 
+            { 
+                return _bufferSize; 
+            }
             set
             {
                 _bufferSize = Math.Clamp(value, 1000, 5000000);
                 BufferSizeTextBox.Text = _bufferSize.ToString();
-                BufferSizeChanged?.Invoke(this, _bufferSize);
+                if (BufferSizeChanged != null)
+                    BufferSizeChanged.Invoke(this, _bufferSize);
             }
         }
 
@@ -46,9 +56,7 @@ namespace SerialPlotDN_WPF.View.UserControls
         {
             // Unsubscribe from old settings
             if (e.OldValue is PlotSettings oldSettings)
-            {
                 oldSettings.PropertyChanged -= Settings_PropertyChanged;
-            }
 
             // Subscribe to new settings
             if (e.NewValue is PlotSettings newSettings)
@@ -61,49 +69,39 @@ namespace SerialPlotDN_WPF.View.UserControls
         private void Settings_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
         {
             if (e.PropertyName == nameof(PlotSettings.Xmax))
-            {
-                Dispatcher.BeginInvoke(UpdateUIFromSettings);
-            }
+                Dispatcher.BeginInvoke(new Action(UpdateUIFromSettings));
         }
 
         private void UpdateUIFromSettings()
         {
             if (Settings != null && SamplesTextBox != null)
-            {
                 SamplesTextBox.Text = Settings.Xmax.ToString();
-            }
         }
 
         private void ButtonGrow_Click(object sender, RoutedEventArgs e)
         {
             if (Settings != null)
-            {
                 Settings.Xmax = Math.Min(Settings.Xmax * 2, BufferSize);
-            }
         }
 
         private void ButtonShrink_Click(object sender, RoutedEventArgs e)
         {
             if (Settings != null)
-            {
                 Settings.Xmax = Math.Max(Settings.Xmax / 2, 128);
-            }
         }
 
         private void BufferSizeTextBox_TextChanged(object sender, TextChangedEventArgs e)
         {
-            if (int.TryParse(BufferSizeTextBox.Text, out int bufferSize) && bufferSize != _bufferSize)
-            {
+            int bufferSize;
+            if (int.TryParse(BufferSizeTextBox.Text, out bufferSize) && bufferSize != _bufferSize)
                 BufferSize = bufferSize;
-            }
         }
 
         private void SamplesTextBox_TextChanged(object sender, TextChangedEventArgs e)
         {
-            if (int.TryParse(SamplesTextBox.Text, out int samples) && Settings != null && samples != Settings.Xmax)
-            {
+            int samples;
+            if (int.TryParse(SamplesTextBox.Text, out samples) && Settings != null && samples != Settings.Xmax)
                 Settings.Xmax = Math.Max(samples, 1);
-            }
         }
     }
 }

@@ -33,12 +33,11 @@ namespace SerialPlotDN_WPF
         {
             InitializeComponent();
 
-            _plotManager = new PlotManager(WpfPlot1, VerticalControl, HorizontalControl);
+            _plotManager = new PlotManager(WpfPlot1);
             _plotManager.InitializePlot();
             _plotManager.SetupPlotUserInput();
             
-            InitializeHorizontalControl();
-            InitializeVerticalControl();
+            InitializeControls();
             InitializeEventHandlers();
 
             readSettingsXML();
@@ -46,42 +45,33 @@ namespace SerialPlotDN_WPF
             // Initialize channel display based on current streams
             int totalChannels = DataStreamBar.GetTotalChannelCount();
             _plotManager.SetDataStreams(DataStreamBar.ConnectedDataStreams);
+            _plotManager.SetChannelSettings(ChannelControlBar.ChannelSettings);
             ChannelControlBar.UpdateChannels(totalChannels);
             _plotManager.UpdateChannelDisplay(totalChannels);
         }
 
-        void InitializeHorizontalControl()
+        void InitializeControls()
         {
-            // Set PlotSettings as DataContext for HorizontalControl
+            // Set PlotSettings as DataContext for controls
             HorizontalControl.Settings = _plotManager.Settings;
-            
-            // Initialize default values through PlotSettings
-            _plotManager.Settings.Xmax = DisplayElements; // Set initial window size
-            HorizontalControl.BufferSize = 5000000; // Set initial buffer size
-        }
-
-        void InitializeVerticalControl()
-        {
-            // Set PlotSettings as DataContext for VerticalControl
             VerticalControl.Settings = _plotManager.Settings;
             
             // Initialize default values through PlotSettings
+            _plotManager.Settings.Xmax = DisplayElements; // Set initial window size
             _plotManager.Settings.Ymax = 4000;
             _plotManager.Settings.Ymin = 0;
+            
+            HorizontalControl.BufferSize = 5000000; // Set initial buffer size
         }
 
         private void InitializeEventHandlers()
         {
-            // HorizontalControl changes are now handled directly by PlotManager via PlotSettings.PropertyChanged
-            
-            // Note: VerticalControl now updates PlotSettings directly via data binding
-            // The PlotManager automatically handles Y-axis limit updates via its PropertyChanged subscription
-            
             RunControl.RunStateChanged += RunControl_RunStateChanged;
 
             DataStreamBar.ChannelsChanged += (totalChannels) => 
             {
                 _plotManager.SetDataStreams(DataStreamBar.ConnectedDataStreams);
+                _plotManager.SetChannelSettings(ChannelControlBar.ChannelSettings);
                 Color[] colors = _plotManager.GetSignalColors(totalChannels);
                 ChannelControlBar.UpdateChannels(totalChannels, colors);
                 _plotManager.UpdateChannelDisplay(totalChannels, colors);
@@ -95,16 +85,6 @@ namespace SerialPlotDN_WPF
             else
                 _plotManager.stopAutoUpdate();
         }
-
-        //private void InitializeDataStream()
-        //{
-        //    SourceSetting sourceSetting = new SourceSetting("COM22", 1000000, 9, Parity.None);
-        //    byte[] startbytes = new byte[] { 0xAA, 0xAA };
-        //    _dataStream = new SerialDataStream(sourceSetting, new DataParser(DataParser.BinaryFormat.uint16_t, 8, startbytes));
-        //    AquisitionControl.Baudrate = sourceSetting.BaudRate;
-        //}
-
-
 
         /// <summary>
         /// Writes current plot settings to an XML file in the application directory.
@@ -133,12 +113,6 @@ namespace SerialPlotDN_WPF
             base.OnClosed(e);
         }
 
-        //private void closing(object sender, CancelEventArgs e)
-        //{
-        //    // Dispose DataStreamBar which will handle all stream disposal
-        //    DataStreamBar.Dispose();
-        //}
-
         private void WpfPlot1_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             // Restore default axis limits as in initialization
@@ -159,7 +133,6 @@ namespace SerialPlotDN_WPF
             View.UserForms.PlotSettingsWindow settingsWindow = new View.UserForms.PlotSettingsWindow(_plotManager.Settings);
             settingsWindow.Show();
         }
-
 
         private void SetupPlotUserInput()
         {
