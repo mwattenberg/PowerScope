@@ -1,10 +1,11 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Collections.Generic;
 
 namespace SerialPlotDN_WPF.Model
 {
-    public class DemoDataStream : IDataStream
+    public class DemoDataStream : IDataStream, IChannelConfigurable
     {
         private bool _disposed = false;
         private bool _isConnected = false;
@@ -19,6 +20,11 @@ namespace SerialPlotDN_WPF.Model
         private readonly object _dataLock = new object();
         private double _timeAccumulator = 0;
         private Random _random = new Random();
+
+        // Channel-specific processing
+        private ChannelSettings[] _channelSettings;
+        private IDigitalFilter[] _channelFilters;
+        private readonly object _channelConfigLock = new object();
 
         public int ChannelCount { get; }
 
@@ -58,8 +64,93 @@ namespace SerialPlotDN_WPF.Model
                 ReceivedData[i] = new RingBuffer<double>(ringBufferSize);
             }
             
+            // Initialize channel processing arrays
+            _channelSettings = new ChannelSettings[ChannelCount];
+            _channelFilters = new IDigitalFilter[ChannelCount];
+            
             _statusMessage = "Disconnected";
         }
+
+        #region IChannelConfigurable Implementation
+
+        public void SetChannelSetting(int channelIndex, ChannelSettings settings)
+        {
+            if (channelIndex < 0 || channelIndex >= ChannelCount)
+                return;
+
+            lock (_channelConfigLock)
+            {
+                _channelSettings[channelIndex] = settings;
+                
+                // Update filter reference and reset if filter type changed
+                var newFilter = settings?.Filter;
+                if (_channelFilters[channelIndex] != newFilter)
+                {
+                    _channelFilters[channelIndex] = newFilter;
+                    _channelFilters[channelIndex]?.Reset();
+                }
+            }
+        }
+
+        public void UpdateChannelSettings(IReadOnlyList<ChannelSettings> channelSettings)
+        {
+            if (channelSettings == null)
+                return;
+
+            lock (_channelConfigLock)
+            {
+                for (int i = 0; i < Math.Min(ChannelCount, channelSettings.Count); i++)
+                {
+                    SetChannelSetting(i, channelSettings[i]);
+                }
+            }
+        }
+
+        public void ResetChannelFilters()
+        {
+            lock (_channelConfigLock)
+            {
+                for (int i = 0; i < ChannelCount; i++)
+                {
+                    _channelFilters[i]?.Reset();
+                }
+            }
+        }
+
+        #endregion
+
+        #region Data Processing
+
+        private double ApplyChannelProcessing(int channel, double rawSample)
+        {
+            // Get channel settings safely
+            ChannelSettings settings;
+            IDigitalFilter filter;
+            
+            lock (_channelConfigLock)
+            {
+                settings = _channelSettings[channel];
+                filter = _channelFilters[channel];
+            }
+            
+            if (settings == null)
+                return rawSample;
+            
+            // Apply gain and offset
+            double processed = rawSample * settings.Gain + settings.Offset;
+            
+            // Apply filter if configured
+            if (filter != null)
+            {
+                processed = filter.Filter(processed);
+            }
+            
+            return processed;
+        }
+
+        #endregion
+
+        #region IDataStream Implementation
 
         public void Connect()
         {
@@ -81,6 +172,9 @@ namespace SerialPlotDN_WPF.Model
 
             _isStreaming = true;
             _statusMessage = "Streaming (Demo Mode)";
+            
+            // Reset filters when starting streaming
+            ResetChannelFilters();
             
             // Calculate timer interval to generate data at the specified sample rate
             // Generate data in chunks of ~100 samples at a time for smooth streaming
@@ -111,20 +205,30 @@ namespace SerialPlotDN_WPF.Model
             
             lock (_dataLock)
             {
+                // Pre-allocate arrays
                 for (int channel = 0; channel < ChannelCount; channel++)
                 {
                     newData[channel] = new double[samplesPerChunk];
+                }
+                
+                // Generate and process data for all channels in parallel
+                Parallel.For(0, ChannelCount, channel =>
+                {
                     for (int sample = 0; sample < samplesPerChunk; sample++)
                     {
                         double time = _timeAccumulator + (double)sample / DemoSettings.SampleRate;
-                        newData[channel][sample] = GenerateSampleForChannel(channel, time);
+                        double rawSample = GenerateSampleForChannel(channel, time);
+                        
+                        // Apply channel-specific processing (gain, offset, filtering)
+                        double processedSample = ApplyChannelProcessing(channel, rawSample);
+                        newData[channel][sample] = processedSample;
                     }
-                }
+                });
                 
                 // Update time accumulator
                 _timeAccumulator += (double)samplesPerChunk / DemoSettings.SampleRate;
                 
-                // Add data to ring buffers
+                // Add processed data to ring buffers
                 for (int channel = 0; channel < ChannelCount; channel++)
                 {
                     ReceivedData[channel].AddRange(newData[channel]);
@@ -191,6 +295,9 @@ namespace SerialPlotDN_WPF.Model
                 TotalBits = 0;
                 _timeAccumulator = 0;
             }
+            
+            // Reset filters when clearing data
+            ResetChannelFilters();
         }
 
         public void Dispose()
@@ -214,6 +321,8 @@ namespace SerialPlotDN_WPF.Model
             _disposed = true;
             GC.SuppressFinalize(this);
         }
+
+        #endregion
     }
 
     public class DemoSettings

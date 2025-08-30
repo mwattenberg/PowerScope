@@ -76,6 +76,12 @@ namespace SerialPlotDN_WPF
                 ChannelControlBar.UpdateChannels(totalChannels, colors);
                 _plotManager.UpdateChannelDisplay(totalChannels, colors);
             };
+            
+            DataStreamBar.StreamsChanged += () =>
+            {
+                // Update data streams when streams are added or removed
+                _plotManager.SetDataStreams(DataStreamBar.ConnectedDataStreams);
+            };
         }
 
         private void RunControl_RunStateChanged(object? sender, RunControl.RunStates newState)

@@ -137,6 +137,9 @@ namespace SerialPlotDN_WPF.Model
                     setting.PropertyChanged += ChannelSetting_PropertyChanged;
                 }
             }
+            
+            // Update data streams with new channel settings
+            UpdateDataStreamChannelSettings();
         }
 
         private void ChannelSettings_CollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
@@ -184,6 +187,13 @@ namespace SerialPlotDN_WPF.Model
                     });
                 }
             }
+            else if (e.PropertyName == nameof(ChannelSettings.Gain) ||
+                     e.PropertyName == nameof(ChannelSettings.Offset) ||
+                     e.PropertyName == nameof(ChannelSettings.Filter))
+            {
+                // Update channel processing settings in data streams
+                UpdateDataStreamChannelSettings();
+            }
         }
 
         private void UpdateSignalColors()
@@ -206,6 +216,9 @@ namespace SerialPlotDN_WPF.Model
         public void SetDataStreams(List<IDataStream> connectedStreams)
         {
             _connectedStreams = connectedStreams;
+            
+            // Update channel settings for any configurable streams
+            UpdateDataStreamChannelSettings();
         }
 
         private void setDarkMode()
@@ -443,6 +456,48 @@ namespace SerialPlotDN_WPF.Model
         {
             _plot.Plot.Axes.AutoScaleX();
             _plot.Refresh();
+        }
+
+        /// <summary>
+        /// Updates channel settings for all configurable data streams
+        /// </summary>
+        private void UpdateDataStreamChannelSettings()
+        {
+            if (_connectedStreams == null || _channelSettings == null)
+                return;
+
+            int globalChannelIndex = 0;
+            
+            foreach (IDataStream stream in _connectedStreams)
+            {
+                if (stream is IChannelConfigurable configurableStream)
+                {
+                    // Create a list of channel settings for this stream
+                    var streamChannelSettings = new List<ChannelSettings>();
+                    
+                    for (int streamChannel = 0; streamChannel < stream.ChannelCount; streamChannel++)
+                    {
+                        if (globalChannelIndex < _channelSettings.Count)
+                        {
+                            streamChannelSettings.Add(_channelSettings[globalChannelIndex]);
+                        }
+                        else
+                        {
+                            // Create default settings if not enough channel settings provided
+                            streamChannelSettings.Add(new ChannelSettings());
+                        }
+                        globalChannelIndex++;
+                    }
+                    
+                    // Update the stream with its channel settings
+                    configurableStream.UpdateChannelSettings(streamChannelSettings);
+                }
+                else
+                {
+                    // For non-configurable streams, just advance the channel index
+                    globalChannelIndex += stream.ChannelCount;
+                }
+            }
         }
     }
 }

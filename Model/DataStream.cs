@@ -35,6 +35,29 @@ namespace SerialPlotDN_WPF.Model
         //Returns the latest n samples from the specified channel
         int CopyLatestTo(int channel, double[] destination, int n);
         void clearData();
+    }
 
+    /// <summary>
+    /// Interface for data streams that support per-channel configuration
+    /// </summary>
+    public interface IChannelConfigurable
+    {
+        /// <summary>
+        /// Set channel-specific settings for processing (gain, offset, filtering)
+        /// </summary>
+        /// <param name="channelIndex">Index of the channel (0-based)</param>
+        /// <param name="settings">Channel settings to apply</param>
+        void SetChannelSetting(int channelIndex, ChannelSettings settings);
+        
+        /// <summary>
+        /// Update all channel settings at once
+        /// </summary>
+        /// <param name="channelSettings">Array or collection of channel settings</param>
+        void UpdateChannelSettings(IReadOnlyList<ChannelSettings> channelSettings);
+        
+        /// <summary>
+        /// Reset all filters to their initial state
+        /// </summary>
+        void ResetChannelFilters();
     }
 }

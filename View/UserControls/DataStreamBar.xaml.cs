@@ -19,6 +19,9 @@ namespace SerialPlotDN_WPF.View.UserControls
 
         // Event to notify when channels need to be updated
         public event System.Action<int> ChannelsChanged;
+        
+        // Event to notify when streams have changed (added/removed)
+        public event System.Action StreamsChanged;
 
         public DataStreamBar()
         {
@@ -43,6 +46,9 @@ namespace SerialPlotDN_WPF.View.UserControls
                 dataStream.StartStreaming();
 
                 UpdateChannels();
+                
+                // Notify that streams have changed so PlotManager can update channel settings
+                StreamsChanged?.Invoke();
             }
         }
 
@@ -158,6 +164,9 @@ namespace SerialPlotDN_WPF.View.UserControls
                     }
                 }
                 UpdateChannels();
+                
+                // Notify that streams have changed
+                StreamsChanged?.Invoke();
             }
         }
 
