@@ -3,6 +3,7 @@ using RJCP.IO.Ports; // Changed from System.IO.Ports to RJCP.IO.Ports for Parity
 using System.Windows.Media; // Add for SolidColorBrush and Colors
 using System; // Add for IDisposable
 using System.Collections.Generic; // Add for List<T>
+using System.Windows.Controls; // Add for ComboBoxItem
 
 namespace SerialPlotDN_WPF.Model
 {
@@ -16,7 +17,8 @@ namespace SerialPlotDN_WPF.Model
     {
         SerialPort,
         AudioInput,
-        USB
+        USB,
+        Demo
     }
 
     public enum NumberTypeEnum
@@ -48,6 +50,8 @@ namespace SerialPlotDN_WPF.Model
         private string _endianness; // "LittleEndian", "BigEndian"
         private string _delimiter; // "Comma", "Space", "Tab", or custom
         private string _frameStart; // for CustomFrame
+        private int _demoSampleRate; // for Demo mode
+        private string _demoSignalType; // for Demo mode
 
         public StreamSettings()
         {
@@ -57,6 +61,9 @@ namespace SerialPlotDN_WPF.Model
             NumberOfChannels = 8;
             DataFormat = DataFormatType.RawBinary;
             FrameStart = "AA AA"; // Default frame start bytes as string representation
+            DemoSampleRate = 1000; // Default demo sample rate
+            DemoSignalType = "Sine Wave"; // Default demo signal type
+            StreamSource = StreamSource.SerialPort; // Default to serial port
         }
 
         // Removed Connect/Disconnect methods
@@ -239,6 +246,36 @@ namespace SerialPlotDN_WPF.Model
             }
         }
 
+        public int DemoSampleRate
+        {
+            get { return _demoSampleRate; }
+            set
+            {
+                _demoSampleRate = value;
+                OnPropertyChanged(nameof(DemoSampleRate));
+            }
+        }
+
+        public string DemoSignalType
+        {
+            get { return _demoSignalType; }
+            set
+            {
+                _demoSignalType = value;
+                OnPropertyChanged(nameof(DemoSignalType));
+            }
+        }
+
+        public StreamSource StreamSource
+        {
+            get { return _streamSource; }
+            set
+            {
+                _streamSource = value;
+                OnPropertyChanged(nameof(StreamSource));
+            }
+        }
+
         public event PropertyChangedEventHandler PropertyChanged;
 
         protected virtual void OnPropertyChanged(string propertyName)
@@ -257,7 +294,18 @@ namespace SerialPlotDN_WPF.Model
             window.SelectedAudioDevice = this.AudioDevice;
             window.SelectedAudioDeviceIndex = this.AudioDeviceIndex;
             window.SelectedSampleRate = this.AudioSampleRate;
-            window.SelectedNumberType = this.NumberType;
+            // Note: SelectedNumberType exists in the code-behind, keeping it
+            if (window.ComboBox_NumberType != null)
+            {
+                foreach (var obj in window.ComboBox_NumberType.Items)
+                {
+                    if (obj is ComboBoxItem item && item.Tag?.ToString() == this.NumberType.ToString())
+                    {
+                        window.ComboBox_NumberType.SelectedItem = item;
+                        break;
+                    }
+                }
+            }
         }
 
         public void UpdateFromWindow(View.UserForms.SerialConfigWindow window)
@@ -270,7 +318,13 @@ namespace SerialPlotDN_WPF.Model
             this.AudioDevice = window.SelectedAudioDevice;
             this.AudioDeviceIndex = window.SelectedAudioDeviceIndex;
             this.AudioSampleRate = window.SelectedSampleRate;
-            this.NumberType = window.SelectedNumberType;
+            // Get NumberType from the ComboBox
+            if (window.ComboBox_NumberType?.SelectedItem is ComboBoxItem selectedItem && 
+                Enum.TryParse<NumberTypeEnum>(selectedItem.Tag?.ToString(), out var numberType))
+            {
+                this.NumberType = numberType;
+            }
+            // Demo properties are handled by data binding automatically
         }
     }
 }

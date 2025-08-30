@@ -93,11 +93,28 @@ namespace SerialPlotDN_WPF.View.UserControls
                     long bitsPerSecond = currentBits - _prevBitsCount;
                     _prevBitsCount = currentBits;
 
-                    double portUsagePercent = (100.0 * bitsPerSecond / _viewModel.Baud);
+                    double portUsagePercent;
+                    if (AssociatedDataStream.StreamType == "Demo")
+                    {
+                        // For demo streams, show a different metric or just show N/A
+                        portUsagePercent = 0; // Demo doesn't have port usage
+                    }
+                    else
+                    {
+                        // For serial streams, calculate based on baud rate
+                        portUsagePercent = (100.0 * bitsPerSecond / _viewModel.Baud);
+                    }
 
                     // Update UI
                     SamplesPerSecondTextBlock.Text = samplesPerSecond.ToString();
-                    PortUsageTextBlock.Text = $"{portUsagePercent:F1}%";
+                    if (AssociatedDataStream.StreamType == "Demo")
+                    {
+                        PortUsageTextBlock.Text = "N/A";
+                    }
+                    else
+                    {
+                        PortUsageTextBlock.Text = $"{portUsagePercent:F1}%";
+                    }
                 }
                 else
                 {

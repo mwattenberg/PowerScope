@@ -85,6 +85,6 @@
             </StackPanel>
         </Border>
         <!-- Replace bottom two rows with Filters button -->
-        <Button x:Name="ButtonFilters" Grid.Row="3" Content="Filters" Height="28" FontSize="13" Margin="4,2,4,2"/>
+        <Button x:Name="ButtonFilters" Grid.Row="3" Content="Filters" Height="28" FontSize="13" Margin="4,2,4,2" Click="ButtonFilters_Click"/>
     </Grid>
 </UserControl>

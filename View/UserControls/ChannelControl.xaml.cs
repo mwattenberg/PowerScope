@@ -102,5 +102,16 @@ namespace SerialPlotDN_WPF.View.UserControls
             if (Settings != null)
                 Settings.Gain = Math.Max(Settings.Gain / 2, 0.125); // Halve gain, minimum 0.125
         }
+
+        private void ButtonFilters_Click(object sender, RoutedEventArgs e)
+        {
+            if (Settings != null)
+            {
+                var filterWindow = new View.UserForms.FilterConfigWindow();
+                filterWindow.DataContext = Settings;
+                filterWindow.Owner = Window.GetWindow(this);
+                filterWindow.ShowDialog();
+            }
+        }
     }
 }

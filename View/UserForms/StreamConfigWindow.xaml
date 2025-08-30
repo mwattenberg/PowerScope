@@ -287,9 +287,9 @@
             <!-- Content Area -->
             <DockPanel Grid.Row="2" Margin="10,10,10,0">
                 <!-- Tab Control -->
-                <TabControl>
+                <TabControl x:Name="TabControl_StreamTypes" SelectionChanged="TabControl_SelectionChanged">
                     <!-- Serial Tab -->
-                    <TabItem Header="Serial">
+                    <TabItem Header="Serial" x:Name="TabItem_Serial">
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
                             <StackPanel Margin="10" VerticalAlignment="Top">
                                 <!-- Port -->
@@ -404,7 +404,7 @@
                         </StackPanel>
                     </TabItem>
                     <!-- Audio Tab -->
-                    <TabItem Header="Audio">
+                    <TabItem Header="Audio" x:Name="TabItem_Audio">
                         <StackPanel Margin="10">
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                                 <Label Content="Input:" VerticalAlignment="Center" Width="50"/>
@@ -417,11 +417,57 @@
                             <!-- Add your Audio controls here -->
                         </StackPanel>
                     </TabItem>
+                    <!-- Demo Tab -->
+                    <TabItem Header="Demo" x:Name="TabItem_Demo">
+                        <StackPanel Margin="10" VerticalAlignment="Top">
+                            <Label Content="Demo Mode Configuration" FontWeight="Bold" FontSize="14" Margin="0,0,0,10"/>
+                            <Label Content="This mode generates simulated data for testing and demonstration purposes."/>
+                            <Label Content="No external hardware required." Margin="0,0,0,10"/>
+                            
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                                <Label Content="Channels:" VerticalAlignment="Center" Width="80"/>
+                                <ComboBox x:Name="ComboBox_DemoChannels" Width="200" IsEditable="True" Text="{Binding NumberOfChannels, Mode=TwoWay}" SelectedValuePath="Content">
+                                    <ComboBoxItem Content="1"/>
+                                    <ComboBoxItem Content="2"/>
+                                    <ComboBoxItem Content="3"/>
+                                    <ComboBoxItem Content="4"/>
+                                    <ComboBoxItem Content="5"/>
+                                    <ComboBoxItem Content="6"/>
+                                    <ComboBoxItem Content="7"/>
+                                    <ComboBoxItem Content="8" IsSelected="True"/>
+                                </ComboBox>
+                            </StackPanel>
+                            
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                                <Label Content="Sample Rate:" VerticalAlignment="Center" Width="80"/>
+                                <ComboBox x:Name="ComboBox_DemoSampleRate" Width="200" IsEditable="True" Text="{Binding DemoSampleRate, Mode=TwoWay}" SelectedValuePath="Content">
+                                    <ComboBoxItem Content="100"/>
+                                    <ComboBoxItem Content="1000" IsSelected="True"/>
+                                    <ComboBoxItem Content="10000"/>
+                                    <ComboBoxItem Content="44100"/>
+                                </ComboBox>
+                            </StackPanel>
+                            
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                                <Label Content="Signal Type:" VerticalAlignment="Center" Width="80"/>
+                                <ComboBox x:Name="ComboBox_DemoSignalType" Width="200" SelectedValue="{Binding DemoSignalType, Mode=TwoWay}" SelectedValuePath="Content">
+                                    <ComboBoxItem Content="Sine Wave" IsSelected="True"/>
+                                    <ComboBoxItem Content="Square Wave"/>
+                                    <ComboBoxItem Content="Triangle Wave"/>
+                                    <ComboBoxItem Content="Random Noise"/>
+                                    <ComboBoxItem Content="Mixed Signals"/>
+                                </ComboBox>
+                            </StackPanel>
+                            
+                            <TextBlock Text="Demo mode will generate continuous data streams for visualization and testing." 
+                                      Margin="0,20,0,0" FontStyle="Italic" Foreground="Gray"/>
+                        </StackPanel>
+                    </TabItem>
                 </TabControl>
             </DockPanel>
             <!-- Buttons -->
             <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="20,10,20,20">
-                <Button Content="Connect" Width="75" Margin="0,0,10,0" Click="Button_OK_Click"/>
+                <Button Content="Connect" Width="75" Margin="0,0,10,0" Click="Button_Connect_Click"/>
                 <Button Content="Cancel" Width="75" Click="Button_Cancel_Click"/>
             </StackPanel>
         </Grid>

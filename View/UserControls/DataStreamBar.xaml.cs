@@ -48,26 +48,38 @@ namespace SerialPlotDN_WPF.View.UserControls
 
         public IDataStream CreateDataStreamFromUserInput(StreamSettings vm)
         {
-            // Only SerialDataStream for now, can be extended for other types
-            var sourceSetting = new SourceSetting(vm.Port, vm.Baud, vm.DataBits, vm.StopBits, vm.Parity);
-            DataParser dataParser;
-            if (vm.DataFormat == DataFormatType.RawBinary)
+            // Determine stream type based on StreamSource property
+            switch (vm.StreamSource)
             {
-                byte[] frameStartBytes = ParseFrameStartBytes(vm.FrameStart);
-                if (frameStartBytes != null && frameStartBytes.Length > 0)
-                    dataParser = new DataParser(DataParser.BinaryFormat.uint16_t, vm.NumberOfChannels, frameStartBytes);
-                else
-                    dataParser = new DataParser(DataParser.BinaryFormat.uint16_t, vm.NumberOfChannels);
+                case StreamSource.Demo:
+                    var demoSettings = new DemoSettings(vm.NumberOfChannels, vm.DemoSampleRate, vm.DemoSignalType);
+                    var demoStream = new DemoDataStream(demoSettings);
+                    AddStreamInfoPanel(vm, demoStream);
+                    return demoStream;
+                    
+                case StreamSource.SerialPort:
+                default:
+                    // Default to SerialDataStream
+                    var sourceSetting = new SourceSetting(vm.Port, vm.Baud, vm.DataBits, vm.StopBits, vm.Parity);
+                    DataParser dataParser;
+                    if (vm.DataFormat == DataFormatType.RawBinary)
+                    {
+                        byte[] frameStartBytes = ParseFrameStartBytes(vm.FrameStart);
+                        if (frameStartBytes != null && frameStartBytes.Length > 0)
+                            dataParser = new DataParser(DataParser.BinaryFormat.uint16_t, vm.NumberOfChannels, frameStartBytes);
+                        else
+                            dataParser = new DataParser(DataParser.BinaryFormat.uint16_t, vm.NumberOfChannels);
+                    }
+                    else
+                    {
+                        char frameEnd = '\n';
+                        char separator = ParseDelimiter(vm.Delimiter);
+                        dataParser = new DataParser(vm.NumberOfChannels, frameEnd, separator);
+                    }
+                    var stream = new SerialDataStream(sourceSetting, dataParser);
+                    AddStreamInfoPanel(vm, stream);
+                    return stream;
             }
-            else
-            {
-                char frameEnd = '\n';
-                char separator = ParseDelimiter(vm.Delimiter);
-                dataParser = new DataParser(vm.NumberOfChannels, frameEnd, separator);
-            }
-            var stream = new SerialDataStream(sourceSetting, dataParser);
-            AddStreamInfoPanel(vm, stream);
-            return stream;
         }
 
         private byte[] ParseFrameStartBytes(string frameStart)
@@ -117,7 +129,18 @@ namespace SerialPlotDN_WPF.View.UserControls
             {
                 viewModel.PropertyChanged -= DataStreamViewModel_PropertyChanged;
                 // Find and remove corresponding IDataStream
-                var streamToRemove = ConnectedDataStreams.FirstOrDefault(ds => ds != null && ds.StreamType == "Serial" && ds is SerialDataStream sds && sds.SourceSetting.PortName == viewModel.Port);
+                IDataStream streamToRemove = null;
+                
+                if (viewModel.StreamSource == StreamSource.Demo)
+                {
+                    streamToRemove = ConnectedDataStreams.FirstOrDefault(ds => ds != null && ds.StreamType == "Demo");
+                }
+                else if (viewModel.StreamSource == StreamSource.SerialPort)
+                {
+                    streamToRemove = ConnectedDataStreams.FirstOrDefault(ds => ds != null && ds.StreamType == "Serial" && ds is SerialDataStream sds && sds.SourceSetting.PortName == viewModel.Port);
+                }
+                // Add other stream types as needed
+                
                 if (streamToRemove != null)
                 {
                     streamToRemove.StopStreaming();

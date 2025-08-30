@@ -251,34 +251,53 @@ namespace SerialPlotDN_WPF.View.UserForms
             set { ComboBox_SampleRates.SelectedItem = value.ToString(); }
         }
 
-        public NumberTypeEnum SelectedNumberType
+        private void Button_Connect_Click(object sender, RoutedEventArgs e)
         {
-            get
+            // Validate based on the selected stream source
+            switch (ViewModel.StreamSource)
             {
-                if (ComboBox_NumberType.SelectedItem is ComboBoxItem item && Enum.TryParse<NumberTypeEnum>(item.Tag.ToString(), out var type))
-                    return type;
-                return NumberTypeEnum.Uint16; // Default
-            }
-            set
-            {
-                foreach (var obj in ComboBox_NumberType.Items)
-                {
-                    if (obj is ComboBoxItem item && item.Tag.ToString() == value.ToString())
+                case StreamSource.SerialPort:
+                    // Only validate serial port settings for serial streams
+                    if (string.IsNullOrWhiteSpace(SelectedPort) || SelectedBaud == 0)
                     {
-                        ComboBox_NumberType.SelectedItem = item;
+                        MessageBox.Show("Please select a valid port and baud rate.", "Invalid Input", MessageBoxButton.OK, MessageBoxImage.Warning);
                         return;
                     }
-                }
+                    break;
+                    
+                case StreamSource.AudioInput:
+                    // Validate audio settings
+                    if (string.IsNullOrWhiteSpace(SelectedAudioDevice))
+                    {
+                        MessageBox.Show("Please select a valid audio device.", "Invalid Input", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        return;
+                    }
+                    break;
+                    
+                case StreamSource.Demo:
+                    // Demo mode requires minimal validation
+                    if (ViewModel.NumberOfChannels <= 0)
+                    {
+                        MessageBox.Show("Please specify a valid number of channels.", "Invalid Input", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        return;
+                    }
+                    if (ViewModel.DemoSampleRate <= 0)
+                    {
+                        MessageBox.Show("Please specify a valid sample rate.", "Invalid Input", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        return;
+                    }
+                    break;
+                    
+                case StreamSource.USB:
+                    // USB validation would go here when implemented
+                    MessageBox.Show("USB streams are not yet implemented.", "Not Implemented", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                    
+                default:
+                    MessageBox.Show("Please select a valid stream type.", "Invalid Input", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
             }
-        }
-
-        private void Button_OK_Click(object sender, RoutedEventArgs e)
-        {
-            if (string.IsNullOrWhiteSpace(SelectedPort) || SelectedBaud == 0)
-            {
-                MessageBox.Show("Please select a valid port and baud rate.", "Invalid Input", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
+            
             DialogResult = true;
             Close();
         }
@@ -305,6 +324,36 @@ namespace SerialPlotDN_WPF.View.UserForms
         {
             if (Panel_ASCII != null)
                 Panel_ASCII.Visibility = ViewModel.DataFormat == DataFormatType.ASCII ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private void PopulateDemoControls()
+        {
+            // Demo controls are already defined in XAML, just ensure they're bound properly
+            // The binding is handled through the DataContext (ViewModel)
+        }
+
+        private void TabControl_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (ViewModel == null || !(sender is TabControl tabControl))
+                return;
+
+            if (tabControl.SelectedItem is TabItem selectedTab)
+            {
+                // Update StreamSource based on selected tab
+                if (selectedTab.Name == "TabItem_Serial")
+                {
+                    ViewModel.StreamSource = StreamSource.SerialPort;
+                }
+                else if (selectedTab.Name == "TabItem_Audio")
+                {
+                    ViewModel.StreamSource = StreamSource.AudioInput;
+                }
+                else if (selectedTab.Name == "TabItem_Demo")
+                {
+                    ViewModel.StreamSource = StreamSource.Demo;
+                }
+                // USB tab would set StreamSource.USB when implemented
+            }
         }
     }
 
