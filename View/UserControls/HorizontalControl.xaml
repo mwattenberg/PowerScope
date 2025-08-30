@@ -5,7 +5,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:SerialPlotDN_WPF.View.UserControls"
              mc:Ignorable="d" 
-             Width="280" Height="150">
+             Width="280" Height="auto" BorderThickness="2" Margin="2">
     
     <UserControl.Resources>
         <!-- Button style matching ChannelControl -->
@@ -71,8 +71,8 @@
         </Style>
     </UserControl.Resources>
     
-    <Border Height="Auto" Background="{DynamicResource PlotSettings_BackgroundBrush}" CornerRadius="5"
-            BorderBrush="{DynamicResource PlotSettings_BorderBrush}" BorderThickness="1">
+    <Border Height="Auto" Background="{DynamicResource PlotSettings_BackgroundBrush}" CornerRadius="4"
+            BorderBrush="{DynamicResource PlotSettings_BorderBrush}" BorderThickness="2">
         <Grid x:Name="RootGrid" Background="{DynamicResource PlotSettings_BackgroundBrush}">
             <Grid.RowDefinitions>
                 <RowDefinition Height="32"/>  <!-- Top color bar -->

@@ -252,6 +252,7 @@ namespace SerialPlotDN_WPF.Model
                 "Triangle Wave" => amplitude * (2.0 / Math.PI) * Math.Asin(Math.Sin(2 * Math.PI * baseFrequency * time)),
                 "Random Noise" => amplitude * (_random.NextDouble() - 0.5) * 2,
                 "Mixed Signals" => GenerateMixedSignal(channel, time, amplitude),
+                "Chirp Signal" => GenerateChirpSignal(channel, time, amplitude),
                 _ => amplitude * Math.Sin(2 * Math.PI * baseFrequency * time)
             };
         }
@@ -267,6 +268,40 @@ namespace SerialPlotDN_WPF.Model
                 3 => amplitude * (_random.NextDouble() - 0.5) * 2,
                 _ => amplitude * Math.Sin(2 * Math.PI * (1.0 + channel * 0.5) * time)
             };
+        }
+
+        /// <summary>
+        /// Generates a chirp signal that sweeps from 10Hz to 10kHz over 3 seconds
+        /// </summary>
+        /// <param name="channel">Channel index (adds slight frequency offset per channel)</param>
+        /// <param name="time">Current time in seconds</param>
+        /// <param name="amplitude">Signal amplitude</param>
+        /// <returns>Chirp signal sample</returns>
+        private double GenerateChirpSignal(int channel, double time, double amplitude)
+        {
+            // Chirp parameters
+            const double chirpDuration = 3.0; // 3 seconds
+            const double startFrequency = 10.0; // 10 Hz
+            const double endFrequency = 10000.0; // 10 kHz
+            
+            // Add slight frequency offset per channel to make them distinguishable
+            double channelFreqOffset = channel * 100.0; // 100 Hz offset per channel
+            double adjustedStartFreq = startFrequency + channelFreqOffset;
+            double adjustedEndFreq = endFrequency + channelFreqOffset;
+            
+            // Calculate the time within the current chirp cycle
+            double cycleTime = time % chirpDuration;
+            
+            // Linear frequency sweep: f(t) = f0 + (f1 - f0) * t / T
+            double instantaneousFreq = adjustedStartFreq + (adjustedEndFreq - adjustedStartFreq) * (cycleTime / chirpDuration);
+            
+            // Calculate the phase for the chirp signal
+            // For a linear chirp: ?(t) = 2? * [f0 * t + (f1 - f0) * t² / (2 * T)]
+            double phase = 2 * Math.PI * (adjustedStartFreq * cycleTime + 
+                          (adjustedEndFreq - adjustedStartFreq) * cycleTime * cycleTime / (2 * chirpDuration));
+            
+            // Generate the chirp signal
+            return amplitude * Math.Sin(phase);
         }
 
         public int CopyLatestTo(int channel, double[] destination, int n)

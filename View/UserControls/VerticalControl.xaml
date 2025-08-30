@@ -5,7 +5,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:SerialPlotDN_WPF.View.UserControls"
              mc:Ignorable="d" 
-             Width="150" Height="150">
+             Width="150" Height="180">
     <UserControl.Resources>
         <Style TargetType="Button">
             <Setter Property="Background" Value="{DynamicResource PlotSettings_TextBoxBackgroundBrush}"/>
@@ -70,6 +70,11 @@
             <Border Background="Gray" CornerRadius="2" Height="20" Margin="0,0,0,10">
                 <TextBox x:Name="VerticalLabelTextBox" Text="Vertical" Style="{StaticResource VerticalLabelTextBoxStyle}"/>
             </Border>
+            <!-- Two buttons below the label -->
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,0,0,10">
+                <Button x:Name="ButtonGrow" Width="55" Height="25" Margin="2" Content="~" FontSize="16" FontWeight="Bold" Click="ButtonGrow_Click"/>
+                <Button x:Name="ButtonShrink" Width="55" Height="25" Margin="2" Content="~" FontSize="10" FontWeight="Bold" Click="ButtonShrink_Click"/>
+            </StackPanel>
             <!-- Max row -->
             <Grid Margin="0,0,0,5">
                 <Grid.ColumnDefinitions>

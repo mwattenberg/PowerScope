@@ -11,7 +11,7 @@ namespace SerialPlotDN_WPF.Model
         private bool _isEnabled = true;
         private double _gain = 1.0;
         private double _offset = 0.0;
-        private IDigitalFilter _filter = null;
+        private IDigitalFilter? _filter = null;
 
         public string Label
         {

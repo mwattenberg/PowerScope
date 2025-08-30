@@ -150,5 +150,35 @@ namespace SerialPlotDN_WPF.View.UserControls
                 }
             }
         }
+
+        private void ButtonGrow_Click(object sender, RoutedEventArgs e)
+        {
+            if (Settings != null)
+            {
+                // Calculate the current range center
+                int center = (Settings.Ymax + Settings.Ymin) / 2;
+                int halfRange = (Settings.Ymax - Settings.Ymin) / 2;
+                
+                // Double the range while keeping the center the same
+                int newHalfRange = halfRange * 2;
+                Settings.Ymin = center - newHalfRange;
+                Settings.Ymax = center + newHalfRange;
+            }
+        }
+
+        private void ButtonShrink_Click(object sender, RoutedEventArgs e)
+        {
+            if (Settings != null)
+            {
+                // Calculate the current range center
+                int center = (Settings.Ymax + Settings.Ymin) / 2;
+                int halfRange = (Settings.Ymax - Settings.Ymin) / 2;
+                
+                // Halve the range while keeping the center the same (minimum range of 2)
+                int newHalfRange = Math.Max(halfRange / 2, 1);
+                Settings.Ymin = center - newHalfRange;
+                Settings.Ymax = center + newHalfRange;
+            }
+        }
     }
 }

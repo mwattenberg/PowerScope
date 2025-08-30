@@ -456,6 +456,7 @@
                                     <ComboBoxItem Content="Triangle Wave"/>
                                     <ComboBoxItem Content="Random Noise"/>
                                     <ComboBoxItem Content="Mixed Signals"/>
+                                    <ComboBoxItem Content="Chirp Signal"/>
                                 </ComboBox>
                             </StackPanel>
                             

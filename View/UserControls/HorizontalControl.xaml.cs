@@ -49,22 +49,9 @@ namespace SerialPlotDN_WPF.View.UserControls
         public HorizontalControl()
         {
             InitializeComponent();
-            DataContextChanged += HorizontalControl_DataContextChanged;
         }
 
-        private void HorizontalControl_DataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
-        {
-            // Unsubscribe from old settings
-            if (e.OldValue is PlotSettings oldSettings)
-                oldSettings.PropertyChanged -= Settings_PropertyChanged;
 
-            // Subscribe to new settings
-            if (e.NewValue is PlotSettings newSettings)
-            {
-                newSettings.PropertyChanged += Settings_PropertyChanged;
-                UpdateUIFromSettings();
-            }
-        }
 
         private void Settings_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
         {

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Globalization;
+using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
@@ -45,40 +46,9 @@ namespace SerialPlotDN_WPF.View.UserControls
             } 
         }
 
-        // Events
-        public event RoutedEventHandler ChannelEnabledChanged;
-        public event RoutedEventHandler GainChanged;
-
         public ChannelControl()
         {
             InitializeComponent();
-            Loaded += ChannelControl_Loaded;
-        }
-
-        private void ChannelControl_Loaded(object sender, RoutedEventArgs e)
-        {
-            if (Settings != null)
-            {
-                Settings.PropertyChanged += Settings_PropertyChanged;
-            }
-        }
-
-        private void Settings_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
-        {
-            Action updateAction = delegate()
-            {
-                if (e.PropertyName == nameof(ChannelSettings.IsEnabled))
-                {
-                    if (ChannelEnabledChanged != null)
-                        ChannelEnabledChanged.Invoke(this, new RoutedEventArgs());
-                }
-                else if (e.PropertyName == nameof(ChannelSettings.Gain))
-                {
-                    if (GainChanged != null)
-                        GainChanged.Invoke(this, new RoutedEventArgs());
-                }
-            };
-            Dispatcher.BeginInvoke(updateAction);
         }
 
         private void TopColorBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -94,13 +64,13 @@ namespace SerialPlotDN_WPF.View.UserControls
         private void ButtonGainUp_Click(object sender, RoutedEventArgs e)
         {
             if (Settings != null)
-                Settings.Gain = Math.Min(Settings.Gain * 2, 16); // Double gain, max 16
+                Settings.Gain = Settings.Gain * 2;
         }
 
         private void ButtonGainDown_Click(object sender, RoutedEventArgs e)
         {
             if (Settings != null)
-                Settings.Gain = Math.Max(Settings.Gain / 2, 0.125); // Halve gain, minimum 0.125
+                Settings.Gain = Settings.Gain / 2;
         }
 
         private void ButtonFilters_Click(object sender, RoutedEventArgs e)
@@ -112,6 +82,31 @@ namespace SerialPlotDN_WPF.View.UserControls
                 filterWindow.Owner = Window.GetWindow(this);
                 filterWindow.ShowDialog();
             }
+        }
+
+        // Input validation methods
+        private void DecimalOnly_PreviewTextInput(object sender, TextCompositionEventArgs e)
+        {
+            var textBox = sender as TextBox;
+            var newText = textBox.Text.Insert(textBox.SelectionStart, e.Text);
+            e.Handled = !IsDecimal(newText);
+        }
+
+        private void SignedDecimalOnly_PreviewTextInput(object sender, TextCompositionEventArgs e)
+        {
+            var textBox = sender as TextBox;
+            var newText = textBox.Text.Insert(textBox.SelectionStart, e.Text);
+            e.Handled = !IsSignedDecimal(newText);
+        }
+
+        private static bool IsDecimal(string text)
+        {
+            return Regex.IsMatch(text, @"^[0-9]*\.?[0-9]*$") && text != "." && !text.EndsWith("..");
+        }
+
+        private static bool IsSignedDecimal(string text)
+        {
+            return Regex.IsMatch(text, @"^-?[0-9]*\.?[0-9]*$") && text != "." && text != "-" && !text.EndsWith("..") && !text.EndsWith("-.");
         }
     }
 }
