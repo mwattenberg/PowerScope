@@ -21,7 +21,6 @@ namespace SerialPlotDN_WPF.View.UserForms
     public partial class FilterConfigWindow : Window
     {
         private ChannelSettings _channelSettings;
-        private IDigitalFilter _tempFilter; // Temporary filter being configured
 
         public FilterConfigWindow()
         {
@@ -96,7 +95,7 @@ namespace SerialPlotDN_WPF.View.UserForms
             if (filterType == "None")
             {
                 parametersPanel.Visibility = Visibility.Collapsed;
-                _tempFilter = null;
+                ApplyFilter(null);
                 return;
             }
 
@@ -132,14 +131,14 @@ namespace SerialPlotDN_WPF.View.UserForms
                 Maximum = 1.0, 
                 Value = GetCurrentAlpha(filterType),
                 TickFrequency = 0.1,
-                IsSnapToTickEnabled = false
+                IsSnapToTickEnabled = false,
             };
             var alphaValueLabel = new Label { Name = "AlphaValueLabel", Width = 60, Content = alphaSlider.Value.ToString("F2") };
             
             alphaSlider.ValueChanged += (s, e) => 
             {
                 alphaValueLabel.Content = e.NewValue.ToString("F2");
-                CreateTempFilter(filterType, e.NewValue);
+                ApplyFilterWithParameter(filterType, e.NewValue);
             };
             
             alphaPanel.Children.Add(alphaLabel);
@@ -147,8 +146,8 @@ namespace SerialPlotDN_WPF.View.UserForms
             alphaPanel.Children.Add(alphaValueLabel);
             parametersStackPanel.Children.Add(alphaPanel);
             
-            // Create initial temp filter
-            CreateTempFilter(filterType, alphaSlider.Value);
+            // Apply initial filter
+            ApplyFilterWithParameter(filterType, alphaSlider.Value);
         }
 
         private void CreateWindowSizeControls(string filterType, StackPanel parametersStackPanel)
@@ -172,8 +171,9 @@ namespace SerialPlotDN_WPF.View.UserForms
             {
                 if (int.TryParse(windowTextBox.Text, out int current))
                 {
-                    windowTextBox.Text = Math.Min(current + 1, 100).ToString();
-                    CreateTempFilter(filterType, int.Parse(windowTextBox.Text));
+                    int newValue = Math.Min(current + 1, 100);
+                    windowTextBox.Text = newValue.ToString();
+                    ApplyFilterWithParameter(filterType, newValue);
                 }
             };
             
@@ -181,8 +181,9 @@ namespace SerialPlotDN_WPF.View.UserForms
             {
                 if (int.TryParse(windowTextBox.Text, out int current))
                 {
-                    windowTextBox.Text = Math.Max(current - 1, 1).ToString();
-                    CreateTempFilter(filterType, int.Parse(windowTextBox.Text));
+                    int newValue = Math.Max(current - 1, 1);
+                    windowTextBox.Text = newValue.ToString();
+                    ApplyFilterWithParameter(filterType, newValue);
                 }
             };
             
@@ -190,7 +191,7 @@ namespace SerialPlotDN_WPF.View.UserForms
             {
                 if (int.TryParse(windowTextBox.Text, out int value) && value >= 1 && value <= 100)
                 {
-                    CreateTempFilter(filterType, value);
+                    ApplyFilterWithParameter(filterType, value);
                 }
             };
             
@@ -202,10 +203,10 @@ namespace SerialPlotDN_WPF.View.UserForms
             windowPanel.Children.Add(buttonPanel);
             parametersStackPanel.Children.Add(windowPanel);
             
-            // Create initial temp filter
+            // Apply initial filter
             if (int.TryParse(windowTextBox.Text, out int windowSize))
             {
-                CreateTempFilter(filterType, windowSize);
+                ApplyFilterWithParameter(filterType, windowSize);
             }
         }
 
@@ -232,21 +233,24 @@ namespace SerialPlotDN_WPF.View.UserForms
             bandwidthPanel.Children.Add(bandwidthTextBox);
             parametersStackPanel.Children.Add(bandwidthPanel);
             
-            // Update temp filter when any parameter changes
-            TextChangedEventHandler updateNotchFilter = (s, e) => CreateNotchTempFilter(freqTextBox, sampleTextBox, bandwidthTextBox);
+            // Update filter when any parameter changes
+            TextChangedEventHandler updateNotchFilter = (s, e) => ApplyNotchFilter(freqTextBox, sampleTextBox, bandwidthTextBox);
             freqTextBox.TextChanged += updateNotchFilter;
             sampleTextBox.TextChanged += updateNotchFilter;
             bandwidthTextBox.TextChanged += updateNotchFilter;
             
-            // Create initial temp filter
-            CreateNotchTempFilter(freqTextBox, sampleTextBox, bandwidthTextBox);
+            // Apply initial filter
+            ApplyNotchFilter(freqTextBox, sampleTextBox, bandwidthTextBox);
         }
 
-        private void CreateTempFilter(string filterType, double parameter)
+        /// <summary>
+        /// Apply filter with a single parameter (for Alpha and WindowSize filters)
+        /// </summary>
+        private void ApplyFilterWithParameter(string filterType, double parameter)
         {
             try
             {
-                _tempFilter = filterType switch
+                IDigitalFilter newFilter = filterType switch
                 {
                     "LowPass" => new ExponentialLowPassFilter(parameter),
                     "HighPass" => new ExponentialHighPassFilter(parameter),
@@ -254,14 +258,20 @@ namespace SerialPlotDN_WPF.View.UserForms
                     "Median" => new MedianFilter((int)parameter),
                     _ => null
                 };
+                
+                ApplyFilter(newFilter);
             }
             catch
             {
-                _tempFilter = null;
+                // If filter creation fails, apply null filter (no filtering)
+                ApplyFilter(null);
             }
         }
 
-        private void CreateNotchTempFilter(TextBox freqBox, TextBox sampleBox, TextBox bandwidthBox)
+        /// <summary>
+        /// Apply notch filter with multiple parameters
+        /// </summary>
+        private void ApplyNotchFilter(TextBox freqBox, TextBox sampleBox, TextBox bandwidthBox)
         {
             try
             {
@@ -270,16 +280,28 @@ namespace SerialPlotDN_WPF.View.UserForms
                     double.TryParse(bandwidthBox.Text, out double bandwidth) &&
                     freq > 0 && sample > 0 && bandwidth > 0)
                 {
-                    _tempFilter = new NotchFilter(freq, sample, bandwidth);
+                    var notchFilter = new NotchFilter(freq, sample, bandwidth);
+                    ApplyFilter(notchFilter);
                 }
                 else
                 {
-                    _tempFilter = null;
+                    ApplyFilter(null);
                 }
             }
             catch
             {
-                _tempFilter = null;
+                ApplyFilter(null);
+            }
+        }
+
+        /// <summary>
+        /// Apply the filter directly to the channel settings (immediate application)
+        /// </summary>
+        private void ApplyFilter(IDigitalFilter filter)
+        {
+            if (_channelSettings != null)
+            {
+                _channelSettings.Filter = filter;
             }
         }
 
@@ -359,23 +381,7 @@ namespace SerialPlotDN_WPF.View.UserForms
 
         private void CloseButton_Click(object sender, RoutedEventArgs e)
         {
-            DialogResult = false;
-            Close();
-        }
-
-        private void Button_Apply_Click(object sender, RoutedEventArgs e)
-        {
-            if (_channelSettings != null)
-            {
-                _channelSettings.Filter = _tempFilter;
-            }
             DialogResult = true;
-            Close();
-        }
-
-        private void Button_Cancel_Click(object sender, RoutedEventArgs e)
-        {
-            DialogResult = false;
             Close();
         }
     }

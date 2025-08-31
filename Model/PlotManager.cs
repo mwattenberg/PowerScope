@@ -1,8 +1,9 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
-using System.Timers;
+using System.Threading;
 using System.Windows;
 using ScottPlot.Plottables;
 using ScottPlot.WPF;
@@ -12,29 +13,16 @@ namespace SerialPlotDN_WPF.Model
 {
     public class PlotManager
     {
-        private readonly System.Timers.Timer _updatePlotTimer;
+        private System.Threading.Timer _updatePlotTimer;
         private readonly WpfPlotGL _plot;
         private readonly Signal[] _signals;
         private readonly double[][] _data;
         private readonly int _maxChannels;
-
-        // Stream management
         private List<IDataStream> _connectedStreams;
-        
-        // Channel settings for enabled/disabled state
         private ObservableCollection<ChannelSettings> _channelSettings;
 
-        // Plot settings - centralized configuration
         public PlotSettings Settings { get; private set; }
-
-        public WpfPlotGL Plot 
-        { 
-            get 
-            { 
-                return _plot; 
-            } 
-        }
-
+        public WpfPlotGL Plot => _plot;
         public int NumberOfChannels { get; private set; } = 0;
 
         /// <summary>
@@ -49,179 +37,143 @@ namespace SerialPlotDN_WPF.Model
             return Color.FromArgb(scottPlotColor.A, scottPlotColor.R, scottPlotColor.G, scottPlotColor.B);
         }
 
-        public PlotManager(WpfPlotGL wpfPlot1, int maxChannels = 12)
+        public PlotManager(WpfPlotGL wpfPlot, int maxChannels = 12)
         {
-            _plot = wpfPlot1;
+            _plot = wpfPlot;
             _maxChannels = maxChannels;
             _signals = new Signal[_maxChannels];
+            _data = new double[_maxChannels][];
             
             Settings = new PlotSettings();
+            Settings.PropertyChanged += OnSettingsChanged;
             
-            _data = new double[_maxChannels][];
-            _updatePlotTimer = new System.Timers.Timer(Settings.TimerInterval);
-            _updatePlotTimer.Enabled = false;
-            _updatePlotTimer.AutoReset = true;
-            _updatePlotTimer.Elapsed += UpdatePlot;
-
-            Settings.PropertyChanged += Settings_PropertyChanged;
+            _updatePlotTimer = new System.Threading.Timer(UpdatePlot, null, Timeout.Infinite, Timeout.Infinite);
         }
 
-        private void Settings_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
+        private void OnSettingsChanged(object sender, PropertyChangedEventArgs e)
         {
-            if (e.PropertyName == nameof(PlotSettings.PlotUpdateRateFPS))
+            Application.Current?.Dispatcher.BeginInvoke(() =>
             {
-                _updatePlotTimer.Interval = Settings.TimerInterval;
-            }
-            else if (e.PropertyName == nameof(PlotSettings.Ymin) || e.PropertyName == nameof(PlotSettings.Ymax))
-            {
-                if (Application.Current != null)
+                switch (e.PropertyName)
                 {
-                    Application.Current.Dispatcher.BeginInvoke(() =>
-                    {
+                    case nameof(PlotSettings.PlotUpdateRateFPS):
+                        UpdateTimerInterval();
+                        break;
+                        
+                    case nameof(PlotSettings.Ymin):
+                    case nameof(PlotSettings.Ymax):
                         _plot.Plot.Axes.SetLimitsY(Settings.Ymin, Settings.Ymax);
                         _plot.Refresh();
-                    });
+                        break;
+                        
+                    case nameof(PlotSettings.Xmax):
+                        RebuildSignalsForNewXRange();
+                        break;
+                        
+                    case nameof(PlotSettings.LineWidth):
+                    case nameof(PlotSettings.AntiAliasing):
+                    case nameof(PlotSettings.ShowRenderTime):
+                        ApplyVisualSettings();
+                        break;
+                        
+                    case nameof(PlotSettings.SerialPortUpdateRateHz):
+                        UpdateStreamSettings();
+                        break;
                 }
-            }
-            else if (e.PropertyName == nameof(PlotSettings.Xmax))
-            {
-                if (Application.Current != null)
-                {
-                    Application.Current.Dispatcher.BeginInvoke(() =>
-                    {
-                        updateHorizontalScale(null, Settings.Xmax);
-                    });
-                }
-            }
-            else if (e.PropertyName == nameof(PlotSettings.SerialPortUpdateRateHz))
-            {
-                if (_connectedStreams != null)
-                {
-                    foreach (IDataStream stream in _connectedStreams)
-                    {
-                        if (stream is SerialDataStream serialStream)
-                        {
-                            serialStream.SerialPortUpdateRateHz = Settings.SerialPortUpdateRateHz;
-                        }
-                    }
-                }
-            }
-            else if (e.PropertyName == nameof(PlotSettings.LineWidth) ||
-                     e.PropertyName == nameof(PlotSettings.AntiAliasing) ||
-                     e.PropertyName == nameof(PlotSettings.ShowRenderTime))
-            {
-                ApplyCurrentSettings();
-            }
+            });
         }
 
         public void SetChannelSettings(ObservableCollection<ChannelSettings> channelSettings)
         {
-            // Unsubscribe from old channel settings
+            // Unsubscribe from old settings
             if (_channelSettings != null)
             {
-                _channelSettings.CollectionChanged -= ChannelSettings_CollectionChanged;
+                _channelSettings.CollectionChanged -= OnChannelSettingsCollectionChanged;
                 foreach (ChannelSettings setting in _channelSettings)
                 {
-                    setting.PropertyChanged -= ChannelSetting_PropertyChanged;
+                    setting.PropertyChanged -= OnChannelSettingChanged;
                 }
             }
 
             _channelSettings = channelSettings;
 
-            // Subscribe to new channel settings
+            // Subscribe to new settings
             if (_channelSettings != null)
             {
-                _channelSettings.CollectionChanged += ChannelSettings_CollectionChanged;
+                _channelSettings.CollectionChanged += OnChannelSettingsCollectionChanged;
                 foreach (ChannelSettings setting in _channelSettings)
                 {
-                    setting.PropertyChanged += ChannelSetting_PropertyChanged;
+                    setting.PropertyChanged += OnChannelSettingChanged;
                 }
             }
             
-            // Update data streams with new channel settings
             UpdateDataStreamChannelSettings();
         }
 
-        private void ChannelSettings_CollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
+        private void OnChannelSettingsCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
         {
-            // Subscribe to PropertyChanged for new items
             if (e.NewItems != null)
             {
                 foreach (ChannelSettings setting in e.NewItems)
                 {
-                    setting.PropertyChanged += ChannelSetting_PropertyChanged;
+                    setting.PropertyChanged += OnChannelSettingChanged;
                 }
             }
 
-            // Unsubscribe from PropertyChanged for removed items
             if (e.OldItems != null)
             {
                 foreach (ChannelSettings setting in e.OldItems)
                 {
-                    setting.PropertyChanged -= ChannelSetting_PropertyChanged;
+                    setting.PropertyChanged -= OnChannelSettingChanged;
                 }
             }
         }
 
-        private void ChannelSetting_PropertyChanged(object sender, PropertyChangedEventArgs e)
+        private void OnChannelSettingChanged(object sender, PropertyChangedEventArgs e)
         {
-            if (e.PropertyName == nameof(ChannelSettings.IsEnabled))
+            Application.Current?.Dispatcher.BeginInvoke(() =>
             {
-                // Refresh the channel display when enabled state changes
-                if (Application.Current != null)
+                switch (e.PropertyName)
                 {
-                    Application.Current.Dispatcher.BeginInvoke(() =>
-                    {
+                    case nameof(ChannelSettings.IsEnabled):
                         UpdateChannelDisplay(NumberOfChannels);
-                    });
+                        break;
+                        
+                    case nameof(ChannelSettings.Color):
+                        ApplyChannelColors();
+                        break;
+                        
+                    case nameof(ChannelSettings.Gain):
+                    case nameof(ChannelSettings.Offset):
+                    case nameof(ChannelSettings.Filter):
+                        UpdateDataStreamChannelSettings();
+                        break;
                 }
-            }
-            else if (e.PropertyName == nameof(ChannelSettings.Color))
-            {
-                // Update signal color when channel color changes
-                if (Application.Current != null)
-                {
-                    Application.Current.Dispatcher.BeginInvoke(() =>
-                    {
-                        UpdateSignalColors();
-                    });
-                }
-            }
-            else if (e.PropertyName == nameof(ChannelSettings.Gain) ||
-                     e.PropertyName == nameof(ChannelSettings.Offset) ||
-                     e.PropertyName == nameof(ChannelSettings.Filter))
-            {
-                // Update channel processing settings in data streams
-                UpdateDataStreamChannelSettings();
-            }
-        }
-
-        private void UpdateSignalColors()
-        {
-            if (_channelSettings == null)
-                return;
-
-            for (int i = 0; i < NumberOfChannels && i < _maxChannels; i++)
-            {
-                if (_signals[i] != null && i < _channelSettings.Count)
-                {
-                    Color channelColor = _channelSettings[i].Color;
-                    _signals[i].Color = new ScottPlot.Color(channelColor.R, channelColor.G, channelColor.B);
-                }
-            }
-            
-            _plot.Refresh();
+            });
         }
 
         public void SetDataStreams(List<IDataStream> connectedStreams)
         {
             _connectedStreams = connectedStreams;
-            
-            // Update channel settings for any configurable streams
             UpdateDataStreamChannelSettings();
         }
 
-        private void setDarkMode()
+        public void InitializePlot()
+        {
+            _plot.Plot.Clear();
+            _plot.Plot.Add.Palette = new ScottPlot.Palettes.Category10();
+            
+            // Initialize data arrays
+            for (int i = 0; i < _maxChannels; i++)
+            {
+                _data[i] = new double[Settings.Xmax];
+            }
+
+            // Apply dark theme
+            ApplyDarkTheme();
+        }
+
+        private void ApplyDarkTheme()
         {
             _plot.Plot.FigureBackground.Color = ScottPlot.Color.FromHex("#181818");
             _plot.Plot.DataBackground.Color = ScottPlot.Color.FromHex("#1f1f1f");
@@ -238,20 +190,7 @@ namespace SerialPlotDN_WPF.Model
             _plot.Plot.Axes.Bottom.IsVisible = true;
         }
 
-        public void InitializePlot()
-        {
-            _plot.Plot.Clear();
-            _plot.Plot.Add.Palette = new ScottPlot.Palettes.Category10();
-            
-            for (int i = 0; i < _maxChannels; i++)
-            {
-                _data[i] = new double[Settings.Xmax];
-            }
-
-            setDarkMode();
-        }
-
-        public void UpdateChannelDisplay(int channelCount, Color[] channelColors = null)
+        public void UpdateChannelDisplay(int channelCount)
         {
             NumberOfChannels = Math.Min(channelCount, _maxChannels);
 
@@ -268,30 +207,14 @@ namespace SerialPlotDN_WPF.Model
             // Add signals only for enabled channels
             for (int i = 0; i < NumberOfChannels; i++)
             {
-                bool isChannelEnabled = true;
-                if (_channelSettings != null && i < _channelSettings.Count)
-                {
-                    isChannelEnabled = _channelSettings[i].IsEnabled;
-                }
+                bool isChannelEnabled = _channelSettings?[i]?.IsEnabled ?? true;
 
                 if (isChannelEnabled)
                 {
                     _signals[i] = _plot.Plot.Add.Signal(_data[i]);
                     
-                    // Always use the color from ChannelSettings for consistency
-                    Color channelColor;
-                    if (_channelSettings != null && i < _channelSettings.Count)
-                    {
-                        channelColor = _channelSettings[i].Color;
-                    }
-                    else if (channelColors != null && i < channelColors.Length)
-                    {
-                        channelColor = channelColors[i];
-                    }
-                    else
-                    {
-                        channelColor = GetColor(i);
-                    }
+                    // Get color from ChannelSettings or fallback to palette
+                    Color channelColor = _channelSettings?[i]?.Color ?? GetColor(i);
                     
                     _signals[i].Color = new ScottPlot.Color(channelColor.R, channelColor.G, channelColor.B);
                     _signals[i].MarkerShape = ScottPlot.MarkerShape.None;
@@ -303,87 +226,82 @@ namespace SerialPlotDN_WPF.Model
             _plot.Refresh();
         }
 
-        public Color[] GetSignalColors(int channelCount)
+        //// Legacy method for backward compatibility with MainWindow
+        //public Color[] GetSignalColors(int channelCount)
+        //{
+        //    Color[] colors = new Color[channelCount];
+        //    for (int i = 0; i < channelCount && i < _maxChannels; i++)
+        //    {
+        //        colors[i] = _channelSettings?[i]?.Color ?? GetColor(i);
+        //    }
+        //    return colors;
+        //}
+
+        public void StartAutoUpdate()
         {
-            Color[] colors = new Color[channelCount];
-            for (int i = 0; i < channelCount && i < _maxChannels; i++)
-            {
-                if (_channelSettings != null && i < _channelSettings.Count)
-                {
-                    // Use color from channel settings
-                    colors[i] = _channelSettings[i].Color;
-                }
-                else if (_signals[i] != null)
-                {
-                    // Fallback to current signal color
-                    ScottPlot.Color signalColor = _signals[i].Color;
-                    colors[i] = Color.FromArgb(signalColor.A, signalColor.R, signalColor.G, signalColor.B);
-                }
-                else
-                {
-                    // Final fallback to palette color
-                    colors[i] = GetColor(i);
-                }
-            }
-            return colors;
+            int intervalMs = (int)Settings.TimerInterval;
+            _updatePlotTimer.Change(0, intervalMs);
         }
 
-        public void startAutoUpdate()
+        public void StopAutoUpdate()
         {
-            _updatePlotTimer.Start();
+            _updatePlotTimer.Change(Timeout.Infinite, Timeout.Infinite);
         }
 
-        public void stopAutoUpdate()
-        {
-            _updatePlotTimer.Stop();
-        }
-
-        public void UpdatePlot(object? source, ElapsedEventArgs? e)
+        // Simplified UpdatePlot method with correct timer signature
+        private void UpdatePlot(object state)
         {
             if (Application.Current == null)
                 return;
 
             Application.Current.Dispatcher.BeginInvoke(() =>
             {
-                int channelIndex = 0;
+                _plot.Plot.RenderManager.EnableRendering = false;
                 
-                if (_connectedStreams != null)
-                {
-                    foreach (IDataStream stream in _connectedStreams)
-                    {
-                        for (int streamChannel = 0; streamChannel < stream.ChannelCount; streamChannel++)
-                        {
-                            bool isChannelEnabled = true;
-                            if (_channelSettings != null && channelIndex < _channelSettings.Count)
-                            {
-                                isChannelEnabled = _channelSettings[channelIndex].IsEnabled;
-                            }
-
-                            if (isChannelEnabled && channelIndex < _maxChannels)
-                            {
-                                stream.CopyLatestTo(streamChannel, _data[channelIndex], Settings.Xmax);
-                            }
-                            
-                            channelIndex++;
-                        }
-                    }
-                }
-
+                CopyStreamDataToPlot();
+                
                 if (Settings.YAutoScale)
                     _plot.Plot.Axes.AutoScaleY();
-
+                
+                _plot.Plot.RenderManager.EnableRendering = true;
                 _plot.Refresh();
-
+                
             }, System.Windows.Threading.DispatcherPriority.Render);
         }
 
-        public void updateHorizontalScale(object? sender, int numberOfPointsToShow)
+        private void CopyStreamDataToPlot()
         {
-            Settings.Xmax = numberOfPointsToShow;
-            bool isRunning = _updatePlotTimer.Enabled;
-            if (_updatePlotTimer.Enabled)
-                _updatePlotTimer.Stop();
-                
+            if (_connectedStreams == null) return;
+            
+            int channelIndex = 0;
+            foreach (IDataStream stream in _connectedStreams)
+            {
+                for (int streamChannel = 0; streamChannel < stream.ChannelCount; streamChannel++)
+                {
+                    bool isChannelEnabled = _channelSettings?[channelIndex]?.IsEnabled ?? true;
+
+                    if (isChannelEnabled && channelIndex < _maxChannels)
+                    {
+                        stream.CopyLatestTo(streamChannel, _data[channelIndex], Settings.Xmax);
+                    }
+                    
+                    channelIndex++;
+                }
+            }
+        }
+
+        private void UpdateTimerInterval()
+        {
+            if (_updatePlotTimer != null)
+            {
+                int intervalMs = (int)Settings.TimerInterval;
+                _updatePlotTimer.Change(intervalMs, intervalMs);
+            }
+        }
+
+        private void RebuildSignalsForNewXRange()
+        {
+            // Recreate data arrays with new size
             for (int i = 0; i < _maxChannels; i++)
             {
                 _data[i] = new double[Settings.Xmax];
@@ -401,25 +319,11 @@ namespace SerialPlotDN_WPF.Model
             }
             
             _plot.Plot.Axes.SetLimitsX(0, Settings.Xmax);
-            if (isRunning)
-                _updatePlotTimer.Start();
-            else
-                UpdatePlot(null, null);
+            _plot.Refresh();
         }
 
-        public void ApplyPlotSettings(double plotUpdateRateFPS, int lineWidth, bool antiAliasing, bool showRenderTime)
+        private void ApplyVisualSettings()
         {
-            Settings.PlotUpdateRateFPS = plotUpdateRateFPS;
-            Settings.LineWidth = lineWidth;
-            Settings.AntiAliasing = antiAliasing;
-            Settings.ShowRenderTime = showRenderTime;
-
-            ApplyCurrentSettings();
-        }
-
-        public void ApplyCurrentSettings()
-        {
-            _updatePlotTimer.Interval = Settings.TimerInterval;
             _plot.Plot.Grid.LineWidth = (float)Settings.LineWidth;
             
             for (int i = 0; i < _signals.Length; i++)
@@ -435,32 +339,59 @@ namespace SerialPlotDN_WPF.Model
             _plot.Refresh();
         }
 
+        private void ApplyChannelColors()
+        {
+            if (_channelSettings == null) return;
+
+            for (int i = 0; i < NumberOfChannels && i < _maxChannels; i++)
+            {
+                if (_signals[i] != null && i < _channelSettings.Count)
+                {
+                    Color channelColor = _channelSettings[i].Color;
+                    _signals[i].Color = new ScottPlot.Color(channelColor.R, channelColor.G, channelColor.B);
+                }
+            }
+            
+            _plot.Refresh();
+        }
+
+        private void UpdateStreamSettings()
+        {
+            if (_connectedStreams == null) return;
+            
+            foreach (IDataStream stream in _connectedStreams)
+            {
+                if (stream is SerialDataStream serialStream)
+                {
+                    serialStream.SerialPortUpdateRateHz = Settings.SerialPortUpdateRateHz;
+                }
+            }
+        }
+
         public void SetupPlotUserInput()
         {
             _plot.UserInputProcessor.RemoveAll<ScottPlot.Interactivity.IUserActionResponse>();
             _plot.UserInputProcessor.IsEnabled = true;
-            ScottPlot.Interactivity.MouseButton zoomRectangleButton = ScottPlot.Interactivity.StandardMouseButtons.Left;
-            ScottPlot.Interactivity.UserActionResponses.MouseDragZoomRectangle zoomRectangleResponse = new ScottPlot.Interactivity.UserActionResponses.MouseDragZoomRectangle(zoomRectangleButton);
+            
+            // Left-click drag zoom rectangle
+            var zoomRectangleResponse = new ScottPlot.Interactivity.UserActionResponses.MouseDragZoomRectangle(
+                ScottPlot.Interactivity.StandardMouseButtons.Left);
             _plot.UserInputProcessor.UserActionResponses.Add(zoomRectangleResponse);
 
-            _plot.MouseRightButtonUp += Plot_MouseRightButtonUp;
-
-            ScottPlot.Interactivity.Key horizontalLock = ScottPlot.Interactivity.StandardKeys.Shift;
-            ScottPlot.Interactivity.Key verticalLock= ScottPlot.Interactivity.StandardKeys.Control;
-
-            ScottPlot.Interactivity.UserActionResponses.MouseWheelZoom wheelZoomResponse = new ScottPlot.Interactivity.UserActionResponses.MouseWheelZoom(horizontalLock, verticalLock);
+            // Mouse wheel zoom with modifier keys
+            var wheelZoomResponse = new ScottPlot.Interactivity.UserActionResponses.MouseWheelZoom(
+                ScottPlot.Interactivity.StandardKeys.Shift, 
+                ScottPlot.Interactivity.StandardKeys.Control);
             _plot.UserInputProcessor.UserActionResponses.Add(wheelZoomResponse);
+
+            // Right-click auto-scale X
+            _plot.MouseRightButtonUp += (sender, e) =>
+            {
+                _plot.Plot.Axes.AutoScaleX();
+                _plot.Refresh();
+            };
         }
 
-        private void Plot_MouseRightButtonUp(object sender, System.Windows.Input.MouseButtonEventArgs e)
-        {
-            _plot.Plot.Axes.AutoScaleX();
-            _plot.Refresh();
-        }
-
-        /// <summary>
-        /// Updates channel settings for all configurable data streams
-        /// </summary>
         private void UpdateDataStreamChannelSettings()
         {
             if (_connectedStreams == null || _channelSettings == null)
@@ -472,7 +403,6 @@ namespace SerialPlotDN_WPF.Model
             {
                 if (stream is IChannelConfigurable configurableStream)
                 {
-                    // Create a list of channel settings for this stream
                     var streamChannelSettings = new List<ChannelSettings>();
                     
                     for (int streamChannel = 0; streamChannel < stream.ChannelCount; streamChannel++)
@@ -483,21 +413,19 @@ namespace SerialPlotDN_WPF.Model
                         }
                         else
                         {
-                            // Create default settings if not enough channel settings provided
                             streamChannelSettings.Add(new ChannelSettings());
                         }
                         globalChannelIndex++;
                     }
                     
-                    // Update the stream with its channel settings
                     configurableStream.UpdateChannelSettings(streamChannelSettings);
                 }
                 else
                 {
-                    // For non-configurable streams, just advance the channel index
                     globalChannelIndex += stream.ChannelCount;
                 }
             }
         }
+
     }
 }

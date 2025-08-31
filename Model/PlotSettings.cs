@@ -9,7 +9,7 @@ namespace SerialPlotDN_WPF.Model
     public class PlotSettings : INotifyPropertyChanged
     {
         private double _plotUpdateRateFPS = 30.0;
-        private int _serialPortUpdateRateHz = 1000;
+        private int _serialPortUpdateRateHz = 200;
         private int _lineWidth = 1;
         private bool _antiAliasing = false;
         private bool _showRenderTime = false;

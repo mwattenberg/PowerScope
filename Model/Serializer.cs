@@ -192,8 +192,7 @@ namespace SerialPlotDN_WPF.Model
             plotManager.Settings.Ymin = yMin;
             plotManager.Settings.Ymax = yMax;
             
-            // Apply the settings to the plot
-            plotManager.ApplyCurrentSettings();
+            // Settings are automatically applied via PropertyChanged events in PlotManager
             plotManager.Plot.Plot.Axes.SetLimitsY(yMin, yMax);
             plotManager.Plot.Refresh();
         }

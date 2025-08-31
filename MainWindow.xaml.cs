@@ -72,9 +72,9 @@ namespace SerialPlotDN_WPF
             {
                 _plotManager.SetDataStreams(DataStreamBar.ConnectedDataStreams);
                 _plotManager.SetChannelSettings(ChannelControlBar.ChannelSettings);
-                Color[] colors = _plotManager.GetSignalColors(totalChannels);
-                ChannelControlBar.UpdateChannels(totalChannels, colors);
-                _plotManager.UpdateChannelDisplay(totalChannels, colors);
+                // Simplified: no need for GetSignalColors, ChannelSettings handle colors directly
+                ChannelControlBar.UpdateChannels(totalChannels);
+                _plotManager.UpdateChannelDisplay(totalChannels);
             };
             
             DataStreamBar.StreamsChanged += () =>
@@ -87,9 +87,9 @@ namespace SerialPlotDN_WPF
         private void RunControl_RunStateChanged(object? sender, RunControl.RunStates newState)
         {
             if (newState == RunControl.RunStates.Running)
-                _plotManager.startAutoUpdate();
+                _plotManager.StartAutoUpdate();
             else
-                _plotManager.stopAutoUpdate();
+                _plotManager.StopAutoUpdate();
         }
 
         /// <summary>
