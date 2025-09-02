@@ -113,7 +113,7 @@ namespace SerialPlotDN_WPF.Model
             if (serialPortUpdateRateHzElement != null)
                 serialPortUpdateRateHzValue = serialPortUpdateRateHzElement.Value;
             else
-                serialPortUpdateRateHzValue = "1000";
+                serialPortUpdateRateHzValue = "200";
             int serialPortUpdateRateHz = int.Parse(serialPortUpdateRateHzValue);
 
             XElement lineWidthElement = settingsXml.Element("LineWidth");

@@ -1,6 +1,7 @@
 ﻿using System.Text;
 using RJCP.IO.Ports; // Changed from System.IO.Ports to RJCP.IO.Ports
-using System.Linq; // Add for LINQ methods
+using System.Linq;
+using System.Diagnostics; // Add for LINQ methods
 
 namespace SerialPlotDN_WPF.Model
 {
@@ -44,7 +45,7 @@ namespace SerialPlotDN_WPF.Model
         }
     }
 
-    public class SerialDataStream : IDataStream
+    public class SerialDataStream : IDataStream, IChannelConfigurable
     {
         private readonly SerialPortStream _port;
         private byte[] _residue;
@@ -62,6 +63,12 @@ namespace SerialPlotDN_WPF.Model
         private int[] _lastReadPositions;
         public DataParser Parser { get; init; }
         public int SerialPortUpdateRateHz { get; set; } = 200;
+
+        // Channel-specific processing
+        private ChannelSettings[] _channelSettings;
+        private IDigitalFilter[] _channelFilters;
+        private readonly object _channelConfigLock = new object();
+
         public int ChannelCount 
         { 
             get 
@@ -93,8 +100,6 @@ namespace SerialPlotDN_WPF.Model
             set { _isStreaming = value; }
         }
 
-
-
         public SerialDataStream(SourceSetting source, DataParser dataParser)
         {
             SourceSetting = source;
@@ -102,17 +107,15 @@ namespace SerialPlotDN_WPF.Model
             ValidatePortExists(source.PortName);
             _port = new SerialPortStream(source.PortName)
             {
-                DriverInQueue = 4096,
                 BaudRate = source.BaudRate,
                 DataBits = source.DataBits,
                 Parity = source.Parity,
                 Encoding = Encoding.ASCII,
-                ReadTimeout = 1000,
+                ReadTimeout = 100, // Reduced for responsiveness
                 WriteTimeout = 1000,
-                ReadBufferSize = 8 * 2048,
-                WriteBufferSize = 8192,
+                ReadBufferSize = 65536, // Fixed 64KB - good for most use cases
+                WriteBufferSize = 16384, // Fixed 16KB
                 Handshake = Handshake.None,
-
                 DtrEnable = false,
                 RtsEnable = false
             };
@@ -126,20 +129,105 @@ namespace SerialPlotDN_WPF.Model
 
             int ringBufferSize = Math.Max(500000, source.BaudRate / 5);
             ReceivedData = new RingBuffer<double>[dataParser.NumberOfChannels];
+
             _lastReadPositions = new int[dataParser.NumberOfChannels];
             for (int i = 0; i < dataParser.NumberOfChannels; i++)
             {
                 ReceivedData[i] = new RingBuffer<double>(ringBufferSize);
                 _lastReadPositions[i] = 0;
             }
-            int MaxReadSize = _port.ReadBufferSize / 2;
-            _readBuffer = new byte[MaxReadSize];
-            _workingBuffer = new byte[MaxReadSize * 2];
-            _residue = new byte[20];
+
+            // Initialize channel processing arrays
+            _channelSettings = new ChannelSettings[dataParser.NumberOfChannels];
+            _channelFilters = new IDigitalFilter[dataParser.NumberOfChannels];
+
+            // Larger buffers for better performance
+            _readBuffer = new byte[16384]; // Fixed 16KB chunks
+            _workingBuffer = new byte[32768]; // Fixed 32KB working space
+            _residue = new byte[1024]; // Fixed 1KB residue
             _isConnected = false;
             _isStreaming = false;
             _statusMessage = "Disconnected";
         }
+
+        #region IChannelConfigurable Implementation
+
+        public void SetChannelSetting(int channelIndex, ChannelSettings settings)
+        {
+            if (channelIndex < 0 || channelIndex >= ChannelCount)
+                return;
+
+            lock (_channelConfigLock)
+            {
+                _channelSettings[channelIndex] = settings;
+                
+                // Update filter reference and reset if filter type changed
+                var newFilter = settings?.Filter;
+                if (_channelFilters[channelIndex] != newFilter)
+                {
+                    _channelFilters[channelIndex] = newFilter;
+                    _channelFilters[channelIndex]?.Reset();
+                }
+            }
+        }
+
+        public void UpdateChannelSettings(IReadOnlyList<ChannelSettings> channelSettings)
+        {
+            if (channelSettings == null)
+                return;
+
+            lock (_channelConfigLock)
+            {
+                for (int i = 0; i < Math.Min(ChannelCount, channelSettings.Count); i++)
+                {
+                    SetChannelSetting(i, channelSettings[i]);
+                }
+            }
+        }
+
+        public void ResetChannelFilters()
+        {
+            lock (_channelConfigLock)
+            {
+                for (int i = 0; i < ChannelCount; i++)
+                {
+                    _channelFilters[i]?.Reset();
+                }
+            }
+        }
+
+        #endregion
+
+        #region Data Processing
+
+        private double ApplyChannelProcessing(int channel, double rawSample)
+        {
+            // Get channel settings safely
+            ChannelSettings settings;
+            IDigitalFilter filter;
+            
+            lock (_channelConfigLock)
+            {
+                settings = _channelSettings[channel];
+                filter = _channelFilters[channel];
+            }
+            
+            if (settings == null)
+                return rawSample;
+            
+            // Apply gain and offset
+            double processed = settings.Gain * (rawSample + settings.Offset);
+            
+            // Apply filter if configured
+            if (filter != null)
+            {
+                processed = filter.Filter(processed);
+            }
+            
+            return processed;
+        }
+
+        #endregion
 
         private static void ValidatePortExists(string portName)
         {
@@ -224,6 +312,9 @@ namespace SerialPlotDN_WPF.Model
            
             _isStreaming = true;
             
+            // Reset filters when starting streaming
+            ResetChannelFilters();
+            
             //Not sure if I need this, but just in case
             if ( _readSerialPortThread != null && _readSerialPortThread.IsAlive)
             {
@@ -269,53 +360,41 @@ namespace SerialPlotDN_WPF.Model
             TotalSamples = 0;
             TotalBits = 0;
             _lastReadPositions = new int[Parser.NumberOfChannels];
+            
+            // Reset filters when clearing data
+            ResetChannelFilters();
         }
 
         private void ReadSerialData()
         {
-            int MinBytesThreshold = 100;
-            int MaxReadSize = _readBuffer.Length;
+            int minBytesThreshold = 64;
+            int maxReadSize = _readBuffer.Length;
+
             while (_isStreaming && _port.IsOpen)
             {
                 try
                 {
                     int bytesAvailable = _port.BytesToRead;
-                    if (bytesAvailable >= MinBytesThreshold)
+                    if (bytesAvailable >= minBytesThreshold)
                     {
-                        int bytesToRead = MaxReadSize;
-                        if (bytesAvailable < MaxReadSize)
-                            bytesToRead = bytesAvailable;
+                        int bytesToRead = Math.Min(bytesAvailable, maxReadSize);
                         int bytesRead = _port.Read(_readBuffer, 0, bytesToRead);
-                        TotalBits = TotalBits + bytesRead * 8;
+
                         if (bytesRead > 0)
                         {
+                            TotalBits += bytesRead * 8;
                             ProcessReceivedData(_readBuffer, bytesRead, _workingBuffer);
                         }
                     }
-                    //else
-                    //{
-                        int sleepTime = 1000 / SerialPortUpdateRateHz;
-                        if (sleepTime < 1)
-                            sleepTime = 1;
-                        Thread.Sleep(sleepTime);
-                    //}
+                    else
+                    {
+                        Thread.Sleep(Math.Max(1, 1000 / SerialPortUpdateRateHz));
+                    }
                 }
-                catch (TimeoutException)
-                {
-                    continue;
-                }
-                catch (InvalidOperationException)
-                {
-                    break;
-                }
-                catch (System.IO.IOException)
-                {
-                    Thread.Sleep(10);
-                }
-                catch (Exception)
-                {
-                    Thread.Sleep(10);
-                }
+                catch (TimeoutException) { continue; }
+                catch (InvalidOperationException) { break; }
+                catch (System.IO.IOException) { Thread.Sleep(10); }
+                catch (Exception) { Thread.Sleep(10); }
             }
         }
 
@@ -350,16 +429,23 @@ namespace SerialPlotDN_WPF.Model
             int channelsToProcess = parsedData.Length;
             if (channelsToProcess > Parser.NumberOfChannels)
                 channelsToProcess = Parser.NumberOfChannels;
-            for (int i = 0; i < channelsToProcess; i++)
+            
+            for (int channel = 0; channel < channelsToProcess; channel++)
             {
-                if (parsedData[i] != null)
+                if (parsedData[channel] != null && parsedData[channel].Length > 0)
                 {
-                    if (parsedData[i].Length > 0)
+                    // Apply channel processing (gain, offset, filtering) to each sample
+                    double[] processedSamples = new double[parsedData[channel].Length];
+                    for (int sample = 0; sample < parsedData[channel].Length; sample++)
                     {
-                        ReceivedData[i].AddRange(parsedData[i]);
+                        processedSamples[sample] = ApplyChannelProcessing(channel, parsedData[channel][sample]);
                     }
+                    
+                    // Add processed data to ring buffer
+                    ReceivedData[channel].AddRange(processedSamples);
                 }
             }
+            
             if (channelsToProcess > 0)
             {
                 TotalSamples = TotalSamples + parsedData[0].Length;

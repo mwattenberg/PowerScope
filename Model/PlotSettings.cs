@@ -45,7 +45,7 @@ namespace SerialPlotDN_WPF.Model
             {
                 if (_serialPortUpdateRateHz != value)
                 {
-                    _serialPortUpdateRateHz = Math.Max(1, Math.Min(10000, value)); // Clamp between 1-10000 Hz
+                    _serialPortUpdateRateHz = Math.Max(100, Math.Min(10000, value)); // Clamp between 1-10000 Hz
                     OnPropertyChanged(nameof(SerialPortUpdateRateHz));
                 }
             }
