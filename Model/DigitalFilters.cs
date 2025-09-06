@@ -337,4 +337,102 @@ namespace SerialPlotDN_WPF.Model
             return parameters;
         }
     }
+
+    /// <summary>
+    /// Absolute Value Filter implementation - takes the absolute value of input data
+    /// </summary>
+    public class AbsoluteFilter : IDigitalFilter
+    {
+        /// <summary>
+        /// Create a new absolute filter
+        /// </summary>
+        public AbsoluteFilter()
+        {
+        }
+
+        /// <summary>
+        /// Filter a new input value by taking its absolute value
+        /// </summary>
+        /// <param name="input">Input value</param>
+        /// <returns>Absolute value of input</returns>
+        public double Filter(double input)
+        {
+            return Math.Abs(input);
+        }
+
+        /// <summary>
+        /// Reset the filter to its initial state (no state to reset for absolute filter)
+        /// </summary>
+        public void Reset()
+        {
+            // No state to reset for absolute value filter
+        }
+
+        /// <summary>
+        /// Returns the filter type as a string
+        /// </summary>
+        /// <returns>Filter type name</returns>
+        public string GetFilterType()
+        {
+            return "Absolute";
+        }
+
+        /// <summary>
+        /// Returns all filter parameters as a dictionary
+        /// </summary>
+        /// <returns>Empty dictionary since this filter has no parameters</returns>
+        public Dictionary<string, double> GetFilterParameters()
+        {
+            return new Dictionary<string, double>();
+        }
+    }
+
+    /// <summary>
+    /// Squared Filter implementation - squares the input data
+    /// </summary>
+    public class SquaredFilter : IDigitalFilter
+    {
+        /// <summary>
+        /// Create a new squared filter
+        /// </summary>
+        public SquaredFilter()
+        {
+        }
+
+        /// <summary>
+        /// Filter a new input value by squaring it
+        /// </summary>
+        /// <param name="input">Input value</param>
+        /// <returns>Squared value of input</returns>
+        public double Filter(double input)
+        {
+            return input * input;
+        }
+
+        /// <summary>
+        /// Reset the filter to its initial state (no state to reset for squared filter)
+        /// </summary>
+        public void Reset()
+        {
+            // No state to reset for squared filter
+        }
+
+        /// <summary>
+        /// Returns the filter type as a string
+        /// </summary>
+        /// <returns>Filter type name</returns>
+        public string GetFilterType()
+        {
+            return "Squared";
+        }
+
+        /// <summary>
+        /// Returns all filter parameters as a dictionary
+        /// </summary>
+        /// <returns>Empty dictionary since this filter has no parameters</returns>
+        public Dictionary<string, double> GetFilterParameters()
+        {
+            return new Dictionary<string, double>();
+        }
+    }
 }

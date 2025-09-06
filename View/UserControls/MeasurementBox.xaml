@@ -5,32 +5,75 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:SerialPlotDN_WPF.View.UserControls"
              mc:Ignorable="d" 
-             d:DesignHeight="100" d:DesignWidth="200">
-    <Grid Background="Gray">
-        
+             d:DesignHeight="120" d:DesignWidth="200">
+    <Grid Background="{DynamicResource PlotSettings_BackgroundBrush}" Margin="2">
         <Grid.RowDefinitions>
-            <RowDefinition Height="20"/>
-            <RowDefinition Height="*"/>
+            <RowDefinition Height="25"/>   <!-- Header row with title and remove button -->
+            <RowDefinition Height="*"/>    <!-- Content area -->
         </Grid.RowDefinitions>
 
-        <Grid Grid.Row="0" Background="Black">
-            <!--<Grid.ColumnDefinitions>
-                <ColumnDefinition = "*"/>
-                <ColumnDefinition = "20"/>
-            </Grid.ColumnDefinitions>-->
-            <Label Name="MeasurementNumber" Content="Measurement 1" Foreground="White" HorizontalAlignment="Left" FontSize="9" VerticalAlignment="Top"/>
-            <Label Name="Channel" Content="Channel" Foreground="Black" HorizontalAlignment="Right" Background="Yellow" FontSize="8" VerticalAlignment="Top"/>
-        </Grid>
-
-        <!--<Label Content="Hello&#10;Test&#10;lala" Grid.Row="1">-->
-        <Label Grid.Row="1">
-            <TextBlock> Hello <LineBreak/> World </TextBlock>
+        <!-- Header row -->
+        <Grid Grid.Row="0" Background="{DynamicResource PlotSettings_TextBoxBackgroundBrush}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="20"/>
+            </Grid.ColumnDefinitions>
             
-        </Label>
-
-        <Grid Grid.Row="1">
-
+            <!-- Measurement type and channel info -->
+            <TextBlock Grid.Column="0" 
+                       Text="{Binding Type}" 
+                       Foreground="{DynamicResource PlotSettings_ButtonForegroundBrush}" 
+                       HorizontalAlignment="Left" 
+                       VerticalAlignment="Center"
+                       FontSize="10" 
+                       FontWeight="Bold"
+                       Margin="5,0,0,0"/>
+            
+            <!-- Remove button -->
+            <Button Grid.Column="1"
+                    Content="×"
+                    Click="Button_Remove_Click"
+                    Background="Transparent"
+                    BorderThickness="0"
+                    Foreground="{DynamicResource PlotSettings_ButtonForegroundBrush}"
+                    FontSize="12"
+                    FontWeight="Bold"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Width="20"
+                    Height="20"
+                    ToolTip="Remove measurement"/>
         </Grid>
 
+        <!-- Content area -->
+        <Grid Grid.Row="1" Background="{DynamicResource PlotSettings_BackgroundBrush}" Margin="2">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            
+            <!-- Channel label -->
+            <TextBlock Grid.Row="0"
+                       Text="Channel 1"
+                       Foreground="{DynamicResource PlotSettings_ButtonForegroundBrush}"
+                       HorizontalAlignment="Center"
+                       FontSize="9"
+                       Margin="0,2"/>
+            
+            <!-- Result value -->
+            <TextBlock Grid.Row="1"
+                       Text="{Binding Result, StringFormat=F3}"
+                       Foreground="{DynamicResource PlotSettings_ButtonForegroundBrush}"
+                       HorizontalAlignment="Center"
+                       FontSize="14"
+                       FontWeight="Bold"
+                       Margin="0,5"/>
+            
+            <!-- Additional info area -->
+            <StackPanel Grid.Row="2" Orientation="Vertical" HorizontalAlignment="Center" VerticalAlignment="Top">
+                <!-- Could add more measurement details here if needed -->
+            </StackPanel>
+        </Grid>
     </Grid>
 </UserControl>

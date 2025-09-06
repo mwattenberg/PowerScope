@@ -56,6 +56,9 @@ namespace SerialPlotDN_WPF
             HorizontalControl.Settings = _plotManager.Settings;
             VerticalControl.Settings = _plotManager.Settings;
             
+            // Initialize MeasurementBar with DataStreamBar reference
+            MeasurementBar.Initialize(DataStreamBar);
+            
             // Initialize default values through PlotSettings
             _plotManager.Settings.Xmax = DisplayElements; // Set initial window size
             _plotManager.Settings.Ymax = 4000;
@@ -113,6 +116,9 @@ namespace SerialPlotDN_WPF
         protected override void OnClosed(EventArgs e)
         {
             writeSettingsToXML(); // Save settings on exit
+            
+            // Dispose MeasurementBar
+            MeasurementBar.Dispose();
             
             // Dispose DataStreamBar which will handle all stream disposal
             DataStreamBar.Dispose();

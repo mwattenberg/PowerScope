@@ -70,6 +70,8 @@ namespace SerialPlotDN_WPF.View.UserForms
                 "Moving Average" => "MovingAverage",
                 "Median" => "Median",
                 "Notch" => "Notch",
+                "Absolute" => "Absolute",
+                "Squared" => "Squared",
                 _ => "None"
             };
         }
@@ -96,6 +98,14 @@ namespace SerialPlotDN_WPF.View.UserForms
             {
                 parametersPanel.Visibility = Visibility.Collapsed;
                 ApplyFilter(null);
+                return;
+            }
+
+            // For Absolute and Squared filters, no parameters are needed
+            if (filterType == "Absolute" || filterType == "Squared")
+            {
+                parametersPanel.Visibility = Visibility.Collapsed;
+                ApplyFilterWithoutParameters(filterType);
                 return;
             }
 
@@ -241,6 +251,29 @@ namespace SerialPlotDN_WPF.View.UserForms
             
             // Apply initial filter
             ApplyNotchFilter(freqTextBox, sampleTextBox, bandwidthTextBox);
+        }
+
+        /// <summary>
+        /// Apply filter with no parameters (for Absolute and Squared filters)
+        /// </summary>
+        private void ApplyFilterWithoutParameters(string filterType)
+        {
+            try
+            {
+                IDigitalFilter newFilter = filterType switch
+                {
+                    "Absolute" => new AbsoluteFilter(),
+                    "Squared" => new SquaredFilter(),
+                    _ => null
+                };
+                
+                ApplyFilter(newFilter);
+            }
+            catch
+            {
+                // If filter creation fails, apply null filter (no filtering)
+                ApplyFilter(null);
+            }
         }
 
         /// <summary>

@@ -447,6 +447,8 @@ namespace SerialPlotDN_WPF.Model
                     "Moving Average" => CreateMovingAverageFilter(parameters),
                     "Median" => CreateMedianFilter(parameters),
                     "Notch" => CreateNotchFilter(parameters),
+                    "Absolute" => new AbsoluteFilter(),
+                    "Squared" => new SquaredFilter(),
                     _ => null
                 };
             }

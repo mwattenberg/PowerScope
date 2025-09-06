@@ -100,6 +100,8 @@
                             <ComboBoxItem Content="Moving Average" Tag="MovingAverage"/>
                             <ComboBoxItem Content="Median" Tag="Median"/>
                             <ComboBoxItem Content="Notch" Tag="Notch"/>
+                            <ComboBoxItem Content="Absolute" Tag="Absolute"/>
+                            <ComboBoxItem Content="Squared" Tag="Squared"/>
                         </ComboBox>
                     </StackPanel>
 
