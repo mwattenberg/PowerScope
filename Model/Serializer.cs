@@ -5,7 +5,7 @@ using SerialPlotDN_WPF.View.UserControls;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows.Media;
-using RJCP.IO.Ports;
+using System.IO.Ports;
 
 namespace SerialPlotDN_WPF.Model
 {
@@ -36,7 +36,6 @@ namespace SerialPlotDN_WPF.Model
         private static void WritePlotSettings(XElement parent, PlotManager plotManager)
         {
             parent.Add(new XElement("PlotUpdateRateFPS", plotManager.Settings.PlotUpdateRateFPS.ToString(System.Globalization.CultureInfo.InvariantCulture)));
-            parent.Add(new XElement("SerialPortUpdateRateHz", plotManager.Settings.SerialPortUpdateRateHz));
             parent.Add(new XElement("LineWidth", plotManager.Settings.LineWidth));
             parent.Add(new XElement("AntiAliasing", plotManager.Settings.AntiAliasing));
             parent.Add(new XElement("ShowRenderTime", plotManager.Settings.ShowRenderTime));
@@ -85,9 +84,31 @@ namespace SerialPlotDN_WPF.Model
                             new XElement("Label", channelSettings.Label),
                             new XElement("Color", channelSettings.Color.ToString()),
                             new XElement("IsEnabled", channelSettings.IsEnabled),
-                            new XElement("Gain", channelSettings.Gain),
-                            new XElement("Offset", channelSettings.Offset)
+                            new XElement("Gain", channelSettings.Gain.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+                            new XElement("Offset", channelSettings.Offset.ToString(System.Globalization.CultureInfo.InvariantCulture))
                         );
+
+                        // Add filter information if a filter is configured
+                        if (channelSettings.Filter != null)
+                        {
+                            XElement filterElement = new XElement("Filter",
+                                new XElement("Type", channelSettings.Filter.GetFilterType())
+                            );
+
+                            // Add filter parameters
+                            var parameters = channelSettings.Filter.GetFilterParameters();
+                            XElement parametersElement = new XElement("Parameters");
+                            foreach (var parameter in parameters)
+                            {
+                                parametersElement.Add(new XElement("Parameter",
+                                    new XAttribute("Name", parameter.Key),
+                                    new XAttribute("Value", parameter.Value.ToString(System.Globalization.CultureInfo.InvariantCulture))
+                                ));
+                            }
+                            filterElement.Add(parametersElement);
+                            channelElement.Add(filterElement);
+                        }
+
                         channelsElement.Add(channelElement);
                     }
                     globalChannelIndex++;
@@ -107,14 +128,6 @@ namespace SerialPlotDN_WPF.Model
             else
                 plotUpdateValue = "30.0";
             double plotUpdateRateFPS = double.Parse(plotUpdateValue, System.Globalization.CultureInfo.InvariantCulture);
-
-            XElement serialPortUpdateRateHzElement = settingsXml.Element("SerialPortUpdateRateHz");
-            string serialPortUpdateRateHzValue;
-            if (serialPortUpdateRateHzElement != null)
-                serialPortUpdateRateHzValue = serialPortUpdateRateHzElement.Value;
-            else
-                serialPortUpdateRateHzValue = "200";
-            int serialPortUpdateRateHz = int.Parse(serialPortUpdateRateHzValue);
 
             XElement lineWidthElement = settingsXml.Element("LineWidth");
             string lineWidthValue;
@@ -180,9 +193,8 @@ namespace SerialPlotDN_WPF.Model
                 yMaxValue = "4000";
             int yMax = int.Parse(yMaxValue);
             
-            // Apply settings to PlotManager.Settings (this will automatically update VerticalControl via DataBinding)
+            // Apply settings to PlotManager.Settings (this will automatically update via DataBinding)
             plotManager.Settings.PlotUpdateRateFPS = plotUpdateRateFPS;
-            plotManager.Settings.SerialPortUpdateRateHz = serialPortUpdateRateHz;
             plotManager.Settings.LineWidth = lineWidth;
             plotManager.Settings.AntiAliasing = antiAliasing;
             plotManager.Settings.ShowRenderTime = showRenderTime;
@@ -236,10 +248,10 @@ namespace SerialPlotDN_WPF.Model
                     vm.StopBits = 1;
 
                 XElement parityElement = streamElement.Element("Parity");
-                if (parityElement != null && Enum.TryParse<RJCP.IO.Ports.Parity>(parityElement.Value, out RJCP.IO.Ports.Parity parity))
+                if (parityElement != null && Enum.TryParse<Parity>(parityElement.Value, out Parity parity))
                     vm.Parity = parity;
                 else
-                    vm.Parity = RJCP.IO.Ports.Parity.None;
+                    vm.Parity = Parity.None; // Parity.None
 
                 XElement audioDeviceElement = streamElement.Element("AudioDevice");
                 if (audioDeviceElement != null)
@@ -332,16 +344,47 @@ namespace SerialPlotDN_WPF.Model
                             setting.IsEnabled = true;
 
                         XElement gainElement = channelElement.Element("Gain");
-                        if (gainElement != null && double.TryParse(gainElement.Value, out double gain))
+                        if (gainElement != null && double.TryParse(gainElement.Value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double gain))
                             setting.Gain = gain;
                         else
                             setting.Gain = 1.0;
 
                         XElement offsetElement = channelElement.Element("Offset");
-                        if (offsetElement != null && double.TryParse(offsetElement.Value, out double offset))
+                        if (offsetElement != null && double.TryParse(offsetElement.Value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double offset))
                             setting.Offset = offset;
                         else
                             setting.Offset = 0.0;
+
+                        // Load filter information
+                        XElement filterElement = channelElement.Element("Filter");
+                        if (filterElement != null)
+                        {
+                            XElement typeElement = filterElement.Element("Type");
+                            if (typeElement != null)
+                            {
+                                string filterType = typeElement.Value;
+                                XElement parametersElement = filterElement.Element("Parameters");
+                                
+                                if (parametersElement != null)
+                                {
+                                    var parameters = new Dictionary<string, double>();
+                                    foreach (XElement paramElement in parametersElement.Elements("Parameter"))
+                                    {
+                                        string paramName = paramElement.Attribute("Name")?.Value;
+                                        string paramValue = paramElement.Attribute("Value")?.Value;
+                                        
+                                        if (!string.IsNullOrEmpty(paramName) && !string.IsNullOrEmpty(paramValue) &&
+                                            double.TryParse(paramValue, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double value))
+                                        {
+                                            parameters[paramName] = value;
+                                        }
+                                    }
+                                    
+                                    // Create the appropriate filter based on type and parameters
+                                    setting.Filter = CreateFilterFromTypeAndParameters(filterType, parameters);
+                                }
+                            }
+                        }
 
                         channelSettings.Add(setting);
                     }
@@ -385,6 +428,65 @@ namespace SerialPlotDN_WPF.Model
             {
                 channelControlBar.ChannelSettings.Add(setting);
             }
+        }
+
+        /// <summary>
+        /// Creates a filter instance from the saved filter type and parameters
+        /// </summary>
+        /// <param name="filterType">The type of filter to create</param>
+        /// <param name="parameters">Dictionary of parameter names and values</param>
+        /// <returns>IDigitalFilter instance or null if creation fails</returns>
+        private static IDigitalFilter CreateFilterFromTypeAndParameters(string filterType, Dictionary<string, double> parameters)
+        {
+            try
+            {
+                return filterType switch
+                {
+                    "Exponential Low Pass" => CreateExponentialLowPassFilter(parameters),
+                    "Exponential High Pass" => CreateExponentialHighPassFilter(parameters),
+                    "Moving Average" => CreateMovingAverageFilter(parameters),
+                    "Median" => CreateMedianFilter(parameters),
+                    "Notch" => CreateNotchFilter(parameters),
+                    _ => null
+                };
+            }
+            catch
+            {
+                // If filter creation fails, return null (no filtering)
+                return null;
+            }
+        }
+
+        private static ExponentialLowPassFilter CreateExponentialLowPassFilter(Dictionary<string, double> parameters)
+        {
+            double alpha = parameters.ContainsKey("Alpha") ? parameters["Alpha"] : 0.1;
+            return new ExponentialLowPassFilter(alpha);
+        }
+
+        private static ExponentialHighPassFilter CreateExponentialHighPassFilter(Dictionary<string, double> parameters)
+        {
+            double alpha = parameters.ContainsKey("Alpha") ? parameters["Alpha"] : 0.1;
+            return new ExponentialHighPassFilter(alpha);
+        }
+
+        private static MovingAverageFilter CreateMovingAverageFilter(Dictionary<string, double> parameters)
+        {
+            int windowSize = parameters.ContainsKey("WindowSize") ? (int)parameters["WindowSize"] : 5;
+            return new MovingAverageFilter(windowSize);
+        }
+
+        private static MedianFilter CreateMedianFilter(Dictionary<string, double> parameters)
+        {
+            int windowSize = parameters.ContainsKey("WindowSize") ? (int)parameters["WindowSize"] : 5;
+            return new MedianFilter(windowSize);
+        }
+
+        private static NotchFilter CreateNotchFilter(Dictionary<string, double> parameters)
+        {
+            double notchFreq = parameters.ContainsKey("NotchFreq") ? parameters["NotchFreq"] : 50.0;
+            double sampleRate = parameters.ContainsKey("SampleRate") ? parameters["SampleRate"] : 1000.0;
+            double bandwidth = parameters.ContainsKey("Bandwidth") ? parameters["Bandwidth"] : 2.0;
+            return new NotchFilter(notchFreq, sampleRate, bandwidth);
         }
     }
 }

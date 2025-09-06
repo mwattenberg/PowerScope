@@ -45,7 +45,8 @@
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <TextBlock Grid.Column="0"
-                       Text="{Binding PortAndBaudDisplay}"
+                       x:Name="PortBaudTextBlock"
+                       Text=""
                        VerticalAlignment="Center"
                        FontWeight="Bold"
                        Foreground="White"

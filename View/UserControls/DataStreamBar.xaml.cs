@@ -38,12 +38,16 @@ namespace SerialPlotDN_WPF.View.UserControls
             if (configWindow.ShowDialog() == true)
             {
                 ConfiguredDataStreams.Add(settings);
+
+                
                 // Create and connect IDataStream from config
                 var dataStream = CreateDataStreamFromUserInput(settings);
-                ConnectedDataStreams.Add(dataStream);
-
                 dataStream.Connect();
                 dataStream.StartStreaming();
+
+                ConnectedDataStreams.Add(dataStream);
+
+
 
                 UpdateChannels();
                 
@@ -155,14 +159,18 @@ namespace SerialPlotDN_WPF.View.UserControls
                     ConnectedDataStreams.Remove(streamToRemove);
                 }
                 ConfiguredDataStreams.Remove(viewModel);
+                
+                // Find and remove the StreamInfoPanel using the associated StreamSettings instead of DataContext
                 for (int i = Panel_Streams.Children.Count - 1; i >= 0; i--)
                 {
-                    if (Panel_Streams.Children[i] is StreamInfoPanel panel && panel.DataContext == viewModel)
+                    if (Panel_Streams.Children[i] is StreamInfoPanel panel && 
+                        panel.AssociatedStreamSettings == viewModel)
                     {
                         Panel_Streams.Children.RemoveAt(i);
                         break;
                     }
                 }
+                
                 UpdateChannels();
                 
                 // Notify that streams have changed

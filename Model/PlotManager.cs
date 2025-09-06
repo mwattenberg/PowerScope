@@ -57,6 +57,7 @@ namespace SerialPlotDN_WPF.Model
                 switch (e.PropertyName)
                 {
                     case nameof(PlotSettings.PlotUpdateRateFPS):
+                    case nameof(PlotSettings.PlotUpdateRateFpsOption):
                         UpdateTimerInterval();
                         break;
                         
@@ -74,10 +75,6 @@ namespace SerialPlotDN_WPF.Model
                     case nameof(PlotSettings.AntiAliasing):
                     case nameof(PlotSettings.ShowRenderTime):
                         ApplyVisualSettings();
-                        break;
-                        
-                    case nameof(PlotSettings.SerialPortUpdateRateHz):
-                        UpdateStreamSettings();
                         break;
                 }
             });
@@ -226,17 +223,6 @@ namespace SerialPlotDN_WPF.Model
             _plot.Refresh();
         }
 
-        //// Legacy method for backward compatibility with MainWindow
-        //public Color[] GetSignalColors(int channelCount)
-        //{
-        //    Color[] colors = new Color[channelCount];
-        //    for (int i = 0; i < channelCount && i < _maxChannels; i++)
-        //    {
-        //        colors[i] = _channelSettings?[i]?.Color ?? GetColor(i);
-        //    }
-        //    return colors;
-        //}
-
         public void StartAutoUpdate()
         {
             int intervalMs = (int)Settings.TimerInterval;
@@ -353,19 +339,6 @@ namespace SerialPlotDN_WPF.Model
             }
             
             _plot.Refresh();
-        }
-
-        private void UpdateStreamSettings()
-        {
-            if (_connectedStreams == null) return;
-            
-            foreach (IDataStream stream in _connectedStreams)
-            {
-                if (stream is SerialDataStream serialStream)
-                {
-                    serialStream.SerialPortUpdateRateHz = Settings.SerialPortUpdateRateHz;
-                }
-            }
         }
 
         public void SetupPlotUserInput()

@@ -4,12 +4,95 @@ using System.ComponentModel;
 namespace SerialPlotDN_WPF.Model
 {
     /// <summary>
+    /// Predefined FPS values for plot update rate
+    /// </summary>
+    public enum PlotFpsOption
+    {
+        [Description("120")]
+        Fps120 = 120,
+        
+        [Description("60")]
+        Fps60 = 60,
+        
+        [Description("30")]
+        Fps30 = 30,
+        
+        [Description("15")]
+        Fps15 = 15,
+        
+        [Description("7.5")]
+        Fps7_5 = 75, // Store as 75, convert to 7.5
+        
+        [Description("3.75")]
+        Fps3_75 = 375, // Store as 375, convert to 3.75
+        
+        [Description("1.875")]
+        Fps1_875 = 1875 // Store as 1875, convert to 1.875
+    }
+
+    /// <summary>
+    /// Extension methods for PlotFpsOption enum
+    /// </summary>
+    public static class PlotFpsOptionExtensions
+    {
+        /// <summary>
+        /// Converts PlotFpsOption to actual double FPS value
+        /// </summary>
+        public static double ToFpsValue(this PlotFpsOption option)
+        {
+            return option switch
+            {
+                PlotFpsOption.Fps120 => 120.0,
+                PlotFpsOption.Fps60 => 60.0,
+                PlotFpsOption.Fps30 => 30.0,
+                PlotFpsOption.Fps15 => 15.0,
+                PlotFpsOption.Fps7_5 => 7.5,
+                PlotFpsOption.Fps3_75 => 3.75,
+                PlotFpsOption.Fps1_875 => 1.875,
+                _ => 30.0 // Default fallback
+            };
+        }
+
+        /// <summary>
+        /// Gets the display text for the FPS option
+        /// </summary>
+        public static string GetDisplayText(this PlotFpsOption option)
+        {
+            var field = option.GetType().GetField(option.ToString());
+            var attribute = (DescriptionAttribute)Attribute.GetCustomAttribute(field, typeof(DescriptionAttribute));
+            return attribute?.Description ?? option.ToString();
+        }
+
+        /// <summary>
+        /// Converts a double FPS value to the closest PlotFpsOption
+        /// </summary>
+        public static PlotFpsOption FromFpsValue(double fpsValue)
+        {
+            // Find the closest enum value
+            var options = Enum.GetValues<PlotFpsOption>();
+            PlotFpsOption closest = PlotFpsOption.Fps30;
+            double minDifference = double.MaxValue;
+
+            foreach (var option in options)
+            {
+                double difference = Math.Abs(option.ToFpsValue() - fpsValue);
+                if (difference < minDifference)
+                {
+                    minDifference = difference;
+                    closest = option;
+                }
+            }
+
+            return closest;
+        }
+    }
+
+    /// <summary>
     /// Model class that holds all plot-related settings and configuration
     /// </summary>
     public class PlotSettings : INotifyPropertyChanged
     {
-        private double _plotUpdateRateFPS = 30.0;
-        private int _serialPortUpdateRateHz = 200;
+        private PlotFpsOption _plotUpdateRateFps = PlotFpsOption.Fps30;
         private int _lineWidth = 1;
         private bool _antiAliasing = false;
         private bool _showRenderTime = false;
@@ -20,36 +103,44 @@ namespace SerialPlotDN_WPF.Model
         private bool _yAutoScale = true;
 
         /// <summary>
-        /// Plot refresh rate in frames per second
+        /// Plot refresh rate option (enum-based)
         /// </summary>
-        public double PlotUpdateRateFPS
+        public PlotFpsOption PlotUpdateRateFpsOption
         {
-            get { return _plotUpdateRateFPS; }
+            get { return _plotUpdateRateFps; }
             set
             {
-                if (Math.Abs(_plotUpdateRateFPS - value) > 0.001) // Use tolerance for double comparison
+                if (_plotUpdateRateFps != value)
                 {
-                    _plotUpdateRateFPS = Math.Max(0.1, Math.Min(120.0, value)); // Clamp between 0.1-120 FPS
-                    OnPropertyChanged(nameof(PlotUpdateRateFPS));
+                    _plotUpdateRateFps = value;
+                    OnPropertyChanged(nameof(PlotUpdateRateFpsOption));
+                    OnPropertyChanged(nameof(PlotUpdateRateFPS)); // Notify computed property
                 }
             }
         }
 
         /// <summary>
-        /// Serial port data update rate in Hz (legacy property, may not be used with multiple streams)
+        /// Plot refresh rate in frames per second (computed from enum)
         /// </summary>
-        public int SerialPortUpdateRateHz
+        public double PlotUpdateRateFPS
         {
-            get { return _serialPortUpdateRateHz; }
+            get { return _plotUpdateRateFps.ToFpsValue(); }
             set
             {
-                if (_serialPortUpdateRateHz != value)
+                var newOption = PlotFpsOptionExtensions.FromFpsValue(value);
+                if (_plotUpdateRateFps != newOption)
                 {
-                    _serialPortUpdateRateHz = Math.Max(100, Math.Min(10000, value)); // Clamp between 1-10000 Hz
-                    OnPropertyChanged(nameof(SerialPortUpdateRateHz));
+                    _plotUpdateRateFps = newOption;
+                    OnPropertyChanged(nameof(PlotUpdateRateFPS));
+                    OnPropertyChanged(nameof(PlotUpdateRateFpsOption));
                 }
             }
         }
+
+        /// <summary>
+        /// Serial port data update rate in Hz (fixed value)
+        /// </summary>
+        public int SerialPortUpdateRateHz => 300;
 
         /// <summary>
         /// Line width for plot signals
@@ -190,6 +281,5 @@ namespace SerialPlotDN_WPF.Model
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
-
     }
 }

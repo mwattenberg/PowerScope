@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Collections.Generic;
@@ -28,10 +29,24 @@ namespace SerialPlotDN_WPF.Model
 
         public int ChannelCount { get; }
 
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        protected virtual void OnPropertyChanged(string propertyName)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+
         public string StatusMessage
         {
             get { return _statusMessage; }
-            private set { _statusMessage = value; }
+            private set 
+            { 
+                if (_statusMessage != value)
+                {
+                    _statusMessage = value;
+                    OnPropertyChanged(nameof(StatusMessage));
+                }
+            }
         }
 
         public string StreamType
@@ -42,13 +57,27 @@ namespace SerialPlotDN_WPF.Model
         public bool IsConnected
         {
             get { return _isConnected; }
-            private set { _isConnected = value; }
+            private set 
+            { 
+                if (_isConnected != value)
+                {
+                    _isConnected = value;
+                    OnPropertyChanged(nameof(IsConnected));
+                }
+            }
         }
 
         public bool IsStreaming
         {
             get { return _isStreaming; }
-            private set { _isStreaming = value; }
+            private set 
+            { 
+                if (_isStreaming != value)
+                {
+                    _isStreaming = value;
+                    OnPropertyChanged(nameof(IsStreaming));
+                }
+            }
         }
 
         public DemoDataStream(DemoSettings demoSettings)
@@ -68,7 +97,7 @@ namespace SerialPlotDN_WPF.Model
             _channelSettings = new ChannelSettings[ChannelCount];
             _channelFilters = new IDigitalFilter[ChannelCount];
             
-            _statusMessage = "Disconnected";
+            StatusMessage = "Disconnected";
         }
 
         #region IChannelConfigurable Implementation
@@ -154,15 +183,15 @@ namespace SerialPlotDN_WPF.Model
 
         public void Connect()
         {
-            _isConnected = true;
-            _statusMessage = "Connected (Demo Mode)";
+            IsConnected = true;
+            StatusMessage = "Connected (Demo Mode)";
         }
 
         public void Disconnect()
         {
             StopStreaming();
-            _isConnected = false;
-            _statusMessage = "Disconnected";
+            IsConnected = false;
+            StatusMessage = "Disconnected";
         }
 
         public void StartStreaming()
@@ -170,8 +199,8 @@ namespace SerialPlotDN_WPF.Model
             if (!_isConnected || _isStreaming)
                 return;
 
-            _isStreaming = true;
-            _statusMessage = "Streaming (Demo Mode)";
+            IsStreaming = true;
+            StatusMessage = "Streaming (Demo Mode)";
             
             // Reset filters when starting streaming
             ResetChannelFilters();
@@ -189,15 +218,15 @@ namespace SerialPlotDN_WPF.Model
             if (!_isStreaming)
                 return;
                 
-            _isStreaming = false;
+            IsStreaming = false;
             _dataGenerationTimer?.Dispose();
             _dataGenerationTimer = null;
-            _statusMessage = "Stopped";
+            StatusMessage = "Stopped";
         }
 
         private void GenerateData(object state)
         {
-            if (!_isStreaming)
+            if (!IsStreaming)
                 return;
 
             int samplesPerChunk = (int)state;
@@ -358,6 +387,8 @@ namespace SerialPlotDN_WPF.Model
         }
 
         #endregion
+
+
     }
 
     public class DemoSettings

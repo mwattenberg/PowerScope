@@ -29,6 +29,14 @@
             <Setter Property="Foreground" Value="{DynamicResource PlotSettings_LabelForegroundBrush}"/>
             <Setter Property="FontSize" Value="12"/>
         </Style>
+        <Style TargetType="ComboBox">
+            <Setter Property="Background" Value="{DynamicResource PlotSettings_TextBoxBackgroundBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource PlotSettings_LabelForegroundBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource PlotSettings_BorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="5,3"/>
+            <Setter Property="FontSize" Value="12"/>
+        </Style>
         <Style TargetType="Button">
             <Setter Property="Background" Value="{DynamicResource PlotSettings_TextBoxBackgroundBrush}"/>
             <Setter Property="Foreground" Value="{DynamicResource PlotSettings_ButtonForegroundBrush}"/>
@@ -130,39 +138,13 @@
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="150"/>
                         <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="60"/>
                     </Grid.ColumnDefinitions>
                     
                     <Label Grid.Column="0" Content="Plot Update Rate (FPS):" VerticalAlignment="Center"/>
-                    <TextBox x:Name="TextBoxPlotFPS" Grid.Column="1" VerticalAlignment="Center" 
-                             Text="{Binding PlotUpdateRateFPS, StringFormat=F1}"
-                             PreviewTextInput="DecimalOnly_PreviewTextInput"/>
-                    <StackPanel Grid.Column="2" Orientation="Vertical" Margin="5,0,0,0">
-                        <Button x:Name="ButtonPlotFPSUp" Content="▲" Height="15" FontSize="8" 
-                                Click="ButtonPlotFPSUp_Click" Margin="0,0,0,1"/>
-                        <Button x:Name="ButtonPlotFPSDown" Content="▼" Height="15" FontSize="8" 
-                                Click="ButtonPlotFPSDown_Click"/>
-                    </StackPanel>
-                </Grid>
-                
-                <!-- Serial Port Update Rate (Hz) -->
-                <Grid Margin="0,0,0,15">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="150"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="60"/>
-                    </Grid.ColumnDefinitions>
-                    
-                    <Label Grid.Column="0" Content="Serial Update Rate (Hz):" VerticalAlignment="Center"/>
-                    <TextBox x:Name="TextBoxSerialHz" Grid.Column="1" VerticalAlignment="Center" 
-                             Text="{Binding SerialPortUpdateRateHz}"
-                             PreviewTextInput="NumbersOnly_PreviewTextInput"/>
-                    <StackPanel Grid.Column="2" Orientation="Vertical" Margin="5,0,0,0">
-                        <Button x:Name="ButtonSerialHzUp" Content="▲" Height="15" FontSize="8" 
-                                Click="ButtonSerialHzUp_Click" Margin="0,0,0,1"/>
-                        <Button x:Name="ButtonSerialHzDown" Content="▼" Height="15" FontSize="8" 
-                                Click="ButtonSerialHzDown_Click"/>
-                    </StackPanel>
+                    <ComboBox x:Name="ComboBoxPlotFPS" Grid.Column="1" VerticalAlignment="Center" 
+                              SelectedValue="{Binding PlotUpdateRateFpsOption}"
+                              DisplayMemberPath="DisplayText"
+                              SelectedValuePath="Value"/>
                 </Grid>
                 
                 <!-- Line Width -->

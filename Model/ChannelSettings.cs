@@ -73,9 +73,9 @@ namespace SerialPlotDN_WPF.Model
             {
                 if (Math.Abs(_gain - value) > 0.001)
                 {
-                    _gain = Math.Max(0.125, Math.Min(16.0, value));
+                    _gain = value;
                     OnPropertyChanged(nameof(Gain));
-                    OnPropertyChanged(nameof(GainOffsetDisplayText));
+                    //OnPropertyChanged(nameof(GainOffsetDisplayText));
                 }
             }
         }
@@ -92,7 +92,7 @@ namespace SerialPlotDN_WPF.Model
                 {
                     _offset = value;
                     OnPropertyChanged(nameof(Offset));
-                    OnPropertyChanged(nameof(GainOffsetDisplayText));
+                    //OnPropertyChanged(nameof(GainOffsetDisplayText));
                 }
             }
         }
@@ -124,16 +124,16 @@ namespace SerialPlotDN_WPF.Model
             }
         }
 
-        public string GainOffsetDisplayText
-        {
-            get
-            {
-                if (_offset >= 0)
-                    return string.Format("= y * {0:F2} + {1:F2}", _gain, _offset);
-                else
-                    return string.Format("= y * {0:F2} - {1:F2}", _gain, Math.Abs(_offset));
-            }
-        }
+        //public string GainOffsetDisplayText
+        //{
+        //    get
+        //    {
+        //        if (_offset >= 0)
+        //            return string.Format("= y * {0:F2} + {1:F2}", _gain, _offset);
+        //        else
+        //            return string.Format("= y * {0:F2} - {1:F2}", _gain, Math.Abs(_offset));
+        //    }
+        //}
 
         public event PropertyChangedEventHandler PropertyChanged;
 

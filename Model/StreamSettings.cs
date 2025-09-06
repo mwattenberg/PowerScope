@@ -1,5 +1,5 @@
 ﻿using System.ComponentModel;
-using RJCP.IO.Ports; // Changed from System.IO.Ports to RJCP.IO.Ports for Parity enum
+using System.IO.Ports; // Use System.IO.Ports for Parity enum
 using System.Windows.Media; // Add for SolidColorBrush and Colors
 using System; // Add for IDisposable
 using System.Collections.Generic; // Add for List<T>
@@ -66,9 +66,6 @@ namespace SerialPlotDN_WPF.Model
             StreamSource = StreamSource.SerialPort; // Default to serial port
         }
 
-        // Removed Connect/Disconnect methods
-        // Only keep configuration properties and INotifyPropertyChanged
-
         // Dataformat Tab properties
         public DataFormatType DataFormat
         {
@@ -93,7 +90,6 @@ namespace SerialPlotDN_WPF.Model
             {
                 _port = value;
                 OnPropertyChanged(nameof(Port));
-                // Removed PortAndBaudDisplay notification
             }
         }
 
@@ -104,7 +100,6 @@ namespace SerialPlotDN_WPF.Model
             {
                 _baud = value;
                 OnPropertyChanged(nameof(Baud));
-                // Removed PortAndBaudDisplay notification
             }
         }
 

@@ -2,7 +2,7 @@
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
-using RJCP.IO.Ports; // Changed from System.IO.Ports to RJCP.IO.Ports
+using System.IO.Ports;
 using NAudio.Wave;
 using System.Management;
 using System.Collections.Generic;

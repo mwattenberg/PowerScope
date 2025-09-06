@@ -1,12 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
 namespace SerialPlotDN_WPF.Model
 {
-    public interface IDataStream:IDisposable
+    public interface IDataStream : IDisposable, INotifyPropertyChanged
     {
         //Status message to be displayed in the UI, e.g. "Connected", "Disconnected", "Error: Port not found", etc.
         string StatusMessage { get;}

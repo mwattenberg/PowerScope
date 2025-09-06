@@ -1,17 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
 using SerialPlotDN_WPF.Model;
 
 namespace SerialPlotDN_WPF.View.UserControls
@@ -30,65 +19,29 @@ namespace SerialPlotDN_WPF.View.UserControls
             set => DataContext = value;
         }
 
-        // Legacy properties for backward compatibility (delegate to PlotSettings when available)
-        public int Max
-        {
-            get => Settings?.Ymax ?? 1000;
-            set
-            {
-                if (Settings != null)
-                    Settings.Ymax = value;
-            }
-        }
-
-        public int Min
-        {
-            get => Settings?.Ymin ?? -1000;
-            set
-            {
-                if (Settings != null)
-                    Settings.Ymin = value;
-            }
-        }
-
-        public bool IsAutoScale
-        {
-            get => Settings?.YAutoScale ?? false;
-            set
-            {
-                if (Settings != null)
-                    Settings.YAutoScale = value;
-            }
-        }
-
-        // Events for backward compatibility
-        public event EventHandler<int>? MaxValueChanged;
-        public event EventHandler<int>? MinValueChanged;
-        public event EventHandler<bool>? AutoScaleChanged;
-
         public VerticalControl()
         {
             InitializeComponent();
             
-            // Subscribe to DataContext changes
-            DataContextChanged += VerticalControl_DataContextChanged;
+            //// Subscribe to DataContext changes
+            //DataContextChanged += VerticalControl_DataContextChanged;
         }
 
-        private void VerticalControl_DataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
-        {
-            // Unsubscribe from old settings
-            if (e.OldValue is PlotSettings oldSettings)
-            {
-                oldSettings.PropertyChanged -= Settings_PropertyChanged;
-            }
+        //private void VerticalControl_DataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
+        //{
+        //    // Unsubscribe from old settings
+        //    if (e.OldValue is PlotSettings oldSettings)
+        //    {
+        //        oldSettings.PropertyChanged -= Settings_PropertyChanged;
+        //    }
 
-            // Subscribe to new settings
-            if (e.NewValue is PlotSettings newSettings)
-            {
-                newSettings.PropertyChanged += Settings_PropertyChanged;
-                UpdateUIFromSettings();
-            }
-        }
+        //    // Subscribe to new settings
+        //    if (e.NewValue is PlotSettings newSettings)
+        //    {
+        //        newSettings.PropertyChanged += Settings_PropertyChanged;
+        //        UpdateUIFromSettings();
+        //    }
+        //}
 
         private void Settings_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
         {
@@ -121,7 +74,6 @@ namespace SerialPlotDN_WPF.View.UserControls
                 if (minValue != Settings.Ymin)
                 {
                     Settings.Ymin = Math.Min(minValue, Settings.Ymax - 1); // Ensure Min is less than Max
-                    MinValueChanged?.Invoke(this, Settings.Ymin); // Fire legacy event
                 }
             }
         }
@@ -133,7 +85,6 @@ namespace SerialPlotDN_WPF.View.UserControls
                 if (maxValue != Settings.Ymax)
                 {
                     Settings.Ymax = Math.Max(maxValue, Settings.Ymin + 1); // Ensure Max is greater than Min
-                    MaxValueChanged?.Invoke(this, Settings.Ymax); // Fire legacy event
                 }
             }
         }
@@ -146,7 +97,6 @@ namespace SerialPlotDN_WPF.View.UserControls
                 if (isChecked != Settings.YAutoScale)
                 {
                     Settings.YAutoScale = isChecked;
-                    AutoScaleChanged?.Invoke(this, Settings.YAutoScale); // Fire legacy event
                 }
             }
         }

@@ -1,7 +1,9 @@
 ﻿using System.Text;
-using RJCP.IO.Ports; // Changed from System.IO.Ports to RJCP.IO.Ports
+using System.IO.Ports;
 using System.Linq;
-using System.Diagnostics; // Add for LINQ methods
+using System.Diagnostics;
+using System.Threading;
+using System.ComponentModel;
 
 namespace SerialPlotDN_WPF.Model
 {
@@ -47,7 +49,7 @@ namespace SerialPlotDN_WPF.Model
 
     public class SerialDataStream : IDataStream, IChannelConfigurable
     {
-        private readonly SerialPortStream _port;
+        private readonly SerialPort _port;
         private byte[] _residue;
         private readonly byte[] _readBuffer;
         private readonly byte[] _workingBuffer;
@@ -60,14 +62,21 @@ namespace SerialPlotDN_WPF.Model
         public long TotalSamples { get; private set; }
         public long TotalBits { get; private set; }
         private RingBuffer<double>[] ReceivedData { get; set; }
-        private int[] _lastReadPositions;
         public DataParser Parser { get; init; }
-        public int SerialPortUpdateRateHz { get; set; } = 200;
+        public int SerialPortUpdateRateHz { get; set; } = 300;
 
         // Channel-specific processing
         private ChannelSettings[] _channelSettings;
         private IDigitalFilter[] _channelFilters;
         private readonly object _channelConfigLock = new object();
+
+        // INotifyPropertyChanged implementation
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        protected virtual void OnPropertyChanged(string propertyName)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
 
         public int ChannelCount 
         { 
@@ -80,7 +89,14 @@ namespace SerialPlotDN_WPF.Model
         public string StatusMessage
         {
             get { return _statusMessage; }
-            set { _statusMessage = value; }
+            private set 
+            { 
+                if (_statusMessage != value)
+                {
+                    _statusMessage = value;
+                    OnPropertyChanged(nameof(StatusMessage));
+                }
+            }
         }
 
         public string StreamType
@@ -91,13 +107,27 @@ namespace SerialPlotDN_WPF.Model
         public bool IsConnected
         {
             get { return _isConnected; }
-            set { _isConnected = value; }
+            private set 
+            { 
+                if (_isConnected != value)
+                {
+                    _isConnected = value;
+                    OnPropertyChanged(nameof(IsConnected));
+                }
+            }
         }
 
         public bool IsStreaming
         {
             get { return _isStreaming; }
-            set { _isStreaming = value; }
+            private set 
+            { 
+                if (_isStreaming != value)
+                {
+                    _isStreaming = value;
+                    OnPropertyChanged(nameof(IsStreaming));
+                }
+            }
         }
 
         public SerialDataStream(SourceSetting source, DataParser dataParser)
@@ -105,16 +135,16 @@ namespace SerialPlotDN_WPF.Model
             SourceSetting = source;
             Parser = dataParser;
             ValidatePortExists(source.PortName);
-            _port = new SerialPortStream(source.PortName)
+            _port = new SerialPort(source.PortName)
             {
+                ReadBufferSize = 4096,
+                WriteBufferSize = 2048,
                 BaudRate = source.BaudRate,
                 DataBits = source.DataBits,
                 Parity = source.Parity,
                 Encoding = Encoding.ASCII,
                 ReadTimeout = 100, // Reduced for responsiveness
                 WriteTimeout = 1000,
-                ReadBufferSize = 65536, // Fixed 64KB - good for most use cases
-                WriteBufferSize = 16384, // Fixed 16KB
                 Handshake = Handshake.None,
                 DtrEnable = false,
                 RtsEnable = false
@@ -125,16 +155,14 @@ namespace SerialPlotDN_WPF.Model
             else if(source.StopBits == 2)
                 _port.StopBits = StopBits.Two;
             else
-                _port.StopBits = StopBits.One; // Force stop bits to 1 to avoid compatibility issues
+                _port.StopBits = StopBits.One;
 
             int ringBufferSize = Math.Max(500000, source.BaudRate / 5);
             ReceivedData = new RingBuffer<double>[dataParser.NumberOfChannels];
 
-            _lastReadPositions = new int[dataParser.NumberOfChannels];
             for (int i = 0; i < dataParser.NumberOfChannels; i++)
             {
                 ReceivedData[i] = new RingBuffer<double>(ringBufferSize);
-                _lastReadPositions[i] = 0;
             }
 
             // Initialize channel processing arrays
@@ -147,7 +175,7 @@ namespace SerialPlotDN_WPF.Model
             _residue = new byte[1024]; // Fixed 1KB residue
             _isConnected = false;
             _isStreaming = false;
-            _statusMessage = "Disconnected";
+            StatusMessage = "Disconnected";
         }
 
         #region IChannelConfigurable Implementation
@@ -238,7 +266,7 @@ namespace SerialPlotDN_WPF.Model
                     actualPortName = "null";
                 throw new PortNotFoundException(actualPortName);
             }
-            string[] availablePorts = System.IO.Ports.SerialPort.GetPortNames();
+            string[] availablePorts = SerialPort.GetPortNames();
             bool portExists = false;
             foreach (string port in availablePorts)
             {
@@ -259,95 +287,158 @@ namespace SerialPlotDN_WPF.Model
             try
             {
                 _port.Open();
-                _isConnected = true;
-                _statusMessage = "Connected";
+                IsConnected = true;
+                StatusMessage = "Connected";
             }
             catch (UnauthorizedAccessException ex)
             {
                 if (_port != null)
                     _port.Dispose();
-                _statusMessage = "Port already in use";
-                _isConnected = false;
-                throw new PortAlreadyInUseException(SourceSetting.PortName, ex);
+                StatusMessage = "Port already in use";
+                IsConnected = false;
+                //throw new PortAlreadyInUseException(SourceSetting.PortName, ex);
             }
             catch (ArgumentException ex)
             {
                 if (_port != null)
                     _port.Dispose();
-                _statusMessage = "Port not found";
-                _isConnected = false;
-                throw new PortNotFoundException(SourceSetting.PortName, ex);
+                StatusMessage = "Port not found";
+                IsConnected = false;
+                //throw new PortNotFoundException(SourceSetting.PortName, ex);
             }
             catch (InvalidOperationException ex)
             {
                 if (_port != null)
                     _port.Dispose();
-                _statusMessage = "Port already in use";
-                _isConnected = false;
-                throw new PortAlreadyInUseException(SourceSetting.PortName, ex);
+                StatusMessage = "Port already in use";
+                IsConnected = false;
+                //throw new PortAlreadyInUseException(SourceSetting.PortName, ex);
             }
             catch (System.IO.IOException ex)
             {
                 if (_port != null)
                     _port.Dispose();
-                _statusMessage = "Port already in use";
-                _isConnected = false;
-                throw new PortAlreadyInUseException(SourceSetting.PortName, ex);
+                StatusMessage = "Port already in use";
+                IsConnected = false;
+                //throw new PortAlreadyInUseException(SourceSetting.PortName, ex);
             }
         }
 
         public void Disconnect()
         {
             StopStreaming();
-            if (_port != null && _port.IsOpen)
-                _port.Close();
-            _isConnected = false;
-            _statusMessage = "Disconnected";
+            try
+            {
+                if (_port != null && _port.IsOpen)
+                    _port.Close();
+            }
+            catch (Exception ex)
+            {
+                // Port might already be closed or in error state
+                StatusMessage = $"Warning during disconnect: {ex.Message}";
+            }
+            finally
+            {
+                IsConnected = false;
+                if (_statusMessage != "Disconnected")
+                {
+                    StatusMessage = "Disconnected";
+                }
+            }
         }
 
         public void StartStreaming()
         {
             if (!_isConnected || _isStreaming)
                 return;
+
+            // Verify port is still open before starting
+            try
+            {
+                if (_port == null || !_port.IsOpen)
+                {
+                    StatusMessage = "Cannot start streaming: Port not connected";
+                    IsConnected = false;
+                    return;
+                }
+            }
+            catch (Exception ex)
+            {
+                StatusMessage = $"Cannot start streaming: {ex.Message}";
+                IsConnected = false;
+                return;
+            }
            
-            _isStreaming = true;
+            IsStreaming = true;
             
             // Reset filters when starting streaming
             ResetChannelFilters();
             
-            //Not sure if I need this, but just in case
             if ( _readSerialPortThread != null && _readSerialPortThread.IsAlive)
             {
-                _isStreaming = false;
+                IsStreaming = false;
                 _readSerialPortThread.Join(1000);
             }
 
             _readSerialPortThread = new Thread(ReadSerialData) { IsBackground = true };
             _readSerialPortThread.Start();
 
-            _statusMessage = "Streaming";
+            StatusMessage = "Streaming";
         }
 
         public void StopStreaming()
         {
             if (!_isStreaming)
                 return;
-            _isStreaming = false;
+            IsStreaming = false;
             if (_readSerialPortThread != null && _readSerialPortThread.IsAlive)
                 _readSerialPortThread.Join(1000);
-            _statusMessage = "Stopped";
+            
+            // Only update status if we're still connected
+            if (_isConnected)
+            {
+                StatusMessage = "Stopped";
+            }
         }
 
+        /// <summary>
+        /// Checks if the serial port is still physically connected and functional
+        /// </summary>
+        /// <returns>True if port appears to be connected and functional</returns>
+        public bool IsPortHealthy()
+        {
+            try
+            {
+                return _port != null && _port.IsOpen;
+            }
+            catch
+            {
+                return false;
+            }
+        }
         public int CopyLatestTo(int channel, double[] destination, int n)
         {
             if (channel < 0)
                 return 0;
             if (channel >= ReceivedData.Length)
                 return 0;
-            return ReceivedData[channel].CopyLatestTo(destination, n);
+            
+            // If we're not connected or streaming, return 0 (no data)
+            if (!_isConnected && !_isStreaming)
+                return 0;
+                
+            try
+            {
+                return ReceivedData[channel].CopyLatestTo(destination, n);
+            }
+            catch (Exception)
+            {
+                // If there's an error accessing the buffer, return 0
+                return 0;
+            }
         }
 
-        void clearData()
+        private void clearData()
         {
             if (ReceivedData != null)
             {
@@ -359,7 +450,6 @@ namespace SerialPlotDN_WPF.Model
             }
             TotalSamples = 0;
             TotalBits = 0;
-            _lastReadPositions = new int[Parser.NumberOfChannels];
             
             // Reset filters when clearing data
             ResetChannelFilters();
@@ -369,11 +459,20 @@ namespace SerialPlotDN_WPF.Model
         {
             int minBytesThreshold = 64;
             int maxReadSize = _readBuffer.Length;
+            int consecutiveErrorCount = 0;
+            const int maxConsecutiveErrors = 5; // Allow some errors before giving up
 
             while (_isStreaming && _port.IsOpen)
             {
                 try
                 {
+                    // Check if port is still physically connected
+                    if (!_port.IsOpen)
+                    {
+                        HandleRuntimeDisconnection("Port closed unexpectedly");
+                        break;
+                    }
+
                     int bytesAvailable = _port.BytesToRead;
                     if (bytesAvailable >= minBytesThreshold)
                     {
@@ -384,6 +483,7 @@ namespace SerialPlotDN_WPF.Model
                         {
                             TotalBits += bytesRead * 8;
                             ProcessReceivedData(_readBuffer, bytesRead, _workingBuffer);
+                            consecutiveErrorCount = 0; // Reset error counter on successful read
                         }
                     }
                     else
@@ -391,10 +491,100 @@ namespace SerialPlotDN_WPF.Model
                         Thread.Sleep(Math.Max(1, 1000 / SerialPortUpdateRateHz));
                     }
                 }
-                catch (TimeoutException) { continue; }
-                catch (InvalidOperationException) { break; }
-                catch (System.IO.IOException) { Thread.Sleep(10); }
-                catch (Exception) { Thread.Sleep(10); }
+                catch (TimeoutException) 
+                { 
+                    // Timeout is normal, just continue
+                    continue; 
+                }
+                catch (InvalidOperationException ex)
+                {
+                    // Port was closed or became invalid
+                    HandleRuntimeDisconnection($"Port operation failed: {ex.Message}");
+                    break;
+                }
+                catch (System.IO.IOException ex)
+                {
+                    // Cable disconnected, device removed, or I/O error
+                    consecutiveErrorCount++;
+                    if (consecutiveErrorCount >= maxConsecutiveErrors)
+                    {
+                        HandleRuntimeDisconnection($"I/O error (cable disconnected?): {ex.Message}");
+                        break;
+                    }
+                    else
+                    {
+                        Thread.Sleep(100); // Brief pause before retry
+                    }
+                }
+                catch (UnauthorizedAccessException ex)
+                {
+                    // Port access was lost (another application took over)
+                    HandleRuntimeDisconnection($"Port access lost: {ex.Message}");
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    // Unexpected error
+                    consecutiveErrorCount++;
+                    if (consecutiveErrorCount >= maxConsecutiveErrors)
+                    {
+                        HandleRuntimeDisconnection($"Unexpected error: {ex.Message}");
+                        break;
+                    }
+                    else
+                    {
+                        Thread.Sleep(50); // Brief pause before retry
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Handles runtime disconnection events (cable unplug, device removal, etc.)
+        /// Updates connection status and notifies UI through property change events
+        /// </summary>
+        /// <param name="reason">Human-readable reason for the disconnection</param>
+        private void HandleRuntimeDisconnection(string reason)
+        {
+            try
+            {
+                // Update status first
+                StatusMessage = $"Disconnected: {reason}";
+                
+                // Stop streaming
+                IsStreaming = false;
+                
+                // Close the port safely
+                if (_port != null && _port.IsOpen)
+                {
+                    try
+                    {
+                        _port.Close();
+                    }
+                    catch
+                    {
+                        // Port might already be closed, ignore errors
+                    }
+                }
+                
+                // Update connection status
+                IsConnected = false;
+            }
+            catch (Exception ex)
+            {
+                // Ensure we always update the status, even if something fails
+                try
+                {
+                    StatusMessage = $"Error during disconnection handling: {ex.Message}";
+                    IsConnected = false;
+                    IsStreaming = false;
+                }
+                catch
+                {
+                    // Last resort - at least try to update flags directly
+                    _isConnected = false;
+                    _isStreaming = false;
+                }
             }
         }
 
@@ -470,7 +660,6 @@ namespace SerialPlotDN_WPF.Model
                         ringBuffer.Clear();
                 }
             }
-            _lastReadPositions = null;
             _residue = null;
             _disposed = true;
             GC.SuppressFinalize(this);
