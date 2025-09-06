@@ -412,7 +412,7 @@
                             </StackPanel>
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                                 <Label Content="Sample rate:" VerticalAlignment="Center" Width="80"/>
-                                <ComboBox x:Name="ComboBox_SampleRates" Width="120" SelectedValue="{Binding SampleRate, Mode=TwoWay}" SelectedValuePath="Content" />
+                                <ComboBox x:Name="ComboBox_SampleRates" Width="120" SelectedValue="{Binding AudioSampleRate, Mode=TwoWay}" SelectedValuePath="Content" />
                             </StackPanel>
                             <!-- Add your Audio controls here -->
                         </StackPanel>

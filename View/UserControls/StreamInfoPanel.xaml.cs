@@ -69,6 +69,10 @@ namespace SerialPlotDN_WPF.View.UserControls
                 {
                     displayText = $"{_associatedStreamSettings.Port} @ {_associatedStreamSettings.Baud}";
                 }
+                else if (_associatedStreamSettings.StreamSource == Model.StreamSource.AudioInput)
+                {
+                    displayText = $"Audio: {_associatedStreamSettings.AudioDevice ?? "Default Device"}";
+                }
                 else
                 {
                     displayText = "Unknown";
@@ -112,13 +116,15 @@ namespace SerialPlotDN_WPF.View.UserControls
         {
             if (AssociatedDataStream.IsConnected || AssociatedDataStream.IsStreaming)
             {
-                Button_Connect.Background = new SolidColorBrush(Colors.OrangeRed);
-                Button_Connect.Content = "Disconnect";
+                Button_Connect.Foreground = new SolidColorBrush(Colors.OrangeRed);
+                Button_Connect.Content = "⏸️";
+                Button_Connect.ToolTip = "Disconnect";
             }
             else
             {
-                Button_Connect.Background = new SolidColorBrush(Colors.LimeGreen);
-                Button_Connect.Content = "Connect";
+                Button_Connect.Foreground = new SolidColorBrush(Colors.LimeGreen);
+                Button_Connect.Content = "▶️";
+                Button_Connect.ToolTip = "Connect";
             }
         }
 
@@ -157,10 +163,10 @@ namespace SerialPlotDN_WPF.View.UserControls
                     _prevBitsCount = currentBits;
 
                     double portUsagePercent;
-                    if (AssociatedDataStream.StreamType == "Demo")
+                    if (AssociatedDataStream.StreamType == "Demo" || AssociatedDataStream.StreamType == "Audio")
                     {
-                        // For demo streams, show a different metric or just show N/A
-                        portUsagePercent = 0; // Demo doesn't have port usage
+                        // For demo and audio streams, show a different metric or just show N/A
+                        portUsagePercent = 0; // Demo and Audio don't have port usage
                     }
                     else
                     {
@@ -172,7 +178,7 @@ namespace SerialPlotDN_WPF.View.UserControls
 
                     // Update UI
                     SamplesPerSecondTextBlock.Text = samplesPerSecond.ToString();
-                    if (AssociatedDataStream.StreamType == "Demo")
+                    if (AssociatedDataStream.StreamType == "Demo" || AssociatedDataStream.StreamType == "Audio")
                     {
                         PortUsageTextBlock.Text = "N/A";
                     }

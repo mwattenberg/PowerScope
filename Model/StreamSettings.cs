@@ -55,15 +55,31 @@ namespace SerialPlotDN_WPF.Model
 
         public StreamSettings()
         {
-            DataBits = 8;
-            StopBits = 1;
-            Parity = Parity.None;
-            NumberOfChannels = 8;
-            DataFormat = DataFormatType.RawBinary;
-            FrameStart = "AA AA"; // Default frame start bytes as string representation
-            DemoSampleRate = 1000; // Default demo sample rate
-            DemoSignalType = "Sine Wave"; // Default demo signal type
-            StreamSource = StreamSource.SerialPort; // Default to serial port
+            // Set minimal defaults - let the UI configuration window set the actual values
+            DataBits = 8; // Keep reasonable default for serial
+            StopBits = 1; // Keep reasonable default for serial
+            Parity = Parity.None; // Keep reasonable default for serial
+            NumberOfChannels = 1; // Start with minimal default
+            DataFormat = DataFormatType.RawBinary; // Keep as default format
+            NumberType = NumberTypeEnum.Uint16; // Set reasonable default
+            Endianness = "LittleEndian"; // Set reasonable default
+            Delimiter = "Comma"; // Set reasonable default for ASCII
+            FrameStart = "AA AA"; // Keep default frame start bytes
+            
+            // Demo defaults
+            DemoSampleRate = 1000; // Keep for demo mode
+            DemoSignalType = "Sine Wave"; // Keep for demo mode
+            
+            // StreamSource will be set by the configuration dialog based on selected tab
+            StreamSource = StreamSource.SerialPort; // Default to serial port;
+            
+            // Leave other values as null/zero to be set by user input
+            Port = null;
+            Baud = 0;
+            AudioDevice = null;
+            AudioDeviceIndex = 0;
+            AudioSampleRate = 44100; // Set reasonable default for audio
+            EnableChecksum = false;
         }
 
         // Dataformat Tab properties

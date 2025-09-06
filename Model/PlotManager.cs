@@ -5,6 +5,7 @@ using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Threading;
 using System.Windows;
+using ScottPlot;
 using ScottPlot.Plottables;
 using ScottPlot.WPF;
 using Color = System.Windows.Media.Color;
@@ -32,7 +33,8 @@ namespace SerialPlotDN_WPF.Model
         /// <returns>WPF Color from the palette</returns>
         public static Color GetColor(int index)
         {
-            ScottPlot.Palettes.Category10 palette = new ScottPlot.Palettes.Category10();
+            IPalette palette = new ScottPlot.Palettes.Tsitsulin();
+            //ScottPlot.Palettes.Penumbra palette = new ScottPlot.Palettes.Penumbra();
             ScottPlot.Color scottPlotColor = palette.GetColor(index);
             return Color.FromArgb(scottPlotColor.A, scottPlotColor.R, scottPlotColor.G, scottPlotColor.B);
         }

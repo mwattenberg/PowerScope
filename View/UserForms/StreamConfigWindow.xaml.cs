@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.IO.Ports;
 using NAudio.Wave;
+using NAudio.CoreAudioApi;
 using System.Management;
 using System.Collections.Generic;
 using System.Windows.Input;
@@ -16,8 +17,12 @@ namespace SerialPlotDN_WPF.View.UserForms
     /// </summary>
     public partial class SerialConfigWindow : Window
     {
-        private readonly int[] CommonAudioSampleRates = new int[] { 8000, 16000, 22050, 44100, 48000, 96000 };
+        // Common fallback sample rates if device-specific rates can't be determined
+        private static readonly int[] FallbackSampleRates = new int[] { 8000, 16000, 22050, 44100, 48000, 96000 };
+        
         readonly List<PortInfo> ports = new List<PortInfo>();
+        private List<AudioDeviceInfo> audioDevices = new List<AudioDeviceInfo>();
+        
         public StreamSettings ViewModel { get; }
 
         public SerialConfigWindow(StreamSettings viewModel)
@@ -25,9 +30,14 @@ namespace SerialPlotDN_WPF.View.UserForms
             InitializeComponent();
             ViewModel = viewModel;
             this.DataContext = ViewModel;
+            
+            // Apply the ViewModel values to the window controls
+            ViewModel.ApplyToWindow(this);
+            
             Loaded += SerialConfigWindow_Loaded;
             Loaded += SerialConfigWindow_Loaded_AudioDevices;
             ComboBox_DataFormat.SelectionChanged += DataFormatCombo_SelectionChanged;
+            ComboBox_AudioDevices.SelectionChanged += ComboBox_AudioDevices_SelectionChanged;
             SetRawBinaryPanelVisibility();
             SetASCIIPanelVisibility();
         }
@@ -83,27 +93,199 @@ namespace SerialPlotDN_WPF.View.UserForms
                 "9600", "19200", "57600", "115200", "256000"
             };
             ComboBox_Baud.IsEditable = true;
-            //ComboBox_Baud.Text = "115200"; // Default value
         }
 
         private void SerialConfigWindow_Loaded_AudioDevices(object sender, RoutedEventArgs e)
         {
-            ComboBox_AudioDevices.Items.Clear();
-            for (int i = 0; i < WaveIn.DeviceCount; i++)
-            {
-                var deviceInfo = WaveIn.GetCapabilities(i);
-                ComboBox_AudioDevices.Items.Add(deviceInfo.ProductName);
-            }
-            if (ComboBox_AudioDevices.Items.Count > 0)
-                ComboBox_AudioDevices.SelectedIndex = 0;
+            LoadAudioDevices();
+            UpdateSampleRatesForCurrentDevice();
+        }
 
-            // Populate sample rates
+        private void LoadAudioDevices()
+        {
+            audioDevices.Clear();
+            ComboBox_AudioDevices.Items.Clear();
+            
+            try
+            {
+                // Use both WaveIn and WASAPI to get comprehensive device list
+                for (int i = 0; i < WaveIn.DeviceCount; i++)
+                {
+                    var deviceInfo = WaveIn.GetCapabilities(i);
+                    var audioDeviceInfo = new AudioDeviceInfo
+                    {
+                        Index = i,
+                        Name = deviceInfo.ProductName,
+                        WaveInCapabilities = deviceInfo
+                    };
+                    
+                    // Try to get WASAPI device for more detailed capabilities
+                    try
+                    {
+                        using (var deviceEnumerator = new MMDeviceEnumerator())
+                        {
+                            var devices = deviceEnumerator.EnumerateAudioEndPoints(DataFlow.Capture, DeviceState.Active);
+                            var wasapiDevice = devices.FirstOrDefault(d => d.FriendlyName.Contains(deviceInfo.ProductName) || 
+                                                                          deviceInfo.ProductName.Contains(d.FriendlyName));
+                            if (wasapiDevice != null)
+                            {
+                                audioDeviceInfo.WasapiDevice = wasapiDevice;
+                            }
+                        }
+                    }
+                    catch
+                    {
+                        // WASAPI device enumeration failed, continue with WaveIn only
+                    }
+                    
+                    audioDevices.Add(audioDeviceInfo);
+                    ComboBox_AudioDevices.Items.Add(audioDeviceInfo.Name);
+                }
+                
+                if (ComboBox_AudioDevices.Items.Count > 0)
+                    ComboBox_AudioDevices.SelectedIndex = 0;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error loading audio devices: {ex.Message}", "Audio Device Error", 
+                              MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+
+        private void ComboBox_AudioDevices_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            UpdateSampleRatesForCurrentDevice();
+        }
+
+        private void UpdateSampleRatesForCurrentDevice()
+        {
             ComboBox_SampleRates.Items.Clear();
-            foreach (var rate in CommonAudioSampleRates)
+            
+            if (ComboBox_AudioDevices.SelectedIndex < 0 || ComboBox_AudioDevices.SelectedIndex >= audioDevices.Count)
+            {
+                // No device selected, use fallback rates
+                PopulateFallbackSampleRates();
+                return;
+            }
+
+            var selectedDevice = audioDevices[ComboBox_AudioDevices.SelectedIndex];
+            var supportedRates = GetSupportedSampleRates(selectedDevice);
+            
+            if (supportedRates.Any())
+            {
+                foreach (var rate in supportedRates.OrderBy(r => r))
+                {
+                    ComboBox_SampleRates.Items.Add(rate.ToString());
+                }
+                
+                // Select a reasonable default (prefer 44100 or 48000)
+                var preferredRates = new[] { 44100, 48000, 22050, 16000 };
+                string selectedRate = null;
+                foreach (var preferred in preferredRates)
+                {
+                    if (supportedRates.Contains(preferred))
+                    {
+                        selectedRate = preferred.ToString();
+                        break;
+                    }
+                }
+                
+                // If no preferred rate found, select the middle one
+                if (selectedRate == null && supportedRates.Any())
+                {
+                    var sortedRates = supportedRates.OrderBy(r => r).ToList();
+                    selectedRate = sortedRates[sortedRates.Count / 2].ToString();
+                }
+                
+                ComboBox_SampleRates.SelectedItem = selectedRate ?? "44100";
+            }
+            else
+            {
+                // Couldn't determine supported rates, use fallback
+                PopulateFallbackSampleRates();
+            }
+        }
+
+        private void PopulateFallbackSampleRates()
+        {
+            foreach (var rate in FallbackSampleRates)
             {
                 ComboBox_SampleRates.Items.Add(rate.ToString());
             }
             ComboBox_SampleRates.SelectedItem = "44100";
+        }
+
+        private HashSet<int> GetSupportedSampleRates(AudioDeviceInfo deviceInfo)
+        {
+            var supportedRates = new HashSet<int>();
+            
+            try
+            {
+                // Test common sample rates to see what the device supports
+                var testRates = new int[] { 8000, 11025, 16000, 22050, 32000, 44100, 48000, 88200, 96000, 176400, 192000 };
+                
+                if (deviceInfo.WasapiDevice != null)
+                {
+                    // Use WASAPI to test supported formats
+                    try
+                    {
+                        using (var audioClient = deviceInfo.WasapiDevice.AudioClient)
+                        {
+                            var mixFormat = audioClient.MixFormat;
+                            
+                            foreach (var rate in testRates)
+                            {
+                                try
+                                {
+                                    var testFormat = new WaveFormat(rate, mixFormat.BitsPerSample, mixFormat.Channels);
+                                    
+                                    // Test if this format is supported
+                                    if (audioClient.IsFormatSupported(AudioClientShareMode.Shared, testFormat))
+                                    {
+                                        supportedRates.Add(rate);
+                                    }
+                                }
+                                catch
+                                {
+                                    // Format not supported, continue
+                                }
+                            }
+                        }
+                    }
+                    catch
+                    {
+                        // WASAPI testing failed, continue with fallback
+                    }
+                }
+                
+                // If WASAPI didn't yield results or we don't have WASAPI device, add common rates
+                if (!supportedRates.Any())
+                {
+                    // Add standard rates that most audio devices support
+                    supportedRates.UnionWith(new[] { 8000, 16000, 22050, 44100, 48000 });
+                    
+                    // If we have WaveIn capabilities, we can at least verify the device exists
+                    if (deviceInfo.WaveInCapabilities.HasValue)
+                    {
+                        // Device exists via WaveIn, so these rates are likely supported
+                        supportedRates.UnionWith(new[] { 11025, 32000, 96000 });
+                    }
+                }
+                
+                // If still no rates found, assume device supports common rates
+                if (!supportedRates.Any())
+                {
+                    supportedRates.UnionWith(FallbackSampleRates);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error getting supported sample rates: {ex.Message}");
+                // Return common rates as fallback
+                supportedRates.UnionWith(FallbackSampleRates);
+            }
+            
+            return supportedRates;
         }
 
         public string SelectedPort
@@ -362,5 +544,13 @@ namespace SerialPlotDN_WPF.View.UserForms
         public string Port { get; set; }
         public string Description { get; set; }
         public override string ToString() => Description; // For display in ComboBox
+    }
+
+    public class AudioDeviceInfo
+    {
+        public int Index { get; set; }
+        public string Name { get; set; }
+        public WaveInCapabilities? WaveInCapabilities { get; set; }
+        public MMDevice WasapiDevice { get; set; }
     }
 }

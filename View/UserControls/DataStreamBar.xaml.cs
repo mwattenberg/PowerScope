@@ -35,19 +35,21 @@ namespace SerialPlotDN_WPF.View.UserControls
         {
             StreamSettings settings = new StreamSettings();
             SerialConfigWindow configWindow = new SerialConfigWindow(settings);
+            
             if (configWindow.ShowDialog() == true)
             {
+                // Use the existing UpdateFromWindow method to ensure all properties are properly transferred
+                settings.UpdateFromWindow(configWindow);
+                
+                // Add to configured streams
                 ConfiguredDataStreams.Add(settings);
 
-                
                 // Create and connect IDataStream from config
                 var dataStream = CreateDataStreamFromUserInput(settings);
                 dataStream.Connect();
                 dataStream.StartStreaming();
 
                 ConnectedDataStreams.Add(dataStream);
-
-
 
                 UpdateChannels();
                 
@@ -66,6 +68,11 @@ namespace SerialPlotDN_WPF.View.UserControls
                     var demoStream = new DemoDataStream(demoSettings);
                     AddStreamInfoPanel(vm, demoStream);
                     return demoStream;
+                    
+                case StreamSource.AudioInput:
+                    var audioStream = new AudioDataStream(vm.AudioDevice, vm.AudioSampleRate);
+                    AddStreamInfoPanel(vm, audioStream);
+                    return audioStream;
                     
                 case StreamSource.SerialPort:
                 default:
@@ -135,47 +142,59 @@ namespace SerialPlotDN_WPF.View.UserControls
         /// <param name="viewModel">The stream view model to remove</param>
         public void RemoveStream(StreamSettings viewModel)
         {
-            if (ConfiguredDataStreams.Contains(viewModel))
+            if (!ConfiguredDataStreams.Contains(viewModel))
+                return;
+
+            viewModel.PropertyChanged -= DataStreamViewModel_PropertyChanged;
+
+            // Find and remove corresponding IDataStream using switch case
+            IDataStream streamToRemove = viewModel.StreamSource switch
             {
-                viewModel.PropertyChanged -= DataStreamViewModel_PropertyChanged;
-                // Find and remove corresponding IDataStream
-                IDataStream streamToRemove = null;
+                StreamSource.Demo => 
+                    ConnectedDataStreams.FirstOrDefault(ds => ds != null && ds.StreamType == "Demo"),
                 
-                if (viewModel.StreamSource == StreamSource.Demo)
-                {
-                    streamToRemove = ConnectedDataStreams.FirstOrDefault(ds => ds != null && ds.StreamType == "Demo");
-                }
-                else if (viewModel.StreamSource == StreamSource.SerialPort)
-                {
-                    streamToRemove = ConnectedDataStreams.FirstOrDefault(ds => ds != null && ds.StreamType == "Serial" && ds is SerialDataStream sds && sds.SourceSetting.PortName == viewModel.Port);
-                }
-                // Add other stream types as needed
+                StreamSource.SerialPort => 
+                    ConnectedDataStreams.FirstOrDefault(ds => ds != null && 
+                        ds.StreamType == "Serial" && 
+                        ds is SerialDataStream sds && 
+                        sds.SourceSetting.PortName == viewModel.Port),
                 
-                if (streamToRemove != null)
-                {
-                    streamToRemove.StopStreaming();
-                    streamToRemove.Disconnect();
-                    streamToRemove.Dispose();
-                    ConnectedDataStreams.Remove(streamToRemove);
-                }
-                ConfiguredDataStreams.Remove(viewModel);
+                StreamSource.AudioInput => 
+                    ConnectedDataStreams.FirstOrDefault(ds => ds != null && ds.StreamType == "Audio"),
                 
-                // Find and remove the StreamInfoPanel using the associated StreamSettings instead of DataContext
-                for (int i = Panel_Streams.Children.Count - 1; i >= 0; i--)
-                {
-                    if (Panel_Streams.Children[i] is StreamInfoPanel panel && 
-                        panel.AssociatedStreamSettings == viewModel)
-                    {
-                        Panel_Streams.Children.RemoveAt(i);
-                        break;
-                    }
-                }
+                StreamSource.USB => 
+                    ConnectedDataStreams.FirstOrDefault(ds => ds != null && ds.StreamType == "USB"),
                 
-                UpdateChannels();
-                
-                // Notify that streams have changed
-                StreamsChanged?.Invoke();
+                _ => null
+            };
+
+            // Clean up the stream if found
+            if (streamToRemove != null)
+            {
+                streamToRemove.StopStreaming();
+                streamToRemove.Disconnect();
+                streamToRemove.Dispose();
+                ConnectedDataStreams.Remove(streamToRemove);
             }
+
+            // Remove from configured streams
+            ConfiguredDataStreams.Remove(viewModel);
+
+            // Find and remove the StreamInfoPanel
+            for (int i = Panel_Streams.Children.Count - 1; i >= 0; i--)
+            {
+                if (Panel_Streams.Children[i] is StreamInfoPanel panel && 
+                    panel.AssociatedStreamSettings == viewModel)
+                {
+                    Panel_Streams.Children.RemoveAt(i);
+                    break;
+                }
+            }
+
+            UpdateChannels();
+
+            // Notify that streams have changed
+            StreamsChanged?.Invoke();
         }
 
         /// <summary>
