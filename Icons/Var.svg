@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title">
+  <title>Variance (spread)</title>
+  <!-- Bell curve -->
+  <path d="M8 34 C14 22,18 14,24 14 S34 22,40 34"
+        stroke="#E6EAF2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <!-- Outward arrows from the mean to show dispersion -->
+  <line x1="24" y1="26" x2="12" y2="26" stroke="#22D3EE" stroke-width="2" stroke-linecap="round"/>
+  <path d="M14 24 L12 26 L14 28" stroke="#22D3EE" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <line x1="24" y1="26" x2="36" y2="26" stroke="#22D3EE" stroke-width="2" stroke-linecap="round"/>
+  <path d="M34 24 L36 26 L34 28" stroke="#22D3EE" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>

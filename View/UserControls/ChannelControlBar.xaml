@@ -5,7 +5,7 @@
     <Border Height="auto" Background="{DynamicResource PlotSettings_BackgroundBrush}" CornerRadius="5"
             BorderBrush="{DynamicResource PlotSettings_BorderBrush}" BorderThickness="2" Margin="2">
         <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
-            <ItemsControl x:Name="ChannelItemsControl" Height="160" VerticalAlignment="Stretch">
+            <ItemsControl x:Name="ChannelItemsControl" Height="190" VerticalAlignment="Stretch">
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Top" Margin="4"/>

@@ -1,7 +1,10 @@
 ﻿using System.Collections.ObjectModel;
+using System.Collections.Specialized;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using SerialPlotDN_WPF.Model;
+using SerialPlotDN_WPF.View.UserControls;
 
 namespace SerialPlotDN_WPF.View.UserControls
 {
@@ -16,10 +19,23 @@ namespace SerialPlotDN_WPF.View.UserControls
         /// </summary>
         public ObservableCollection<ChannelSettings> ChannelSettings { get; private set; } = new ObservableCollection<ChannelSettings>();
 
+        /// <summary>
+        /// Event raised when a measurement is requested for a specific channel
+        /// </summary>
+        public event System.EventHandler<MeasurementRequestEventArgs> ChannelMeasurementRequested;
+
         public ChannelControlBar()
         {
             InitializeComponent();
             ChannelItemsControl.ItemsSource = ChannelSettings;
+            
+            // Subscribe to collection changes to update channel indices
+            ChannelItemsControl.Loaded += ChannelItemsControl_Loaded;
+        }
+
+        private void ChannelItemsControl_Loaded(object sender, RoutedEventArgs e)
+        {
+            UpdateChannelIndices();
         }
 
         /// <summary>
@@ -60,6 +76,69 @@ namespace SerialPlotDN_WPF.View.UserControls
 
                 ChannelSettings.Add(channelSettings);
             }
+            
+            // Update channel indices after changes
+            Dispatcher.BeginInvoke(() => UpdateChannelIndices());
+        }
+
+        /// <summary>
+        /// Updates channel indices and wire up event handlers for all ChannelControl instances
+        /// </summary>
+        private void UpdateChannelIndices()
+        {
+            for (int i = 0; i < ChannelItemsControl.Items.Count; i++)
+            {
+                var container = ChannelItemsControl.ItemContainerGenerator.ContainerFromIndex(i) as ContentPresenter;
+                if (container != null)
+                {
+                    var channelControl = FindChildOfType<ChannelControl>(container);
+                    if (channelControl != null)
+                    {
+                        // Set channel index
+                        channelControl.ChannelIndex = i;
+                        
+                        // Remove existing event handler to prevent duplicates
+                        channelControl.MeasurementRequested -= ChannelControl_MeasurementRequested;
+                        // Add event handler
+                        channelControl.MeasurementRequested += ChannelControl_MeasurementRequested;
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Handle measurement request from individual channel controls
+        /// </summary>
+        private void ChannelControl_MeasurementRequested(object sender, MeasurementRequestEventArgs e)
+        {
+            // Forward the event to parent controls
+            ChannelMeasurementRequested?.Invoke(this, e);
+        }
+
+        /// <summary>
+        /// Helper method to find child control of specific type
+        /// </summary>
+        private static T FindChildOfType<T>(DependencyObject parent) where T : DependencyObject
+        {
+            if (parent == null) return null;
+
+            T foundChild = null;
+            int childrenCount = System.Windows.Media.VisualTreeHelper.GetChildrenCount(parent);
+            for (int i = 0; i < childrenCount; i++)
+            {
+                var child = System.Windows.Media.VisualTreeHelper.GetChild(parent, i);
+                if (child is T)
+                {
+                    foundChild = (T)child;
+                    break;
+                }
+                else
+                {
+                    foundChild = FindChildOfType<T>(child);
+                    if (foundChild != null) break;
+                }
+            }
+            return foundChild;
         }
     }
 }

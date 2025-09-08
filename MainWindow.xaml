@@ -23,7 +23,7 @@
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="150" MinWidth="150"/>
                 <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="200" MinWidth="200"/>
+                <ColumnDefinition Width="120" MinWidth="120"/>
             </Grid.ColumnDefinitions>
             <!-- DataStreamBar (left) -->
             <UserControls:DataStreamBar Grid.Column="0" x:Name="DataStreamBar"/>
@@ -38,7 +38,7 @@
                 <ScrollBar x:Name="PlotScrollBar" Grid.Row="1" Orientation="Horizontal" Height="6" Margin="0,2,0,0" Background="{DynamicResource PlotSettings_BackgroundBrush}" Maximum="100" SmallChange="0.5" Value="100" Cursor="ScrollWE" ViewportSize="5" Foreground="Black" BorderBrush="{DynamicResource PlotSettings_BorderBrush}" Scroll="Scrollbar_ValueChanged"/>
             </Grid>
             <!-- MeasurementBar (right) -->
-            <UserControls:MeasurementBar Grid.Column="2" x:Name="MeasurementBar"/>
+            <UserControls:MeasurementBar Grid.Column="2" x:Name="MeasurementBar" Height="609" VerticalAlignment="Bottom"/>
         </Grid>
         <!-- Bottom controls: 4 columns for each control -->
         <Grid Grid.Row="2" Margin="0,5,0,0" MinHeight="110">

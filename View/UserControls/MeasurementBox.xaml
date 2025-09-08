@@ -5,75 +5,82 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:SerialPlotDN_WPF.View.UserControls"
              mc:Ignorable="d" 
-             d:DesignHeight="120" d:DesignWidth="200">
+             d:DesignHeight="60" d:DesignWidth="120"
+             MinWidth="100" MinHeight="60">
+
+    <UserControl.Resources>
+        <!-- Value converter for colors -->
+        <local:ColorToBrushConverter x:Key="ColorToBrushConverter"/>
+    </UserControl.Resources>
+
     <Grid Background="{DynamicResource PlotSettings_BackgroundBrush}" Margin="2">
         <Grid.RowDefinitions>
-            <RowDefinition Height="25"/>   <!-- Header row with title and remove button -->
-            <RowDefinition Height="*"/>    <!-- Content area -->
+            <RowDefinition Height="20"/>
+            <!-- Header row with colored background -->
+            <RowDefinition Height="*"/>
+            <!-- Measurement result area -->
         </Grid.RowDefinitions>
 
-        <!-- Header row -->
-        <Grid Grid.Row="0" Background="{DynamicResource PlotSettings_TextBoxBackgroundBrush}">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="20"/>
-            </Grid.ColumnDefinitions>
-            
-            <!-- Measurement type and channel info -->
-            <TextBlock Grid.Column="0" 
-                       Text="{Binding Type}" 
-                       Foreground="{DynamicResource PlotSettings_ButtonForegroundBrush}" 
-                       HorizontalAlignment="Left" 
-                       VerticalAlignment="Center"
-                       FontSize="10" 
-                       FontWeight="Bold"
-                       Margin="5,0,0,0"/>
-            
-            <!-- Remove button -->
-            <Button Grid.Column="1"
-                    Content="×"
-                    Click="Button_Remove_Click"
-                    Background="Transparent"
-                    BorderThickness="0"
-                    Foreground="{DynamicResource PlotSettings_ButtonForegroundBrush}"
-                    FontSize="12"
-                    FontWeight="Bold"
-                    HorizontalAlignment="Center"
-                    VerticalAlignment="Center"
-                    Width="20"
-                    Height="20"
-                    ToolTip="Remove measurement"/>
-        </Grid>
+        <!-- Header row with colored background matching ChannelControl -->
+        <Border Grid.Row="0" 
+                Background="{Binding DisplayColor, Converter={StaticResource ColorToBrushConverter}}" 
+                CornerRadius="2" 
+                Height="20">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="20"/>
+                </Grid.ColumnDefinitions>
 
-        <!-- Content area -->
-        <Grid Grid.Row="1" Background="{DynamicResource PlotSettings_BackgroundBrush}" Margin="2">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="*"/>
-            </Grid.RowDefinitions>
-            
-            <!-- Channel label -->
-            <TextBlock Grid.Row="0"
-                       Text="Channel 1"
-                       Foreground="{DynamicResource PlotSettings_ButtonForegroundBrush}"
-                       HorizontalAlignment="Center"
-                       FontSize="9"
-                       Margin="0,2"/>
-            
+                <!-- Channel Label - Uses data binding for automatic updates -->
+                <TextBlock Grid.Column="0" 
+                           x:Name="ChannelLabelTextBlock"
+                           Text="{Binding Label}"
+                           Foreground="White" 
+                           HorizontalAlignment="Left" 
+                           VerticalAlignment="Center"
+                           FontWeight="Bold"
+                           FontSize="10"
+                           Margin="5,0,5,0"/>
+
+                <!-- Measurement Type Label - Set programmatically -->
+                <TextBlock 
+                           x:Name="MeasurementTypeTextBlock"
+                           Text="Temp"
+                           Foreground="White" 
+                           HorizontalAlignment="Center" 
+                           VerticalAlignment="Center"
+                           FontWeight="Bold"
+                           FontSize="10"/>
+
+                <!-- Remove button -->
+                <Button Grid.Column="2"
+                        Content="×"
+                        Click="Button_Remove_Click"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        Foreground="White"
+                        FontSize="12"
+                        FontWeight="Bold"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Width="20"
+                        Height="20"
+                        ToolTip="Remove measurement"/>
+            </Grid>
+        </Border>
+
+        <!-- Measurement result area -->
+        <Grid Grid.Row="1" Background="{DynamicResource PlotSettings_BackgroundBrush}">
             <!-- Result value -->
-            <TextBlock Grid.Row="1"
-                       Text="{Binding Result, StringFormat=F3}"
+            <TextBlock x:Name="ResultTextBlock"
+                       Text="0.000"
                        Foreground="{DynamicResource PlotSettings_ButtonForegroundBrush}"
                        HorizontalAlignment="Center"
-                       FontSize="14"
-                       FontWeight="Bold"
-                       Margin="0,5"/>
-            
-            <!-- Additional info area -->
-            <StackPanel Grid.Row="2" Orientation="Vertical" HorizontalAlignment="Center" VerticalAlignment="Top">
-                <!-- Could add more measurement details here if needed -->
-            </StackPanel>
+                       VerticalAlignment="Center"
+                       FontSize="16"
+                       FontWeight="Bold"/>
         </Grid>
     </Grid>
 </UserControl>

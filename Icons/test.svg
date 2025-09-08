@@ -1,0 +1,107 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="420" viewBox="0 0 900 420">
+<defs>
+<!-- Arrowheads -->
+<marker id="arrow-red" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+<path d="M0,0 L8,4 L0,8 Z" fill="#d22"/>
+</marker>
+<marker id="arrow-blue" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+<path d="M0,0 L8,4 L0,8 Z" fill="#2456a8"/>
+</marker>
+<marker id="arrow-green" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+<path d="M0,0 L8,4 L0,8 Z" fill="#1a8a1a"/>
+</marker>
+</defs>
+
+<style>
+.box { fill:#fff; stroke:#000; stroke-width:2; vector-effect:non-scaling-stroke; }
+.box-group { fill:none; stroke:#777; stroke-width:2; stroke-dasharray:6 6; }
+.label { font: 14px Arial, Helvetica, sans-serif; fill:#000; }
+.small { font: 12px Arial, Helvetica, sans-serif; fill:#000; }
+.wireP { fill:none; stroke:#d22; stroke-width:3; vector-effect:non-scaling-stroke; }
+.wireN { fill:none; stroke:#2456a8; stroke-width:3; vector-effect:non-scaling-stroke; }
+.wireFB { fill:none; stroke:#1a8a1a; stroke-width:2.5; stroke-dasharray:7 5; vector-effect:non-scaling-stroke; }
+.node { fill:#fff; stroke:#000; stroke-width:1.5; }
+</style>
+
+<!-- Group boundary around the stacked converters -->
+<rect class="box-group" x="500" y="60" width="260" height="320" rx="6"/>
+
+<!-- Converter boxes -->
+<rect class="box" x="70" y="140" width="220" height="160" rx="6"/>
+<rect class="box" x="520" y="80" width="220" height="120" rx="6"/>
+<rect class="box" x="520" y="240" width="220" height="120" rx="6"/>
+
+<!-- Labels -->
+<text class="label" x="180" y="165" text-anchor="middle">DC/DC 1</text>
+<text class="small" x="180" y="185" text-anchor="middle">(source / pre-reg)</text>
+
+<text class="label" x="630" y="105" text-anchor="middle">DC/DC 2</text>
+<text class="label" x="630" y="265" text-anchor="middle">DC/DC 3</text>
+
+<text class="small" x="825" y="52" text-anchor="end">Feedback from DC/DC 2</text>
+<text class="small" x="505" y="48" text-anchor="start">Stacked stage</text>
+
+<!-- Connection symbols (+ / -) near pins -->
+<!-- Left converter output pins -->
+<text class="small" x="288" y="184" text-anchor="start">+</text>
+<text class="small" x="288" y="244" text-anchor="start">−</text>
+
+<!-- Right converters input pins -->
+<text class="small" x="523" y="124" text-anchor="start">+</text>
+<text class="small" x="523" y="164" text-anchor="start">−</text>
+<text class="small" x="523" y="284" text-anchor="start">+</text>
+<text class="small" x="523" y="324" text-anchor="start">−</text>
+
+<!-- Right converters output pins -->
+<text class="small" x="742" y="124" text-anchor="end">+</text>
+<text class="small" x="742" y="164" text-anchor="end">−</text>
+<text class="small" x="742" y="284" text-anchor="end">+</text>
+<text class="small" x="742" y="324" text-anchor="end">−</text>
+
+<!-- Nodes (optional visual anchors) -->
+<!-- Left converter output nodes -->
+<circle class="node" cx="290" cy="180" r="3.5"/>
+<circle class="node" cx="290" cy="240" r="3.5"/>
+
+<!-- Right converter input nodes -->
+<circle class="node" cx="520" cy="120" r="3.5"/>
+<circle class="node" cx="520" cy="160" r="3.5"/>
+<circle class="node" cx="520" cy="280" r="3.5"/>
+<circle class="node" cx="520" cy="320" r="3.5"/>
+
+<!-- Right converter output nodes -->
+<circle class="node" cx="740" cy="120" r="3.5"/>
+<circle class="node" cx="740" cy="160" r="3.5"/>
+<circle class="node" cx="740" cy="280" r="3.5"/>
+<circle class="node" cx="740" cy="320" r="3.5"/>
+
+<!-- Feedback entry point on left converter -->
+<circle class="node" cx="70" cy="170" r="3.5"/>
+<text class="small" x="78" y="174">FB</text>
+
+<!-- Positive power bus: DC/DC 1 -> both right converters -->
+<path class="wireP" marker-end="url(#arrow-red)"
+d="M290,180 H500"/>
+<path class="wireP" d="M500,180 V120"/>
+<path class="wireP" marker-end="url(#arrow-red)" d="M500,120 H520"/>
+<path class="wireP" d="M500,180 V280"/>
+<path class="wireP" marker-end="url(#arrow-red)" d="M500,280 H520"/>
+
+<!-- Negative/return bus: DC/DC 1 -> both right converters -->
+<path class="wireN" marker-end="url(#arrow-blue)"
+d="M290,240 H480"/>
+<path class="wireN" d="M480,240 V160"/>
+<path class="wireN" marker-end="url(#arrow-blue)" d="M480,160 H520"/>
+<path class="wireN" d="M480,240 V320"/>
+<path class="wireN" marker-end="url(#arrow-blue)" d="M480,320 H520"/>
+
+<!-- Right converters outputs (short stubs) -->
+<path class="wireP" d="M740,120 H770"/>
+<path class="wireN" d="M740,160 H770"/>
+<path class="wireP" d="M740,280 H770"/>
+<path class="wireN" d="M740,320 H770"/>
+
+<!-- Feedback path from top-right converter's positive output back to DC/DC 1 -->
+<path class="wireFB" marker-end="url(#arrow-green)"
+d="M770,120 H820 V80 H100 V170 H70"/>
+</svg>

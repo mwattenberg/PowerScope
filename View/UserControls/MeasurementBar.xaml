@@ -5,7 +5,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:SerialPlotDN_WPF.View.UserControls"
              mc:Ignorable="d" 
-             d:DesignHeight="600" d:DesignWidth="120">
+             d:DesignHeight="600" d:DesignWidth="100">
     <Grid Background="{DynamicResource PlotSettings_BackgroundBrush}" MinWidth="120">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>      <!-- Button area -->
@@ -14,11 +14,6 @@
 
         <!-- Buttons area -->
         <Grid Grid.Row="0" Margin="0,0,0,10">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-            </Grid.RowDefinitions>
-
             <!-- Cursor button -->
             <Button Content="Cursor"
                     Click="Button_Cursor_Click"
@@ -28,24 +23,10 @@
                     Background="{DynamicResource PlotSettings_TextBoxBackgroundBrush}"
                     Foreground="{DynamicResource PlotSettings_ButtonForegroundBrush}"
                     HorizontalAlignment="Stretch"
-                    VerticalAlignment="Top"
-                    Grid.Row="0"
-                    Margin="0,0,0,5"/>
-
-            <!-- Measure button -->
-            <Button Content="Measure"
-                    Click="Button_Measure_Click"
-                    x:Name="Button_Measure"
-                    Height="32"
-                    BorderThickness="0"
-                    Background="{DynamicResource PlotSettings_TextBoxBackgroundBrush}"
-                    Foreground="{DynamicResource PlotSettings_ButtonForegroundBrush}"
-                    HorizontalAlignment="Stretch"
-                    VerticalAlignment="Top"
-                    Grid.Row="1"/>
+                    VerticalAlignment="Top"/>
         </Grid>
 
         <!-- List of measurement boxes -->
-        <StackPanel x:Name="Panel_MeasurementBoxes" Grid.Row="1"/>
+        <StackPanel x:Name="Panel_MeasurementBoxes" Grid.Row="1" VerticalAlignment="Top"/>
     </Grid>
 </UserControl>

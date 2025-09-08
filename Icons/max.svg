@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title">
+  <title>Max</title>
+  <g stroke="#E6EAF2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M6 24 L12 22 L18 18 L24 12 L30 20 L36 26 L42 22"/>
+  </g>
+  <g stroke="#22D3EE" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M22 18 L24 16 L26 18"/>
+  </g>
+  <circle cx="24" cy="12" r="2.5" fill="#22D3EE"/>
+</svg>

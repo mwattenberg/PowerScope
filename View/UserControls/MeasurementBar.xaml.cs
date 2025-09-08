@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
-using System.Timers;
 using System.Windows;
 using System.Windows.Controls;
 using SerialPlotDN_WPF.Model;
@@ -22,17 +22,30 @@ namespace SerialPlotDN_WPF.View.UserControls
         // Reference to DataStreamBar to access connected streams
         private DataStreamBar _dataStreamBar;
         
-        public MeasurementBar()
+        // Reference to ChannelSettings collection
+        private ObservableCollection<ChannelSettings> _channelSettings;
+        
+        /// <summary>
+        /// DataStreamBar dependency - must be set after construction when using XAML instantiation
+        /// </summary>
+        public DataStreamBar DataStreamBar
         {
-            InitializeComponent();
+            get => _dataStreamBar;
+            set => _dataStreamBar = value ?? throw new ArgumentNullException(nameof(value));
         }
         
         /// <summary>
-        /// Initialize with reference to DataStreamBar to access data streams
+        /// ChannelSettings dependency - must be set after construction when using XAML instantiation
         /// </summary>
-        public void Initialize(DataStreamBar dataStreamBar)
+        public ObservableCollection<ChannelSettings> ChannelSettings
         {
-            _dataStreamBar = dataStreamBar;
+            get => _channelSettings;
+            set => _channelSettings = value ?? throw new ArgumentNullException(nameof(value));
+        }
+        
+        public MeasurementBar()
+        {
+            InitializeComponent();
         }
 
         private void Button_Cursor_Click(object sender, RoutedEventArgs e)
@@ -41,59 +54,74 @@ namespace SerialPlotDN_WPF.View.UserControls
             // This could show/hide plot cursors or create cursor-related measurements
         }
 
-        private void Button_Measure_Click(object sender, RoutedEventArgs e)
-        {
-            // Create RMS measurement for Channel 1 as requested
-            AddMeasurement(MeasurementType.Rms, 0); // Channel 0 (which displays as Channel 1)
-        }
-        
         /// <summary>
         /// Add a measurement for a specific channel and measurement type
         /// </summary>
         /// <param name="measurementType">Type of measurement to create</param>
         /// <param name="channelIndex">Zero-based channel index</param>
-        private void AddMeasurement(MeasurementType measurementType, int channelIndex)
+        public void AddMeasurement(MeasurementType measurementType, int channelIndex)
         {
-            // Check if we have any connected streams
-            if (_dataStreamBar == null || _dataStreamBar.ConnectedDataStreams.Count == 0)
+            // Check if DataStreamBar is set
+            if (_dataStreamBar == null)
             {
-                MessageBox.Show("No data streams are connected. Please add and connect a data stream first.", 
+                MessageBox.Show("DataStreamBar is not initialized. This is a programming error.",
+                              "Configuration Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+
+            // Check if ChannelSettings is set
+            if (_channelSettings == null)
+            {
+                MessageBox.Show("ChannelSettings is not initialized. This is a programming error.",
+                              "Configuration Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+
+            // Check if we have any connected streams
+            if (_dataStreamBar.ConnectedDataStreams.Count == 0)
+            {
+                MessageBox.Show("No data streams are connected. Please add and connect a data stream first.",
                               "No Data Available", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
-            
-            // Verify the channel exists by trying to get some data
-            if (!VerifyChannelExists(channelIndex))
+
+            // Check if we have channel settings for this channel
+            if (_channelSettings.Count <= channelIndex)
             {
-                MessageBox.Show($"Channel {channelIndex + 1} is not available. Please check your data streams.", 
+                MessageBox.Show($"Channel {channelIndex + 1} settings are not available.",
+                              "Channel Settings Not Available", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            // Find which data stream contains this channel
+            var (dataStream, localChannelIndex) = FindDataStreamForChannel(channelIndex);
+            if (dataStream == null)
+            {
+                MessageBox.Show($"Channel {channelIndex + 1} is not available. Please check your data streams.",
                               "Channel Not Available", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
-            
+
             _measurementCounter++;
-            
-            // Create a simple buffer that will be refreshed each time
-            double[] dataBuffer = new double[5000]; // Fixed size buffer
-            
-            // Create the measurement - since we can't change the constructor, 
-            // we'll have to update the buffer regularly
-            var measurement = new Measurement(measurementType, dataBuffer);
-            
-            // Start a separate timer to update the buffer with fresh data
-            var dataUpdateTimer = new System.Timers.Timer(90); // Slightly faster than measurement timer
-            dataUpdateTimer.Elapsed += (s, e) => UpdateDataBuffer(channelIndex, dataBuffer);
-            dataUpdateTimer.Start();
-            
+
+            // Create the measurement - now it handles all data management internally!
+            var measurement = new Measurement(measurementType, dataStream, localChannelIndex);
             ActiveMeasurements.Add(measurement);
+            
+            // Get the actual ChannelSettings object for this channel
+            var channelSetting = _channelSettings[channelIndex];
             
             // Create the UI representation
             var measurementBox = new MeasurementBox();
-            measurementBox.DataContext = measurement; // Set the Measurement as DataContext
+            // Set the actual ChannelSettings as DataContext - no more ChannelInfo needed!
+            measurementBox.DataContext = channelSetting;
+            
+            // Set the measurement for result updates - MeasurementBox can now bind directly to measurement.Result
+            measurementBox.SetMeasurement(measurement);
             
             // Subscribe to remove event
             measurementBox.OnRemoveClickedEvent += (s, args) => 
             {
-                dataUpdateTimer?.Dispose(); // Clean up the data update timer
                 RemoveMeasurement(measurement, measurementBox);
             };
             
@@ -102,52 +130,26 @@ namespace SerialPlotDN_WPF.View.UserControls
         }
         
         /// <summary>
-        /// Verify that a channel exists and has data
+        /// Find which data stream contains the specified global channel index
         /// </summary>
-        private bool VerifyChannelExists(int channelIndex)
+        /// <param name="globalChannelIndex">Global channel index across all streams</param>
+        /// <returns>Tuple of (DataStream, LocalChannelIndex) or (null, -1) if not found</returns>
+        private (IDataStream dataStream, int localChannelIndex) FindDataStreamForChannel(int globalChannelIndex)
         {
             int currentChannelOffset = 0;
             
             foreach (var dataStream in _dataStreamBar.ConnectedDataStreams)
             {
-                if (channelIndex < currentChannelOffset + dataStream.ChannelCount)
-                {
-                    // Channel exists in this stream
-                    return true;
-                }
-                currentChannelOffset += dataStream.ChannelCount;
-            }
-            
-            return false; // Channel not found
-        }
-        
-        /// <summary>
-        /// Update the data buffer with fresh data from the specified channel
-        /// </summary>
-        private void UpdateDataBuffer(int channelIndex, double[] buffer)
-        {
-            int currentChannelOffset = 0;
-            
-            foreach (var dataStream in _dataStreamBar.ConnectedDataStreams)
-            {
-                if (channelIndex < currentChannelOffset + dataStream.ChannelCount)
+                if (globalChannelIndex < currentChannelOffset + dataStream.ChannelCount)
                 {
                     // This stream contains our target channel
-                    int localChannelIndex = channelIndex - currentChannelOffset;
-                    
-                    // Update the buffer with latest data
-                    try
-                    {
-                        dataStream.CopyLatestTo(localChannelIndex, buffer, buffer.Length);
-                    }
-                    catch
-                    {
-                        // Ignore errors - measurement will just use stale data
-                    }
-                    return;
+                    int localChannelIndex = globalChannelIndex - currentChannelOffset;
+                    return (dataStream, localChannelIndex);
                 }
                 currentChannelOffset += dataStream.ChannelCount;
             }
+            
+            return (null, -1); // Channel not found
         }
         
         /// <summary>
@@ -155,7 +157,7 @@ namespace SerialPlotDN_WPF.View.UserControls
         /// </summary>
         private void RemoveMeasurement(Measurement measurement, MeasurementBox measurementBox)
         {
-            // Dispose the measurement (stops timer)
+            // Dispose the measurement (stops timer and cleans up)
             measurement?.Dispose();
             
             // Remove from lists
@@ -171,7 +173,7 @@ namespace SerialPlotDN_WPF.View.UserControls
         /// </summary>
         public void ClearAllMeasurements()
         {
-            // Dispose all measurements
+            // Dispose all measurements (each handles its own cleanup)
             foreach (var measurement in ActiveMeasurements)
             {
                 measurement?.Dispose();

@@ -16,8 +16,13 @@
     <PackageReference Include="NAudio" Version="2.2.1" />
     <PackageReference Include="RJCP.SerialPortStream" Version="3.0.3" />
     <PackageReference Include="ScottPlot.WPF" Version="5.0.55" />
+    <PackageReference Include="SharpVectors.Wpf" Version="1.8.5" />
     <PackageReference Include="System.IO.Ports" Version="10.0.0-preview.6.25358.103" />
     <PackageReference Include="System.Management" Version="9.0.7" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Icons\*.svg" />
   </ItemGroup>
 
 </Project>

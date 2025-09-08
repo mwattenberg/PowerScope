@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title">
+  <title>RMS (adjusted)</title>
+  <!-- Sine-like waveform -->
+  <path d="M6 24 C10 16,14 16,18 24 S26 32,30 24 S38 16,42 24"
+        stroke="#E6EAF2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <!-- RMS level line placed a bit below the peak -->
+  <line x1="6" y1="19.5" x2="42" y2="19.5"
+        stroke="#22D3EE" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

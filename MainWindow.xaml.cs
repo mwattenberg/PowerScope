@@ -12,6 +12,7 @@ using System.Xml.Linq;
 using ScottPlot.Plottables;
 using SerialPlotDN_WPF.Model;
 using SerialPlotDN_WPF.View.UserControls;
+using SerialPlotDN_WPF.View.UserForms;
 
 
 
@@ -56,8 +57,9 @@ namespace SerialPlotDN_WPF
             HorizontalControl.Settings = _plotManager.Settings;
             VerticalControl.Settings = _plotManager.Settings;
             
-            // Initialize MeasurementBar with DataStreamBar reference
-            MeasurementBar.Initialize(DataStreamBar);
+            // Set dependencies for MeasurementBar
+            MeasurementBar.DataStreamBar = DataStreamBar;
+            MeasurementBar.ChannelSettings = ChannelControlBar.ChannelSettings;
             
             // Initialize default values through PlotSettings
             _plotManager.Settings.Xmax = DisplayElements; // Set initial window size
@@ -85,6 +87,25 @@ namespace SerialPlotDN_WPF
                 // Update data streams when streams are added or removed
                 _plotManager.SetDataStreams(DataStreamBar.ConnectedDataStreams);
             };
+            
+            // Handle measurement requests from individual channel controls
+            ChannelControlBar.ChannelMeasurementRequested += ChannelControlBar_MeasurementRequested;
+        }
+
+        /// <summary>
+        /// Handle measurement request from ChannelControlBar
+        /// </summary>
+        private void ChannelControlBar_MeasurementRequested(object sender, MeasurementRequestEventArgs e)
+        {
+            // Show simplified measurement selection dialog (no channel selection needed)
+            var measurementSelection = new MeasurementSelection();
+            
+            if (measurementSelection.ShowDialog() == true && 
+                measurementSelection.SelectedMeasurementType.HasValue)
+            {
+                // Create measurement using the requesting channel's index and the selected measurement type
+                MeasurementBar.AddMeasurement(measurementSelection.SelectedMeasurementType.Value, e.ChannelIndex);
+            }
         }
 
         private void RunControl_RunStateChanged(object? sender, RunControl.RunStates newState)

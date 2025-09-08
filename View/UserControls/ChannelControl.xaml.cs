@@ -7,6 +7,7 @@ using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
 using SerialPlotDN_WPF.Model;
+using SerialPlotDN_WPF.View.UserForms;
 
 namespace SerialPlotDN_WPF.View.UserControls
 {
@@ -29,11 +30,31 @@ namespace SerialPlotDN_WPF.View.UserControls
         }
     }
 
+    /// <summary>
+    /// Event args for measurement request
+    /// </summary>
+    public class MeasurementRequestEventArgs : EventArgs
+    {
+        public int ChannelIndex { get; }
+        public ChannelSettings ChannelSettings { get; }
+
+        public MeasurementRequestEventArgs(int channelIndex, ChannelSettings channelSettings)
+        {
+            ChannelIndex = channelIndex;
+            ChannelSettings = channelSettings;
+        }
+    }
+
     public partial class ChannelControl : UserControl
     {
         private static readonly Color DisabledColor = Colors.Gray;
         private static readonly Brush SelectedBrush = new SolidColorBrush(Colors.LimeGreen);
         private static readonly Brush DefaultBrush = new SolidColorBrush(DisabledColor);
+
+        /// <summary>
+        /// Event raised when user requests to add a measurement for this channel
+        /// </summary>
+        public event EventHandler<MeasurementRequestEventArgs> MeasurementRequested;
 
         /// <summary>
         /// Gets the ChannelSettings from DataContext
@@ -45,6 +66,11 @@ namespace SerialPlotDN_WPF.View.UserControls
                 return DataContext as ChannelSettings; 
             } 
         }
+
+        /// <summary>
+        /// Channel index for this control (set by parent container)
+        /// </summary>
+        public int ChannelIndex { get; set; } = -1;
 
         public ChannelControl()
         {
@@ -84,6 +110,15 @@ namespace SerialPlotDN_WPF.View.UserControls
             }
         }
 
+        private void ButtonMeasure_Click(object sender, RoutedEventArgs e)
+        {
+            // Raise measurement request event
+            if (Settings != null && ChannelIndex >= 0)
+            {
+                MeasurementRequested?.Invoke(this, new MeasurementRequestEventArgs(ChannelIndex, Settings));
+            }
+        }
+
         // Input validation methods
         private void DecimalOnly_PreviewTextInput(object sender, TextCompositionEventArgs e)
         {
@@ -101,12 +136,12 @@ namespace SerialPlotDN_WPF.View.UserControls
 
         private static bool IsDecimal(string text)
         {
-            return Regex.IsMatch(text, @"^[0-9]*\.?[0-9]*$") && text != "." && !text.EndsWith("..");
+            return Regex.IsMatch(text, @"^[0-9]*\.?[0-9]*$") && text.Length > 0;
         }
 
         private static bool IsSignedDecimal(string text)
         {
-            return Regex.IsMatch(text, @"^-?[0-9]*\.?[0-9]*$") && text != "." && text != "-" && !text.EndsWith("..") && !text.EndsWith("-.");
+            return Regex.IsMatch(text, @"^-?[0-9]*\.?[0-9]*$") && text.Length > 0;
         }
     }
 }

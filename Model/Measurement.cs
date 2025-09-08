@@ -25,32 +25,37 @@ namespace SerialPlotDN_WPF.Model
     public delegate double CalculationFunction(ReadOnlySpan<double> data);
 
     /// <summary>
-    /// Simplified measurement class that calculates only one specific measurement type
-    /// Uses function pointer pattern and automatic timer-based updates every 100ms
+    /// Self-contained measurement class that manages its own data copying and calculations
+    /// Takes a DataStream and channel index, handles all data management internally
     /// </summary>
     public class Measurement : INotifyPropertyChanged, IDisposable
     {
         private readonly MeasurementType _measurementType;
         private readonly CalculationFunction _calculationFunction;
-        private readonly double[] _data;
+        private readonly IDataStream _dataStream;
+        private readonly int _channelIndex;
+        private readonly double[] _dataBuffer;
         private readonly System.Timers.Timer _updateTimer;
         
         // Single measurement result
         private double _result = 0.0;
 
         /// <summary>
-        /// Constructor with measurement type and data reference
+        /// Constructor with measurement type, data stream, and channel
         /// </summary>
         /// <param name="measurementType">Type of measurement to perform</param>
-        /// <param name="data">Reference to data array to operate on</param>
-        public Measurement(MeasurementType measurementType, double[] data)
+        /// <param name="dataStream">Data stream to read from</param>
+        /// <param name="channelIndex">Zero-based channel index</param>
+        public Measurement(MeasurementType measurementType, IDataStream dataStream, int channelIndex)
         {
             _measurementType = measurementType;
-            _data = data ?? throw new ArgumentNullException(nameof(data));
+            _dataStream = dataStream ?? throw new ArgumentNullException(nameof(dataStream));
+            _channelIndex = channelIndex;
+            _dataBuffer = new double[5000]; // Fixed buffer size
             _calculationFunction = GetCalculationFunction(measurementType);
 
-            // Setup timer for automatic updates every 100ms
-            _updateTimer = new System.Timers.Timer(100) // 100ms interval
+            // Setup timer for automatic updates every 90ms
+            _updateTimer = new System.Timers.Timer(90)
             {
                 AutoReset = true,
                 Enabled = true
@@ -81,22 +86,27 @@ namespace SerialPlotDN_WPF.Model
         }
 
         /// <summary>
-        /// Timer elapsed event handler - automatically calculates and updates result
+        /// Timer elapsed event handler - copies fresh data and calculates result
         /// </summary>
         private void OnTimerElapsed(object sender, ElapsedEventArgs e)
         {
-            if (_data != null && _data.Length > 0)
+            try
             {
-                try
+                // Copy fresh data from the data stream
+                int samplesCopied = _dataStream.CopyLatestTo(_channelIndex, _dataBuffer, _dataBuffer.Length);
+                
+                if (samplesCopied > 0)
                 {
-                    // Calculate using the function pointer and update result
-                    var newResult = _calculationFunction(_data.AsSpan());
+                    // Calculate using only the valid data and update result
+                    var validData = _dataBuffer.AsSpan(0, samplesCopied);
+                    var newResult = _calculationFunction(validData);
                     Result = newResult;
                 }
-                catch
-                {
-                    // Ignore calculation errors (e.g., if data is being modified during calculation)
-                }
+            }
+            catch
+            {
+                // Ignore errors - measurement will just use stale data
+                // This can happen if the data stream is being disposed or has errors
             }
         }
 
