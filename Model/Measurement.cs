@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
-using System.Timers;
+using System.Threading;
 
 namespace SerialPlotDN_WPF.Model
 {
@@ -35,10 +35,11 @@ namespace SerialPlotDN_WPF.Model
         private readonly IDataStream _dataStream;
         private readonly int _channelIndex;
         private readonly double[] _dataBuffer;
-        private readonly System.Timers.Timer _updateTimer;
+        private readonly Timer _updateTimer;
         
         // Single measurement result
         private double _result = 0.0;
+        private bool _disposed = false;
 
         /// <summary>
         /// Constructor with measurement type, data stream, and channel
@@ -54,14 +55,8 @@ namespace SerialPlotDN_WPF.Model
             _dataBuffer = new double[5000]; // Fixed buffer size
             _calculationFunction = GetCalculationFunction(measurementType);
 
-            // Setup timer for automatic updates every 90ms
-            _updateTimer = new System.Timers.Timer(90)
-            {
-                AutoReset = true,
-                Enabled = true
-            };
-            _updateTimer.Elapsed += OnTimerElapsed;
-            _updateTimer.Start();
+            // Setup Threading.Timer for automatic updates every 90ms
+            _updateTimer = new Timer(OnTimerCallback, null, TimeSpan.FromMilliseconds(90), TimeSpan.FromMilliseconds(200));
         }
 
         /// <summary>
@@ -86,10 +81,12 @@ namespace SerialPlotDN_WPF.Model
         }
 
         /// <summary>
-        /// Timer elapsed event handler - copies fresh data and calculates result
+        /// Timer callback - copies fresh data and calculates result
         /// </summary>
-        private void OnTimerElapsed(object sender, ElapsedEventArgs e)
+        private void OnTimerCallback(object state)
         {
+            if (_disposed) return;
+
             try
             {
                 // Copy fresh data from the data stream
@@ -233,8 +230,11 @@ namespace SerialPlotDN_WPF.Model
 
         public void Dispose()
         {
-            _updateTimer?.Stop();
-            _updateTimer?.Dispose();
+            if (!_disposed)
+            {
+                _disposed = true;
+                _updateTimer?.Dispose();
+            }
         }
 
         #endregion
