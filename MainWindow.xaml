@@ -23,7 +23,7 @@
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="150" MinWidth="150"/>
                 <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="120" MinWidth="120"/>
+                <ColumnDefinition Width="140" MinWidth="140"/>
             </Grid.ColumnDefinitions>
             <!-- DataStreamBar (left) -->
             <UserControls:DataStreamBar Grid.Column="0" x:Name="DataStreamBar"/>
@@ -33,15 +33,15 @@
                     <RowDefinition Height="*"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
-                <ScottPlot:WpfPlotGL x:Name="WpfPlot1" Grid.Row="0" MouseLeftButtonDown="WpfPlot1_MouseLeftButtonDown" MouseRightButtonDown="WpfPlot1_MouseRightButtonDown" Margin="10,10,10,10"/>
+                <ScottPlot:WpfPlotGL x:Name="WpfPlot1" Grid.Row="0" MouseLeftButtonDown="WpfPlot1_MouseLeftButtonDown" MouseRightButtonDown="WpfPlot1_MouseRightButtonDown" Margin="15"/>
                 <Button x:Name="Button_ConfigPlot" Panel.ZIndex="1" Height="20" Width="20" HorizontalAlignment="Right" VerticalAlignment="Top" Content="🔨" Margin="5,5,5,5" Click="Button_ConfigPlot_Click" Grid.Row="0"/>
                 <ScrollBar x:Name="PlotScrollBar" Grid.Row="1" Orientation="Horizontal" Height="6" Margin="0,2,0,0" Background="{DynamicResource PlotSettings_BackgroundBrush}" Maximum="100" SmallChange="0.5" Value="100" Cursor="ScrollWE" ViewportSize="5" Foreground="Black" BorderBrush="{DynamicResource PlotSettings_BorderBrush}" Scroll="Scrollbar_ValueChanged"/>
             </Grid>
             <!-- MeasurementBar (right) -->
-            <UserControls:MeasurementBar Grid.Column="2" x:Name="MeasurementBar" Height="609" VerticalAlignment="Bottom"/>
+            <UserControls:MeasurementBar Grid.Column="2" x:Name="MeasurementBar" Height="609" VerticalAlignment="Top"/>
         </Grid>
         <!-- Bottom controls: 4 columns for each control -->
-        <Grid Grid.Row="2" Margin="0,5,0,0" MinHeight="110">
+        <Grid Grid.Row="2" Margin="0,0,0,0" MinHeight="100">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="280"/>

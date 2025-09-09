@@ -24,6 +24,7 @@ namespace SerialPlotDN_WPF
     public partial class MainWindow : Window
     {
         private PlotManager _plotManager;
+        private SystemManager _systemManager;
 
         // Configurable display settings - use DataStream's ring buffer capacity
         public int DisplayElements { get; set; } = 3000; // Number of elements to display
@@ -35,6 +36,8 @@ namespace SerialPlotDN_WPF
             InitializeComponent();
 
             _plotManager = new PlotManager(WpfPlot1);
+            _systemManager = new SystemManager();
+            
             _plotManager.InitializePlot();
             _plotManager.SetupPlotUserInput();
             
@@ -60,6 +63,13 @@ namespace SerialPlotDN_WPF
             // Set dependencies for MeasurementBar
             MeasurementBar.DataStreamBar = DataStreamBar;
             MeasurementBar.ChannelSettings = ChannelControlBar.ChannelSettings;
+            MeasurementBar.SystemManager = _systemManager;
+            
+            // Set SystemManager dependencies
+            _systemManager.SetPlotManager(_plotManager);
+            
+            // Set SystemManager as DataContext for RunControl
+            RunControl.DataContext = _systemManager;
             
             // Initialize default values through PlotSettings
             _plotManager.Settings.Xmax = DisplayElements; // Set initial window size
@@ -111,9 +121,9 @@ namespace SerialPlotDN_WPF
         private void RunControl_RunStateChanged(object? sender, RunControl.RunStates newState)
         {
             if (newState == RunControl.RunStates.Running)
-                _plotManager.StartAutoUpdate();
+                _systemManager.StartUpdates();
             else
-                _plotManager.StopAutoUpdate();
+                _systemManager.StopUpdates();
         }
 
         /// <summary>
@@ -137,6 +147,10 @@ namespace SerialPlotDN_WPF
         protected override void OnClosed(EventArgs e)
         {
             writeSettingsToXML(); // Save settings on exit
+            
+            // Stop SystemManager
+            _systemManager?.StopUpdates();
+            _systemManager?.Dispose();
             
             // Dispose MeasurementBar
             MeasurementBar.Dispose();

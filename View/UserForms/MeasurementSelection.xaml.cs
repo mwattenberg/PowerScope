@@ -39,16 +39,6 @@ namespace SerialPlotDN_WPF.View.UserForms
         }
 
         /// <summary>
-        /// Handle cancel button click
-        /// </summary>
-        private void Button_Cancel_Click(object sender, RoutedEventArgs e)
-        {
-            SelectedMeasurementType = null;
-            DialogResult = false;
-            Close();
-        }
-
-        /// <summary>
         /// Handle close button click
         /// </summary>
         private void CloseButton_Click(object sender, RoutedEventArgs e)

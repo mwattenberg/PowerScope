@@ -118,7 +118,7 @@
             </Grid>
 
             <!-- Content Area - Grid of measurement buttons -->
-            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="20,10">
+            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="20,10,20,20" Grid.RowSpan="2">
                 <UniformGrid Columns="3" HorizontalAlignment="Center">
                     
                     <!-- Minimum Button -->
@@ -216,9 +216,7 @@
             </ScrollViewer>
 
             <!-- Bottom buttons -->
-            <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="20,10,20,20">
-                <Button Content="Cancel" Width="75" Click="Button_Cancel_Click"/>
-            </StackPanel>
+            <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="20,10,20,20"/>
         </Grid>
     </Border>
 </Window>

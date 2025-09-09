@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
-using System.Threading;
 using System.Windows;
 using ScottPlot;
 using ScottPlot.Plottables;
@@ -14,7 +13,6 @@ namespace SerialPlotDN_WPF.Model
 {
     public class PlotManager
     {
-        private System.Threading.Timer _updatePlotTimer;
         private readonly WpfPlotGL _plot;
         private readonly Signal[] _signals;
         private readonly double[][] _data;
@@ -48,8 +46,6 @@ namespace SerialPlotDN_WPF.Model
             
             Settings = new PlotSettings();
             Settings.PropertyChanged += OnSettingsChanged;
-            
-            _updatePlotTimer = new System.Threading.Timer(UpdatePlot, null, Timeout.Infinite, Timeout.Infinite);
         }
 
         private void OnSettingsChanged(object sender, PropertyChangedEventArgs e)
@@ -58,11 +54,6 @@ namespace SerialPlotDN_WPF.Model
             {
                 switch (e.PropertyName)
                 {
-                    case nameof(PlotSettings.PlotUpdateRateFPS):
-                    case nameof(PlotSettings.PlotUpdateRateFpsOption):
-                        UpdateTimerInterval();
-                        break;
-                        
                     case nameof(PlotSettings.Ymin):
                     case nameof(PlotSettings.Ymax):
                         _plot.Plot.Axes.SetLimitsY(Settings.Ymin, Settings.Ymax);
@@ -225,19 +216,10 @@ namespace SerialPlotDN_WPF.Model
             _plot.Refresh();
         }
 
-        public void StartAutoUpdate()
-        {
-            int intervalMs = (int)Settings.TimerInterval;
-            _updatePlotTimer.Change(0, intervalMs);
-        }
-
-        public void StopAutoUpdate()
-        {
-            _updatePlotTimer.Change(Timeout.Infinite, Timeout.Infinite);
-        }
-
-        // Simplified UpdatePlot method with correct timer signature
-        private void UpdatePlot(object state)
+        /// <summary>
+        /// Update the plot - called by SystemManager
+        /// </summary>
+        public void UpdatePlot()
         {
             if (Application.Current == null)
                 return;
@@ -275,15 +257,6 @@ namespace SerialPlotDN_WPF.Model
                     
                     channelIndex++;
                 }
-            }
-        }
-
-        private void UpdateTimerInterval()
-        {
-            if (_updatePlotTimer != null)
-            {
-                int intervalMs = (int)Settings.TimerInterval;
-                _updatePlotTimer.Change(intervalMs, intervalMs);
             }
         }
 

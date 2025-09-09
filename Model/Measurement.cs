@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
-using System.Threading;
 
 namespace SerialPlotDN_WPF.Model
 {
@@ -27,6 +26,7 @@ namespace SerialPlotDN_WPF.Model
     /// <summary>
     /// Self-contained measurement class that manages its own data copying and calculations
     /// Takes a DataStream and channel index, handles all data management internally
+    /// Updates are now managed externally by SystemManager
     /// </summary>
     public class Measurement : INotifyPropertyChanged, IDisposable
     {
@@ -35,7 +35,6 @@ namespace SerialPlotDN_WPF.Model
         private readonly IDataStream _dataStream;
         private readonly int _channelIndex;
         private readonly double[] _dataBuffer;
-        private readonly Timer _updateTimer;
         
         // Single measurement result
         private double _result = 0.0;
@@ -54,15 +53,17 @@ namespace SerialPlotDN_WPF.Model
             _channelIndex = channelIndex;
             _dataBuffer = new double[5000]; // Fixed buffer size
             _calculationFunction = GetCalculationFunction(measurementType);
-
-            // Setup Threading.Timer for automatic updates every 90ms
-            _updateTimer = new Timer(OnTimerCallback, null, TimeSpan.FromMilliseconds(90), TimeSpan.FromMilliseconds(200));
         }
 
         /// <summary>
         /// Type of measurement being performed (read-only)
         /// </summary>
         public MeasurementType Type => _measurementType;
+
+        /// <summary>
+        /// Whether this measurement has been disposed
+        /// </summary>
+        public bool IsDisposed => _disposed;
 
         /// <summary>
         /// The calculated result value
@@ -81,9 +82,9 @@ namespace SerialPlotDN_WPF.Model
         }
 
         /// <summary>
-        /// Timer callback - copies fresh data and calculates result
+        /// Update measurement - called by SystemManager
         /// </summary>
-        private void OnTimerCallback(object state)
+        public void UpdateMeasurement()
         {
             if (_disposed) return;
 
@@ -233,7 +234,6 @@ namespace SerialPlotDN_WPF.Model
             if (!_disposed)
             {
                 _disposed = true;
-                _updateTimer?.Dispose();
             }
         }
 

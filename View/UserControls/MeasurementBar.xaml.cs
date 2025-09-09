@@ -25,6 +25,9 @@ namespace SerialPlotDN_WPF.View.UserControls
         // Reference to ChannelSettings collection
         private ObservableCollection<ChannelSettings> _channelSettings;
         
+        // Reference to SystemManager for measurement registration
+        private SystemManager _systemManager;
+        
         /// <summary>
         /// DataStreamBar dependency - must be set after construction when using XAML instantiation
         /// </summary>
@@ -41,6 +44,15 @@ namespace SerialPlotDN_WPF.View.UserControls
         {
             get => _channelSettings;
             set => _channelSettings = value ?? throw new ArgumentNullException(nameof(value));
+        }
+        
+        /// <summary>
+        /// SystemManager dependency - must be set after construction for measurement updates
+        /// </summary>
+        public SystemManager SystemManager
+        {
+            get => _systemManager;
+            set => _systemManager = value;
         }
         
         public MeasurementBar()
@@ -108,6 +120,9 @@ namespace SerialPlotDN_WPF.View.UserControls
             var measurement = new Measurement(measurementType, dataStream, localChannelIndex);
             ActiveMeasurements.Add(measurement);
             
+            // Register measurement with SystemManager for updates
+            _systemManager?.RegisterMeasurement(measurement);
+
             // Get the actual ChannelSettings object for this channel
             var channelSetting = _channelSettings[channelIndex];
             
@@ -157,6 +172,9 @@ namespace SerialPlotDN_WPF.View.UserControls
         /// </summary>
         private void RemoveMeasurement(Measurement measurement, MeasurementBox measurementBox)
         {
+            // Unregister from SystemManager
+            _systemManager?.UnregisterMeasurement(measurement);
+            
             // Dispose the measurement (stops timer and cleans up)
             measurement?.Dispose();
             
@@ -173,9 +191,10 @@ namespace SerialPlotDN_WPF.View.UserControls
         /// </summary>
         public void ClearAllMeasurements()
         {
-            // Dispose all measurements (each handles its own cleanup)
+            // Unregister and dispose all measurements
             foreach (var measurement in ActiveMeasurements)
             {
+                _systemManager?.UnregisterMeasurement(measurement);
                 measurement?.Dispose();
             }
             

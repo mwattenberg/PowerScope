@@ -5,8 +5,8 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:SerialPlotDN_WPF.View.UserControls"
              mc:Ignorable="d" 
-             d:DesignHeight="600" d:DesignWidth="100">
-    <Grid Background="{DynamicResource PlotSettings_BackgroundBrush}" MinWidth="120">
+             d:DesignHeight="600" d:DesignWidth="140">
+    <Grid Background="{DynamicResource PlotSettings_BackgroundBrush}" MinWidth="140">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>      <!-- Button area -->
             <RowDefinition Height="*"/>         <!-- MeasurementBoxes area -->
