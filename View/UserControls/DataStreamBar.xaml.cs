@@ -252,11 +252,50 @@ namespace SerialPlotDN_WPF.View.UserControls
         public int GetTotalChannelCount()
         {
             int totalChannels = 0;
-            foreach (var vm in ConfiguredDataStreams)
+            foreach (StreamSettings vm in ConfiguredDataStreams)
             {
                 totalChannels = totalChannels + vm.NumberOfChannels;
             }
             return totalChannels;
+        }
+
+        /// <summary>
+        /// Resolves a global channel index to its corresponding data stream and local channel index
+        /// Encapsulates the channel-to-stream mapping logic that was previously duplicated
+        /// </summary>
+        /// <param name="globalChannelIndex">Global channel index across all streams</param>
+        /// <returns>Tuple of (DataStream, LocalChannelIndex) or (null, -1) if not found</returns>
+        public (IDataStream dataStream, int localChannelIndex) ResolveChannelToStream(int globalChannelIndex)
+        {
+            if (globalChannelIndex < 0)
+                return (null, -1);
+
+            int currentChannelOffset = 0;
+            
+            for (int streamIndex = 0; streamIndex < ConfiguredDataStreams.Count; streamIndex++)
+            {
+                StreamSettings streamSettings = ConfiguredDataStreams[streamIndex];
+                
+                if (globalChannelIndex < currentChannelOffset + streamSettings.NumberOfChannels)
+                {
+                    // This stream contains our target channel
+                    int localChannelIndex = globalChannelIndex - currentChannelOffset;
+                    
+                    // Find the corresponding connected data stream
+                    if (streamIndex < ConnectedDataStreams.Count)
+                    {
+                        IDataStream dataStream = ConnectedDataStreams[streamIndex];
+                        return (dataStream, localChannelIndex);
+                    }
+                    else
+                    {
+                        return (null, -1); // Stream not connected
+                    }
+                }
+                currentChannelOffset += streamSettings.NumberOfChannels;
+            }
+            
+            return (null, -1); // Channel not found
         }
     }
 }

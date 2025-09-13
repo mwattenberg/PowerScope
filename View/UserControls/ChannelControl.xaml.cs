@@ -30,21 +30,6 @@ namespace SerialPlotDN_WPF.View.UserControls
         }
     }
 
-    /// <summary>
-    /// Event args for measurement request
-    /// </summary>
-    public class MeasurementRequestEventArgs : EventArgs
-    {
-        public int ChannelIndex { get; }
-        public ChannelSettings ChannelSettings { get; }
-
-        public MeasurementRequestEventArgs(int channelIndex, ChannelSettings channelSettings)
-        {
-            ChannelIndex = channelIndex;
-            ChannelSettings = channelSettings;
-        }
-    }
-
     public partial class ChannelControl : UserControl
     {
         private static readonly Color DisabledColor = Colors.Gray;
@@ -52,9 +37,19 @@ namespace SerialPlotDN_WPF.View.UserControls
         private static readonly Brush DefaultBrush = new SolidColorBrush(DisabledColor);
 
         /// <summary>
-        /// Event raised when user requests to add a measurement for this channel
+        /// Dependency property for MeasurementCommand
         /// </summary>
-        public event EventHandler<MeasurementRequestEventArgs> MeasurementRequested;
+        public static readonly DependencyProperty MeasurementCommandProperty =
+            DependencyProperty.Register("MeasurementCommand", typeof(ICommand), typeof(ChannelControl), new PropertyMetadata(null));
+
+        /// <summary>
+        /// Command to execute when measurement is requested (bound from ChannelControlBar)
+        /// </summary>
+        public ICommand MeasurementCommand
+        {
+            get { return (ICommand)GetValue(MeasurementCommandProperty); }
+            set { SetValue(MeasurementCommandProperty, value); }
+        }
 
         /// <summary>
         /// Gets the ChannelSettings from DataContext
@@ -66,11 +61,6 @@ namespace SerialPlotDN_WPF.View.UserControls
                 return DataContext as ChannelSettings; 
             } 
         }
-
-        /// <summary>
-        /// Channel index for this control (set by parent container)
-        /// </summary>
-        public int ChannelIndex { get; set; } = -1;
 
         public ChannelControl()
         {
@@ -103,7 +93,7 @@ namespace SerialPlotDN_WPF.View.UserControls
         {
             if (Settings != null)
             {
-                var filterWindow = new View.UserForms.FilterConfigWindow();
+                FilterConfigWindow filterWindow = new FilterConfigWindow();
                 filterWindow.DataContext = Settings;
                 filterWindow.Owner = Window.GetWindow(this);
                 filterWindow.ShowDialog();
@@ -112,10 +102,11 @@ namespace SerialPlotDN_WPF.View.UserControls
 
         private void ButtonMeasure_Click(object sender, RoutedEventArgs e)
         {
-            // Raise measurement request event
-            if (Settings != null && ChannelIndex >= 0)
+            // Use the command approach since it's properly bound via XAML DataTemplate
+            // This will trigger the MeasurementSelection window through the command chain
+            if (MeasurementCommand != null)
             {
-                MeasurementRequested?.Invoke(this, new MeasurementRequestEventArgs(ChannelIndex, Settings));
+                MeasurementCommand.Execute(Settings);
             }
         }
 
@@ -136,12 +127,12 @@ namespace SerialPlotDN_WPF.View.UserControls
 
         private static bool IsDecimal(string text)
         {
-            return Regex.IsMatch(text, @"^[0-9]*\.?[0-9]*$") && text.Length > 0;
+            return Regex.IsMatch(text, @"^[0-9]*\.?[0-9]*$") && text != "." && !text.EndsWith("..");
         }
 
         private static bool IsSignedDecimal(string text)
         {
-            return Regex.IsMatch(text, @"^-?[0-9]*\.?[0-9]*$") && text.Length > 0;
+            return Regex.IsMatch(text, @"^-?[0-9]*\.?[0-9]*$") && text != "-" && text != "." && !text.EndsWith("..");
         }
     }
 }

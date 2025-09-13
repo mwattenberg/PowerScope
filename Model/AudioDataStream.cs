@@ -37,18 +37,27 @@ namespace SerialPlotDN_WPF.Model
         private const int DefaultSampleRate = 44100;
         private const int RingBufferDurationSeconds = 10;
 
-        public int ChannelCount => _channelCount;
+        public int ChannelCount 
+        { 
+            get { return _channelCount; } 
+        }
         
         /// <summary>
         /// Gets the sample rate being used by the audio device
         /// </summary>
-        public int SampleRate => _sampleRate;
+        public int SampleRate 
+        { 
+            get { return _sampleRate; } 
+        }
 
         public event PropertyChangedEventHandler PropertyChanged;
 
         protected virtual void OnPropertyChanged(string propertyName)
         {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+            if (PropertyChanged != null)
+            {
+                PropertyChanged.Invoke(this, new PropertyChangedEventArgs(propertyName));
+            }
         }
 
         public string StatusMessage
@@ -64,7 +73,10 @@ namespace SerialPlotDN_WPF.Model
             }
         }
 
-        public string StreamType => "Audio";
+        public string StreamType 
+        { 
+            get { return "Audio"; } 
+        }
 
         public bool IsConnected
         {
@@ -94,7 +106,19 @@ namespace SerialPlotDN_WPF.Model
 
         public AudioDataStream(string deviceName = null, int sampleRate = 44100)
         {
-            _deviceName = deviceName ?? GetDefaultAudioDevice()?.FriendlyName ?? "Default";
+            if (string.IsNullOrEmpty(deviceName))
+            {
+                MMDevice defaultDevice = GetDefaultAudioDevice();
+                if (defaultDevice != null)
+                    _deviceName = defaultDevice.FriendlyName;
+                else
+                    _deviceName = "Default";
+            }
+            else
+            {
+                _deviceName = deviceName;
+            }
+            
             _sampleRate = sampleRate;
             StatusMessage = "Disconnected";
             TotalSamples = 0;
@@ -110,16 +134,21 @@ namespace SerialPlotDN_WPF.Model
 
             lock (_channelConfigLock)
             {
-                if (_channelSettings == null) return;
+                if (_channelSettings == null) 
+                    return;
                 
                 _channelSettings[channelIndex] = settings;
                 
                 // Update filter reference and reset if filter type changed
-                var newFilter = settings?.Filter;
+                IDigitalFilter newFilter = null;
+                if (settings != null)
+                    newFilter = settings.Filter;
+                    
                 if (_channelFilters[channelIndex] != newFilter)
                 {
                     _channelFilters[channelIndex] = newFilter;
-                    _channelFilters[channelIndex]?.Reset();
+                    if (_channelFilters[channelIndex] != null)
+                        _channelFilters[channelIndex].Reset();
                 }
             }
         }
@@ -142,11 +171,13 @@ namespace SerialPlotDN_WPF.Model
         {
             lock (_channelConfigLock)
             {
-                if (_channelFilters == null) return;
+                if (_channelFilters == null) 
+                    return;
                 
                 for (int i = 0; i < ChannelCount; i++)
                 {
-                    _channelFilters[i]?.Reset();
+                    if (_channelFilters[i] != null)
+                        _channelFilters[i].Reset();
                 }
             }
         }
@@ -169,8 +200,8 @@ namespace SerialPlotDN_WPF.Model
                 }
 
                 // Initialize WASAPI capture with the specified sample rate
-                var mixFormat = _audioDevice.AudioClient.MixFormat;
-                var desiredFormat = new WaveFormat(_sampleRate, mixFormat.BitsPerSample, mixFormat.Channels);
+                WaveFormat mixFormat = _audioDevice.AudioClient.MixFormat;
+                WaveFormat desiredFormat = new WaveFormat(_sampleRate, mixFormat.BitsPerSample, mixFormat.Channels);
                 
                 // Create WASAPI capture with the desired format
                 _audioCapture = new WasapiCapture(_audioDevice, false, 100);
@@ -277,9 +308,10 @@ namespace SerialPlotDN_WPF.Model
             {
                 lock (_dataLock)
                 {
-                    foreach (var ringBuffer in ReceivedData)
+                    foreach (RingBuffer<double> ringBuffer in ReceivedData)
                     {
-                        ringBuffer?.Clear();
+                        if (ringBuffer != null)
+                            ringBuffer.Clear();
                     }
                 }
             }
@@ -327,11 +359,12 @@ namespace SerialPlotDN_WPF.Model
 
         private void ProcessAudioData(byte[] buffer, int bytesRecorded)
         {
-            var format = _audioCapture.WaveFormat;
+            WaveFormat format = _audioCapture.WaveFormat;
             int bytesPerSample = format.BitsPerSample / 8;
             int samplesRecorded = bytesRecorded / (bytesPerSample * format.Channels);
             
-            if (samplesRecorded == 0) return;
+            if (samplesRecorded == 0) 
+                return;
 
             lock (_dataLock)
             {
@@ -343,24 +376,24 @@ namespace SerialPlotDN_WPF.Model
                 }
 
                 // Convert audio samples to double and separate channels
-                if (format.BitsPerSample == 16)
+                switch (format.BitsPerSample)
                 {
-                    ProcessInt16Samples(buffer, bytesRecorded, format.Channels, channelData);
-                }
-                else if (format.BitsPerSample == 24)
-                {
-                    ProcessInt24Samples(buffer, bytesRecorded, format.Channels, channelData);
-                }
-                else if (format.BitsPerSample == 32)
-                {
-                    if (format.Encoding == WaveFormatEncoding.IeeeFloat)
-                    {
-                        ProcessFloat32Samples(buffer, bytesRecorded, format.Channels, channelData);
-                    }
-                    else
-                    {
-                        ProcessInt32Samples(buffer, bytesRecorded, format.Channels, channelData);
-                    }
+                    case 16:
+                        ProcessInt16Samples(buffer, bytesRecorded, format.Channels, channelData);
+                        break;
+                    case 24:
+                        ProcessInt24Samples(buffer, bytesRecorded, format.Channels, channelData);
+                        break;
+                    case 32:
+                        if (format.Encoding == WaveFormatEncoding.IeeeFloat)
+                        {
+                            ProcessFloat32Samples(buffer, bytesRecorded, format.Channels, channelData);
+                        }
+                        else
+                        {
+                            ProcessInt32Samples(buffer, bytesRecorded, format.Channels, channelData);
+                        }
+                        break;
                 }
 
                 // Apply channel processing and add to ring buffers
@@ -445,8 +478,13 @@ namespace SerialPlotDN_WPF.Model
             
             lock (_channelConfigLock)
             {
-                settings = _channelSettings?[channel];
-                filter = _channelFilters?[channel];
+                settings = null;
+                if (_channelSettings != null && channel < _channelSettings.Length)
+                    settings = _channelSettings[channel];
+                    
+                filter = null;
+                if (_channelFilters != null && channel < _channelFilters.Length)
+                    filter = _channelFilters[channel];
             }
             
             if (settings == null)
@@ -472,7 +510,7 @@ namespace SerialPlotDN_WPF.Model
         {
             try
             {
-                var deviceEnumerator = new MMDeviceEnumerator();
+                MMDeviceEnumerator deviceEnumerator = new MMDeviceEnumerator();
                 return deviceEnumerator.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Console);
             }
             catch
@@ -485,10 +523,10 @@ namespace SerialPlotDN_WPF.Model
         {
             try
             {
-                var deviceEnumerator = new MMDeviceEnumerator();
-                var devices = deviceEnumerator.EnumerateAudioEndPoints(DataFlow.Capture, DeviceState.Active);
+                MMDeviceEnumerator deviceEnumerator = new MMDeviceEnumerator();
+                MMDeviceCollection devices = deviceEnumerator.EnumerateAudioEndPoints(DataFlow.Capture, DeviceState.Active);
                 
-                foreach (var device in devices)
+                foreach (MMDevice device in devices)
                 {
                     if (device.FriendlyName.Equals(deviceName, StringComparison.OrdinalIgnoreCase) ||
                         string.IsNullOrEmpty(deviceName))
@@ -513,13 +551,13 @@ namespace SerialPlotDN_WPF.Model
 
         public static List<string> GetAvailableAudioDevices()
         {
-            var deviceNames = new List<string>();
+            List<string> deviceNames = new List<string>();
             try
             {
-                var deviceEnumerator = new MMDeviceEnumerator();
-                var devices = deviceEnumerator.EnumerateAudioEndPoints(DataFlow.Capture, DeviceState.Active);
+                MMDeviceEnumerator deviceEnumerator = new MMDeviceEnumerator();
+                MMDeviceCollection devices = deviceEnumerator.EnumerateAudioEndPoints(DataFlow.Capture, DeviceState.Active);
                 
-                foreach (var device in devices)
+                foreach (MMDevice device in devices)
                 {
                     deviceNames.Add(device.FriendlyName);
                 }
@@ -572,9 +610,10 @@ namespace SerialPlotDN_WPF.Model
             
             if (ReceivedData != null)
             {
-                foreach (var ringBuffer in ReceivedData)
+                foreach (RingBuffer<double> ringBuffer in ReceivedData)
                 {
-                    ringBuffer?.Clear();
+                    if (ringBuffer != null)
+                        ringBuffer.Clear();
                 }
             }
 

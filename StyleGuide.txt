@@ -8,7 +8,9 @@
 - Clear getter and setter methods.
 - No expression bodied members.
 - Avoid chaining method calls.
+- Employ switch statements over multiple if-else-if statements.
 - The code can be verbose for the sake of clarity and readability.
+- Do not make the code overly defensive. If there are bugs, they should be fixed, not hidden.
 - Naming conventions:
   - private fields: _camelCase
   - public fields / properties: PascalCase

@@ -26,7 +26,20 @@
                     VerticalAlignment="Top"/>
         </Grid>
 
-        <!-- List of measurement boxes -->
-        <StackPanel x:Name="Panel_MeasurementBoxes" Grid.Row="1" VerticalAlignment="Top"/>
+        <!-- Template-driven list of measurement boxes -->
+        <ItemsControl x:Name="MeasurementItemsControl" Grid.Row="1" VerticalAlignment="Top">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <StackPanel Orientation="Vertical"/>
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            
+            <!-- DataTemplate: Automatically creates MeasurementBox for each Measurement -->
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <local:MeasurementBox />
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
     </Grid>
 </UserControl>

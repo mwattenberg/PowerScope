@@ -1,69 +1,120 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Threading;
 using SerialPlotDN_WPF.Model;
 
 namespace SerialPlotDN_WPF.View.UserControls
 {
     /// <summary>
     /// Interaction logic for MeasurementBar.xaml
+    /// Now manages its own measurement updates with DispatcherTimer
     /// </summary>
-    public partial class MeasurementBar : UserControl
+    public partial class MeasurementBar : UserControl, IDisposable
     {
-        private int _measurementCounter = 0;
-        
-        // Lists to manage measurements (similar to DataStreamBar pattern)
-        public List<Measurement> ActiveMeasurements { get; private set; } = new List<Measurement>();
-        public List<MeasurementBox> MeasurementBoxes { get; private set; } = new List<MeasurementBox>();
-        
-        // Reference to DataStreamBar to access connected streams
+        /// <summary>
+        /// Collection of Measurements that drives the UI via DataTemplate
+        /// </summary>
+        public ObservableCollection<Measurement> Measurements { get; private set; } = new ObservableCollection<Measurement>();
+
+        // Dependencies
         private DataStreamBar _dataStreamBar;
-        
-        // Reference to ChannelSettings collection
         private ObservableCollection<ChannelSettings> _channelSettings;
         
-        // Reference to SystemManager for measurement registration
-        private SystemManager _systemManager;
-        
+        // Self-managed timer for measurement updates
+        private readonly DispatcherTimer _measurementTimer;
+        private bool _disposed = false;
+
         /// <summary>
-        /// DataStreamBar dependency - must be set after construction when using XAML instantiation
+        /// Whether measurement updates are currently running
         /// </summary>
+        public bool IsRunning { get; private set; }
+
         public DataStreamBar DataStreamBar
         {
-            get => _dataStreamBar;
-            set => _dataStreamBar = value ?? throw new ArgumentNullException(nameof(value));
+            get 
+            { 
+                return _dataStreamBar; 
+            }
+            set 
+            { 
+                if (value == null)
+                    throw new ArgumentNullException(nameof(value));
+                _dataStreamBar = value;
+            }
         }
-        
-        /// <summary>
-        /// ChannelSettings dependency - must be set after construction when using XAML instantiation
-        /// </summary>
+
         public ObservableCollection<ChannelSettings> ChannelSettings
         {
-            get => _channelSettings;
-            set => _channelSettings = value ?? throw new ArgumentNullException(nameof(value));
+            get 
+            { 
+                return _channelSettings; 
+            }
+            set 
+            { 
+                if (value == null)
+                    throw new ArgumentNullException(nameof(value));
+                _channelSettings = value;
+            }
         }
-        
-        /// <summary>
-        /// SystemManager dependency - must be set after construction for measurement updates
-        /// </summary>
-        public SystemManager SystemManager
-        {
-            get => _systemManager;
-            set => _systemManager = value;
-        }
-        
+
         public MeasurementBar()
         {
             InitializeComponent();
+            MeasurementItemsControl.ItemsSource = Measurements;
+            
+            // Initialize measurement update timer
+            _measurementTimer = new DispatcherTimer(DispatcherPriority.Background);
+            _measurementTimer.Interval = TimeSpan.FromMilliseconds(90); // ~11 FPS for measurements
+            _measurementTimer.Tick += MeasurementTimer_Tick;
+        }
+
+        private void MeasurementTimer_Tick(object sender, EventArgs e)
+        {
+            // Update measurements on background thread for CPU-intensive calculations
+            Task.Run(() =>
+            {
+                Measurement[] measurementsToUpdate = Measurements.ToArray(); // Copy to avoid collection modification
+                Parallel.ForEach(measurementsToUpdate, measurement =>
+                {
+                    if (!measurement.IsDisposed)
+                    {
+                        measurement.UpdateMeasurement();
+                    }
+                });
+            });
+        }
+
+        /// <summary>
+        /// Start measurement updates
+        /// </summary>
+        public void StartUpdates()
+        {
+            if (!IsRunning && !_disposed)
+            {
+                _measurementTimer.Start();
+                IsRunning = true;
+            }
+        }
+
+        /// <summary>
+        /// Stop measurement updates
+        /// </summary>
+        public void StopUpdates()
+        {
+            if (IsRunning)
+            {
+                _measurementTimer.Stop();
+                IsRunning = false;
+            }
         }
 
         private void Button_Cursor_Click(object sender, RoutedEventArgs e)
         {
             // Add cursor functionality here - placeholder for future implementation
-            // This could show/hide plot cursors or create cursor-related measurements
         }
 
         /// <summary>
@@ -73,147 +124,74 @@ namespace SerialPlotDN_WPF.View.UserControls
         /// <param name="channelIndex">Zero-based channel index</param>
         public void AddMeasurement(MeasurementType measurementType, int channelIndex)
         {
-            // Check if DataStreamBar is set
-            if (_dataStreamBar == null)
+            // Validation logic
+            if (_dataStreamBar == null || _dataStreamBar.ConnectedDataStreams.Count == 0)
             {
-                MessageBox.Show("DataStreamBar is not initialized. This is a programming error.",
-                              "Configuration Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show("No data streams are connected.", "No Data Available", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
-            // Check if ChannelSettings is set
-            if (_channelSettings == null)
+            if (_channelSettings == null || _channelSettings.Count <= channelIndex)
             {
-                MessageBox.Show("ChannelSettings is not initialized. This is a programming error.",
-                              "Configuration Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show($"Channel {channelIndex + 1} settings are not available.", "Channel Settings Not Available", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
-            // Check if we have any connected streams
-            if (_dataStreamBar.ConnectedDataStreams.Count == 0)
-            {
-                MessageBox.Show("No data streams are connected. Please add and connect a data stream first.",
-                              "No Data Available", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
-
-            // Check if we have channel settings for this channel
-            if (_channelSettings.Count <= channelIndex)
-            {
-                MessageBox.Show($"Channel {channelIndex + 1} settings are not available.",
-                              "Channel Settings Not Available", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
-
-            // Find which data stream contains this channel
-            var (dataStream, localChannelIndex) = FindDataStreamForChannel(channelIndex);
+            // Use DataStreamBar's encapsulated channel resolution logic
+            (IDataStream dataStream, int localChannelIndex) = _dataStreamBar.ResolveChannelToStream(channelIndex);
             if (dataStream == null)
             {
-                MessageBox.Show($"Channel {channelIndex + 1} is not available. Please check your data streams.",
-                              "Channel Not Available", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show($"Channel {channelIndex + 1} is not available.", "Channel Not Available", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
-            _measurementCounter++;
+            // Create measurement with ChannelSettings reference
+            ChannelSettings channelSetting = _channelSettings[channelIndex];
+            Measurement measurement = new Measurement(measurementType, dataStream, localChannelIndex, channelSetting);
 
-            // Create the measurement - now it handles all data management internally!
-            var measurement = new Measurement(measurementType, dataStream, localChannelIndex);
-            ActiveMeasurements.Add(measurement);
-            
-            // Register measurement with SystemManager for updates
-            _systemManager?.RegisterMeasurement(measurement);
+            // Subscribe to removal request
+            measurement.RemoveRequested += OnMeasurementRemoveRequested;
 
-            // Get the actual ChannelSettings object for this channel
-            var channelSetting = _channelSettings[channelIndex];
-            
-            // Create the UI representation
-            var measurementBox = new MeasurementBox();
-            // Set the actual ChannelSettings as DataContext - no more ChannelInfo needed!
-            measurementBox.DataContext = channelSetting;
-            
-            // Set the measurement for result updates - MeasurementBox can now bind directly to measurement.Result
-            measurementBox.SetMeasurement(measurement);
-            
-            // Subscribe to remove event
-            measurementBox.OnRemoveClickedEvent += (s, args) => 
-            {
-                RemoveMeasurement(measurement, measurementBox);
-            };
-            
-            MeasurementBoxes.Add(measurementBox);
-            Panel_MeasurementBoxes.Children.Add(measurementBox);
+            // Add to collection - UI updates automatically!
+            Measurements.Add(measurement);
         }
-        
-        /// <summary>
-        /// Find which data stream contains the specified global channel index
-        /// </summary>
-        /// <param name="globalChannelIndex">Global channel index across all streams</param>
-        /// <returns>Tuple of (DataStream, LocalChannelIndex) or (null, -1) if not found</returns>
-        private (IDataStream dataStream, int localChannelIndex) FindDataStreamForChannel(int globalChannelIndex)
+
+        private void OnMeasurementRemoveRequested(object sender, EventArgs e)
         {
-            int currentChannelOffset = 0;
-            
-            foreach (var dataStream in _dataStreamBar.ConnectedDataStreams)
+            if (sender is Measurement measurement)
             {
-                if (globalChannelIndex < currentChannelOffset + dataStream.ChannelCount)
-                {
-                    // This stream contains our target channel
-                    int localChannelIndex = globalChannelIndex - currentChannelOffset;
-                    return (dataStream, localChannelIndex);
-                }
-                currentChannelOffset += dataStream.ChannelCount;
+                measurement.RemoveRequested -= OnMeasurementRemoveRequested;
+                measurement.Dispose();
+                Measurements.Remove(measurement);
             }
-            
-            return (null, -1); // Channel not found
         }
-        
-        /// <summary>
-        /// Remove a measurement and its UI representation
-        /// </summary>
-        private void RemoveMeasurement(Measurement measurement, MeasurementBox measurementBox)
-        {
-            // Unregister from SystemManager
-            _systemManager?.UnregisterMeasurement(measurement);
-            
-            // Dispose the measurement (stops timer and cleans up)
-            measurement?.Dispose();
-            
-            // Remove from lists
-            ActiveMeasurements.Remove(measurement);
-            MeasurementBoxes.Remove(measurementBox);
-            
-            // Remove from UI
-            Panel_MeasurementBoxes.Children.Remove(measurementBox);
-        }
-        
+
         /// <summary>
         /// Clear all measurements
         /// </summary>
         public void ClearAllMeasurements()
         {
-            // Unregister and dispose all measurements
-            foreach (var measurement in ActiveMeasurements)
+            // Dispose all measurements
+            foreach (Measurement measurement in Measurements)
             {
-                _systemManager?.UnregisterMeasurement(measurement);
-                measurement?.Dispose();
+                measurement.Dispose();
             }
             
-            // Clear lists
-            ActiveMeasurements.Clear();
-            MeasurementBoxes.Clear();
-            
-            // Clear UI
-            Panel_MeasurementBoxes.Children.Clear();
-            
-            _measurementCounter = 0;
+            Measurements.Clear();
         }
-        
+
         /// <summary>
         /// Dispose of all resources
         /// </summary>
         public void Dispose()
         {
-            ClearAllMeasurements();
+            if (!_disposed)
+            {
+                _disposed = true;
+                StopUpdates();
+                // DispatcherTimer doesn't have Dispose method, just stop it
+                ClearAllMeasurements();
+            }
         }
     }
 }

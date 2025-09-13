@@ -2,12 +2,44 @@
 using System.Collections.Specialized;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using SerialPlotDN_WPF.Model;
 using SerialPlotDN_WPF.View.UserControls;
 
 namespace SerialPlotDN_WPF.View.UserControls
 {
+    /// <summary>
+    /// Simple relay command implementation for MVVM pattern
+    /// </summary>
+    public class RelayCommand<T> : ICommand
+    {
+        private readonly System.Action<T> _execute;
+        private readonly System.Func<T, bool> _canExecute;
+
+        public RelayCommand(System.Action<T> execute, System.Func<T, bool> canExecute = null)
+        {
+            _execute = execute ?? throw new System.ArgumentNullException(nameof(execute));
+            _canExecute = canExecute;
+        }
+
+        public bool CanExecute(object parameter)
+        {
+            return _canExecute == null || _canExecute((T)parameter);
+        }
+
+        public void Execute(object parameter)
+        {
+            _execute((T)parameter);
+        }
+
+        public event System.EventHandler CanExecuteChanged
+        {
+            add { CommandManager.RequerySuggested += value; }
+            remove { CommandManager.RequerySuggested -= value; }
+        }
+    }
+
     /// <summary>
     /// Interaction logic for ChannelControlBar.xaml
     /// Manages channel settings collection with direct data binding via DataTemplate
@@ -24,18 +56,35 @@ namespace SerialPlotDN_WPF.View.UserControls
         /// </summary>
         public event System.EventHandler<MeasurementRequestEventArgs> ChannelMeasurementRequested;
 
+        /// <summary>
+        /// Command to handle measurement requests from ChannelControl instances
+        /// </summary>
+        public ICommand MeasurementCommand { get; private set; }
+
         public ChannelControlBar()
         {
             InitializeComponent();
             ChannelItemsControl.ItemsSource = ChannelSettings;
             
+            // Create command to handle measurement requests
+            MeasurementCommand = new RelayCommand<ChannelSettings>(OnMeasurementRequested);
+            
             // Subscribe to collection changes to update channel indices
-            ChannelItemsControl.Loaded += ChannelItemsControl_Loaded;
+            ChannelSettings.CollectionChanged += ChannelSettings_CollectionChanged;
         }
 
-        private void ChannelItemsControl_Loaded(object sender, RoutedEventArgs e)
+        private void ChannelSettings_CollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
         {
             UpdateChannelIndices();
+        }
+
+        private void OnMeasurementRequested(ChannelSettings channelSettings)
+        {
+            if (channelSettings != null)
+            {
+                var args = new MeasurementRequestEventArgs(channelSettings.ChannelIndex, channelSettings);
+                ChannelMeasurementRequested?.Invoke(this, args);
+            }
         }
 
         /// <summary>
@@ -73,72 +122,25 @@ namespace SerialPlotDN_WPF.View.UserControls
                 channelSettings.Color = channelColor;
                 channelSettings.Gain = 1.0;
                 channelSettings.Offset = 0.0;
+                channelSettings.ChannelIndex = channelIndex; // Set the channel index
 
                 ChannelSettings.Add(channelSettings);
             }
             
             // Update channel indices after changes
-            Dispatcher.BeginInvoke(() => UpdateChannelIndices());
+            UpdateChannelIndices();
         }
 
         /// <summary>
-        /// Updates channel indices and wire up event handlers for all ChannelControl instances
+        /// Updates channel indices using data binding instead of visual tree traversal
         /// </summary>
         private void UpdateChannelIndices()
         {
-            for (int i = 0; i < ChannelItemsControl.Items.Count; i++)
+            for (int i = 0; i < ChannelSettings.Count; i++)
             {
-                var container = ChannelItemsControl.ItemContainerGenerator.ContainerFromIndex(i) as ContentPresenter;
-                if (container != null)
-                {
-                    var channelControl = FindChildOfType<ChannelControl>(container);
-                    if (channelControl != null)
-                    {
-                        // Set channel index
-                        channelControl.ChannelIndex = i;
-                        
-                        // Remove existing event handler to prevent duplicates
-                        channelControl.MeasurementRequested -= ChannelControl_MeasurementRequested;
-                        // Add event handler
-                        channelControl.MeasurementRequested += ChannelControl_MeasurementRequested;
-                    }
-                }
+                // Set the index directly on the data model
+                ChannelSettings[i].ChannelIndex = i;
             }
-        }
-
-        /// <summary>
-        /// Handle measurement request from individual channel controls
-        /// </summary>
-        private void ChannelControl_MeasurementRequested(object sender, MeasurementRequestEventArgs e)
-        {
-            // Forward the event to parent controls
-            ChannelMeasurementRequested?.Invoke(this, e);
-        }
-
-        /// <summary>
-        /// Helper method to find child control of specific type
-        /// </summary>
-        private static T FindChildOfType<T>(DependencyObject parent) where T : DependencyObject
-        {
-            if (parent == null) return null;
-
-            T foundChild = null;
-            int childrenCount = System.Windows.Media.VisualTreeHelper.GetChildrenCount(parent);
-            for (int i = 0; i < childrenCount; i++)
-            {
-                var child = System.Windows.Media.VisualTreeHelper.GetChild(parent, i);
-                if (child is T)
-                {
-                    foundChild = (T)child;
-                    break;
-                }
-                else
-                {
-                    foundChild = FindChildOfType<T>(child);
-                    if (foundChild != null) break;
-                }
-            }
-            return foundChild;
         }
     }
 }

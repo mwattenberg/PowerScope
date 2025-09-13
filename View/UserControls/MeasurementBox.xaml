@@ -16,14 +16,12 @@
     <Grid Background="{DynamicResource PlotSettings_BackgroundBrush}" Margin="2">
         <Grid.RowDefinitions>
             <RowDefinition Height="20"/>
-            <!-- Header row with colored background -->
             <RowDefinition Height="*"/>
-            <!-- Measurement result area -->
         </Grid.RowDefinitions>
 
         <!-- Header row with colored background matching ChannelControl -->
         <Border Grid.Row="0" 
-                Background="{Binding DisplayColor, Converter={StaticResource ColorToBrushConverter}}" 
+                Background="{Binding ChannelSettings.Color, Converter={StaticResource ColorToBrushConverter}}" 
                 CornerRadius="2" 
                 Height="20">
             <Grid>
@@ -33,10 +31,9 @@
                     <ColumnDefinition Width="20"/>
                 </Grid.ColumnDefinitions>
 
-                <!-- Channel Label - Uses data binding for automatic updates -->
+                <!-- Channel Label - Direct binding to ChannelSettings -->
                 <TextBlock Grid.Column="0" 
-                           x:Name="ChannelLabelTextBlock"
-                           Text="{Binding Label}"
+                           Text="{Binding ChannelSettings.Label}"
                            Foreground="White" 
                            HorizontalAlignment="Left" 
                            VerticalAlignment="Center"
@@ -44,10 +41,9 @@
                            FontSize="10"
                            Margin="5,0,5,0"/>
 
-                <!-- Measurement Type Label - Set programmatically -->
-                <TextBlock 
-                           x:Name="MeasurementTypeTextBlock"
-                           Text="Temp"
+                <!-- Measurement Type Label - Bound to Measurement -->
+                <TextBlock Grid.Column="1"
+                           Text="{Binding TypeDisplayName}"
                            Foreground="White" 
                            HorizontalAlignment="Center" 
                            VerticalAlignment="Center"
@@ -73,9 +69,8 @@
 
         <!-- Measurement result area -->
         <Grid Grid.Row="1" Background="{DynamicResource PlotSettings_BackgroundBrush}">
-            <!-- Result value -->
-            <TextBlock x:Name="ResultTextBlock"
-                       Text="0.000"
+            <!-- Result value - Direct binding to Measurement.Result -->
+            <TextBlock Text="{Binding Result, StringFormat=F3}"
                        Foreground="{DynamicResource PlotSettings_ButtonForegroundBrush}"
                        HorizontalAlignment="Center"
                        VerticalAlignment="Center"

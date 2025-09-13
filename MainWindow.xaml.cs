@@ -24,19 +24,15 @@ namespace SerialPlotDN_WPF
     public partial class MainWindow : Window
     {
         private PlotManager _plotManager;
-        private SystemManager _systemManager;
 
         // Configurable display settings - use DataStream's ring buffer capacity
         public int DisplayElements { get; set; } = 3000; // Number of elements to display
-
-        
 
         public MainWindow()
         {
             InitializeComponent();
 
             _plotManager = new PlotManager(WpfPlot1);
-            _systemManager = new SystemManager();
             
             _plotManager.InitializePlot();
             _plotManager.SetupPlotUserInput();
@@ -60,16 +56,12 @@ namespace SerialPlotDN_WPF
             HorizontalControl.Settings = _plotManager.Settings;
             VerticalControl.Settings = _plotManager.Settings;
             
-            // Set dependencies for MeasurementBar
+            // Set dependencies for MeasurementBar (no more SystemManager!)
             MeasurementBar.DataStreamBar = DataStreamBar;
             MeasurementBar.ChannelSettings = ChannelControlBar.ChannelSettings;
-            MeasurementBar.SystemManager = _systemManager;
             
-            // Set SystemManager dependencies
-            _systemManager.SetPlotManager(_plotManager);
-            
-            // Set SystemManager as DataContext for RunControl
-            RunControl.DataContext = _systemManager;
+            // Set PlotManager as DataContext for RunControl (it now handles its own running state)
+            RunControl.DataContext = _plotManager;
             
             // Initialize default values through PlotSettings
             _plotManager.Settings.Xmax = DisplayElements; // Set initial window size
@@ -121,9 +113,15 @@ namespace SerialPlotDN_WPF
         private void RunControl_RunStateChanged(object? sender, RunControl.RunStates newState)
         {
             if (newState == RunControl.RunStates.Running)
-                _systemManager.StartUpdates();
+            {
+                _plotManager.StartUpdates();
+                MeasurementBar.StartUpdates();
+            }
             else
-                _systemManager.StopUpdates();
+            {
+                _plotManager.StopUpdates();
+                MeasurementBar.StopUpdates();
+            }
         }
 
         /// <summary>
@@ -148,15 +146,16 @@ namespace SerialPlotDN_WPF
         {
             writeSettingsToXML(); // Save settings on exit
             
-            // Stop SystemManager
-            _systemManager?.StopUpdates();
-            _systemManager?.Dispose();
+            // Stop updates
+            _plotManager?.StopUpdates();
+            MeasurementBar?.StopUpdates();
             
-            // Dispose MeasurementBar
-            MeasurementBar.Dispose();
+            // Dispose components
+            _plotManager?.Dispose();
+            MeasurementBar?.Dispose();
             
             // Dispose DataStreamBar which will handle all stream disposal
-            DataStreamBar.Dispose();
+            DataStreamBar?.Dispose();
             base.OnClosed(e);
         }
 
@@ -192,12 +191,9 @@ namespace SerialPlotDN_WPF
             WpfPlot1.UserInputProcessor.UserActionResponses.Add(zoomRectangleResponse);
         }
 
-
-
         private void Scrollbar_ValueChanged(object sender, System.Windows.Controls.Primitives.ScrollEventArgs e)
         {
             double test = e.NewValue;
         }
-
     }
 }

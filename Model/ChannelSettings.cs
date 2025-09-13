@@ -4,6 +4,21 @@ using System.Windows.Media;
 
 namespace SerialPlotDN_WPF.Model
 {
+    /// <summary>
+    /// Event args for measurement request
+    /// </summary>
+    public class MeasurementRequestEventArgs : EventArgs
+    {
+        public int ChannelIndex { get; }
+        public ChannelSettings ChannelSettings { get; }
+
+        public MeasurementRequestEventArgs(int channelIndex, ChannelSettings channelSettings)
+        {
+            ChannelIndex = channelIndex;
+            ChannelSettings = channelSettings;
+        }
+    }
+
     public class ChannelSettings : INotifyPropertyChanged
     {
         private string _label = "Channel";
@@ -12,6 +27,7 @@ namespace SerialPlotDN_WPF.Model
         private double _gain = 1.0;
         private double _offset = 0.0;
         private IDigitalFilter? _filter = null;
+        private int _channelIndex = -1;
 
         public string Label
         {
@@ -109,6 +125,25 @@ namespace SerialPlotDN_WPF.Model
                 {
                     _filter = value;
                     OnPropertyChanged(nameof(Filter));
+                }
+            }
+        }
+
+        /// <summary>
+        /// Channel index for this settings instance
+        /// </summary>
+        public int ChannelIndex
+        {
+            get 
+            { 
+                return _channelIndex; 
+            }
+            set
+            {
+                if (_channelIndex != value)
+                {
+                    _channelIndex = value;
+                    OnPropertyChanged(nameof(ChannelIndex));
                 }
             }
         }

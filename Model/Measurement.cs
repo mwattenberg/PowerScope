@@ -27,6 +27,7 @@ namespace SerialPlotDN_WPF.Model
     /// Self-contained measurement class that manages its own data copying and calculations
     /// Takes a DataStream and channel index, handles all data management internally
     /// Updates are now managed externally by SystemManager
+    /// Extended to work directly with WPF data binding and templates
     /// </summary>
     public class Measurement : INotifyPropertyChanged, IDisposable
     {
@@ -35,30 +36,58 @@ namespace SerialPlotDN_WPF.Model
         private readonly IDataStream _dataStream;
         private readonly int _channelIndex;
         private readonly double[] _dataBuffer;
+        private readonly ChannelSettings _channelSettings;
         
         // Single measurement result
         private double _result = 0.0;
         private bool _disposed = false;
 
+        // Events
+        public event EventHandler RemoveRequested;
+        public event PropertyChangedEventHandler PropertyChanged;
+
         /// <summary>
-        /// Constructor with measurement type, data stream, and channel
+        /// Constructor with measurement type, data stream, channel, and channel settings
+        /// </summary>
+        /// <param name="measurementType">Type of measurement to perform</param>
+        /// <param name="dataStream">Data stream to read from</param>
+        /// <param name="channelIndex">Zero-based channel index</param>
+        /// <param name="channelSettings">Channel settings for display (color, label, etc.)</param>
+        public Measurement(MeasurementType measurementType, IDataStream dataStream, int channelIndex, ChannelSettings channelSettings)
+        {
+            _measurementType = measurementType;
+            _dataStream = dataStream ?? throw new ArgumentNullException(nameof(dataStream));
+            _channelIndex = channelIndex;
+            _channelSettings = channelSettings ?? throw new ArgumentNullException(nameof(channelSettings));
+            _dataBuffer = new double[5000]; // Fixed buffer size
+            _calculationFunction = GetCalculationFunction(measurementType);
+        }
+
+        /// <summary>
+        /// Legacy constructor for backward compatibility
         /// </summary>
         /// <param name="measurementType">Type of measurement to perform</param>
         /// <param name="dataStream">Data stream to read from</param>
         /// <param name="channelIndex">Zero-based channel index</param>
         public Measurement(MeasurementType measurementType, IDataStream dataStream, int channelIndex)
+            : this(measurementType, dataStream, channelIndex, new ChannelSettings { Label = $"CH{channelIndex + 1}" })
         {
-            _measurementType = measurementType;
-            _dataStream = dataStream ?? throw new ArgumentNullException(nameof(dataStream));
-            _channelIndex = channelIndex;
-            _dataBuffer = new double[5000]; // Fixed buffer size
-            _calculationFunction = GetCalculationFunction(measurementType);
         }
 
         /// <summary>
         /// Type of measurement being performed (read-only)
         /// </summary>
         public MeasurementType Type => _measurementType;
+
+        /// <summary>
+        /// Display name for the measurement type
+        /// </summary>
+        public string TypeDisplayName => _measurementType.ToString();
+
+        /// <summary>
+        /// The channel settings associated with this measurement (for color, label, etc.)
+        /// </summary>
+        public ChannelSettings ChannelSettings => _channelSettings;
 
         /// <summary>
         /// Whether this measurement has been disposed
@@ -79,6 +108,14 @@ namespace SerialPlotDN_WPF.Model
                     OnPropertyChanged(nameof(Result));
                 }
             }
+        }
+
+        /// <summary>
+        /// Request removal of this measurement (for template-based UI)
+        /// </summary>
+        public void RequestRemove()
+        {
+            RemoveRequested?.Invoke(this, EventArgs.Empty);
         }
 
         /// <summary>
@@ -238,7 +275,5 @@ namespace SerialPlotDN_WPF.Model
         }
 
         #endregion
-
-        public event PropertyChangedEventHandler PropertyChanged;
     }
 }
