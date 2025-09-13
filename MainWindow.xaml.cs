@@ -14,8 +14,6 @@ using SerialPlotDN_WPF.Model;
 using SerialPlotDN_WPF.View.UserControls;
 using SerialPlotDN_WPF.View.UserForms;
 
-
-
 namespace SerialPlotDN_WPF
 {
     /// <summary>
@@ -43,10 +41,12 @@ namespace SerialPlotDN_WPF
             readSettingsXML();
             
             // Initialize channel display based on current streams
-            int totalChannels = DataStreamBar.GetTotalChannelCount();
+            int totalChannels = DataStreamBar.TotalChannelCount;
             _plotManager.SetDataStreams(DataStreamBar.ConnectedDataStreams);
+            
+            // Update ChannelControlBar from DataStreamBar
+            ChannelControlBar.UpdateFromDataStreamBar(DataStreamBar);
             _plotManager.SetChannelSettings(ChannelControlBar.ChannelSettings);
-            ChannelControlBar.UpdateChannels(totalChannels);
             _plotManager.UpdateChannelDisplay(totalChannels);
         }
 
@@ -56,9 +56,8 @@ namespace SerialPlotDN_WPF
             HorizontalControl.Settings = _plotManager.Settings;
             VerticalControl.Settings = _plotManager.Settings;
             
-            // Set dependencies for MeasurementBar (no more SystemManager!)
+            // Set dependencies for MeasurementBar - simplified with channel-centric approach
             MeasurementBar.DataStreamBar = DataStreamBar;
-            MeasurementBar.ChannelSettings = ChannelControlBar.ChannelSettings;
             
             // Set PlotManager as DataContext for RunControl (it now handles its own running state)
             RunControl.DataContext = _plotManager;
@@ -78,9 +77,10 @@ namespace SerialPlotDN_WPF
             DataStreamBar.ChannelsChanged += (totalChannels) => 
             {
                 _plotManager.SetDataStreams(DataStreamBar.ConnectedDataStreams);
+                
+                // Update ChannelControlBar from DataStreamBar
+                ChannelControlBar.UpdateFromDataStreamBar(DataStreamBar);
                 _plotManager.SetChannelSettings(ChannelControlBar.ChannelSettings);
-                // Simplified: no need for GetSignalColors, ChannelSettings handle colors directly
-                ChannelControlBar.UpdateChannels(totalChannels);
                 _plotManager.UpdateChannelDisplay(totalChannels);
             };
             
@@ -96,21 +96,22 @@ namespace SerialPlotDN_WPF
 
         /// <summary>
         /// Handle measurement request from ChannelControlBar
+        /// Uses the channel-centric approach
         /// </summary>
-        private void ChannelControlBar_MeasurementRequested(object sender, MeasurementRequestEventArgs e)
+        private void ChannelControlBar_MeasurementRequested(object sender, View.UserControls.MeasurementRequestEventArgs e)
         {
-            // Show simplified measurement selection dialog (no channel selection needed)
-            var measurementSelection = new MeasurementSelection();
+            // Show measurement selection dialog
+            MeasurementSelection measurementSelection = new MeasurementSelection();
             
             if (measurementSelection.ShowDialog() == true && 
-                measurementSelection.SelectedMeasurementType.HasValue)
+                measurementSelection.SelectedMeasurementType.HasValue &&
+                e.Channel != null)
             {
-                // Create measurement using the requesting channel's index and the selected measurement type
-                MeasurementBar.AddMeasurement(measurementSelection.SelectedMeasurementType.Value, e.ChannelIndex);
+                MeasurementBar.AddMeasurementForChannel(measurementSelection.SelectedMeasurementType.Value, e.Channel);
             }
         }
 
-        private void RunControl_RunStateChanged(object? sender, RunControl.RunStates newState)
+        private void RunControl_RunStateChanged(object sender, RunControl.RunStates newState)
         {
             if (newState == RunControl.RunStates.Running)
             {

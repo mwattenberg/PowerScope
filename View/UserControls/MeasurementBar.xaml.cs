@@ -11,7 +11,7 @@ namespace SerialPlotDN_WPF.View.UserControls
 {
     /// <summary>
     /// Interaction logic for MeasurementBar.xaml
-    /// Now manages its own measurement updates with DispatcherTimer
+    /// Now uses simplified DataStreamBar channel management
     /// </summary>
     public partial class MeasurementBar : UserControl, IDisposable
     {
@@ -20,9 +20,8 @@ namespace SerialPlotDN_WPF.View.UserControls
         /// </summary>
         public ObservableCollection<Measurement> Measurements { get; private set; } = new ObservableCollection<Measurement>();
 
-        // Dependencies
+        // Dependencies - simplified with direct channel management
         private DataStreamBar _dataStreamBar;
-        private ObservableCollection<ChannelSettings> _channelSettings;
         
         // Self-managed timer for measurement updates
         private readonly DispatcherTimer _measurementTimer;
@@ -44,20 +43,6 @@ namespace SerialPlotDN_WPF.View.UserControls
                 if (value == null)
                     throw new ArgumentNullException(nameof(value));
                 _dataStreamBar = value;
-            }
-        }
-
-        public ObservableCollection<ChannelSettings> ChannelSettings
-        {
-            get 
-            { 
-                return _channelSettings; 
-            }
-            set 
-            { 
-                if (value == null)
-                    throw new ArgumentNullException(nameof(value));
-                _channelSettings = value;
             }
         }
 
@@ -119,35 +104,71 @@ namespace SerialPlotDN_WPF.View.UserControls
 
         /// <summary>
         /// Add a measurement for a specific channel and measurement type
+        /// Uses the simplified channel-centric approach
         /// </summary>
         /// <param name="measurementType">Type of measurement to create</param>
         /// <param name="channelIndex">Zero-based channel index</param>
         public void AddMeasurement(MeasurementType measurementType, int channelIndex)
         {
-            // Validation logic
-            if (_dataStreamBar == null || _dataStreamBar.ConnectedDataStreams.Count == 0)
+            // Validation - much simpler with direct channel management
+            if (_dataStreamBar == null)
             {
-                MessageBox.Show("No data streams are connected.", "No Data Available", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show("DataStreamBar is not initialized.", "Configuration Error", MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }
 
-            if (_channelSettings == null || _channelSettings.Count <= channelIndex)
+            if (_dataStreamBar.TotalChannelCount == 0)
             {
-                MessageBox.Show($"Channel {channelIndex + 1} settings are not available.", "Channel Settings Not Available", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show("No channels are available.", "No Data Available", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
-            // Use DataStreamBar's encapsulated channel resolution logic
-            (IDataStream dataStream, int localChannelIndex) = _dataStreamBar.ResolveChannelToStream(channelIndex);
-            if (dataStream == null)
+            // Get the channel directly - no complex resolution needed!
+            Channel channel = _dataStreamBar.GetChannelByIndex(channelIndex);
+            if (channel == null)
             {
                 MessageBox.Show($"Channel {channelIndex + 1} is not available.", "Channel Not Available", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
-            // Create measurement with ChannelSettings reference
-            ChannelSettings channelSetting = _channelSettings[channelIndex];
-            Measurement measurement = new Measurement(measurementType, dataStream, localChannelIndex, channelSetting);
+            if (!channel.IsStreamConnected)
+            {
+                MessageBox.Show($"Channel {channelIndex + 1} stream is not connected.", "Stream Not Connected", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            // Create measurement using the channel - much cleaner!
+            Measurement measurement = new Measurement(measurementType, channel.OwnerStream, channel.LocalChannelIndex, channel.Settings);
+
+            // Subscribe to removal request
+            measurement.RemoveRequested += OnMeasurementRemoveRequested;
+
+            // Add to collection - UI updates automatically!
+            Measurements.Add(measurement);
+        }
+
+        /// <summary>
+        /// Add a measurement for a specific channel object
+        /// This is the preferred method with the new architecture
+        /// </summary>
+        /// <param name="measurementType">Type of measurement to create</param>
+        /// <param name="channel">The channel to create a measurement for</param>
+        public void AddMeasurementForChannel(MeasurementType measurementType, Channel channel)
+        {
+            if (channel == null)
+            {
+                MessageBox.Show("Invalid channel.", "Channel Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+
+            if (!channel.IsStreamConnected)
+            {
+                MessageBox.Show($"Channel '{channel.Label}' stream is not connected.", "Stream Not Connected", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            // Create measurement using the channel
+            Measurement measurement = new Measurement(measurementType, channel.OwnerStream, channel.LocalChannelIndex, channel.Settings);
 
             // Subscribe to removal request
             measurement.RemoveRequested += OnMeasurementRemoveRequested;

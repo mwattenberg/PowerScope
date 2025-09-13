@@ -1,21 +1,23 @@
 ﻿using System.IO;
 using System.Windows;
 using System.Windows.Controls;
-using ScottPlot.DataViews;
+using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.Windows.Media;
+using System.Linq;
 using SerialPlotDN_WPF.Model;
 using SerialPlotDN_WPF.View.UserForms;
-
 
 namespace SerialPlotDN_WPF.View.UserControls
 {
     /// <summary>
     /// Interaction logic for DataStreamBar.xaml
+    /// Simplified to focus on channel management - streams are accessed through channels
     /// </summary>
-
-    public partial class DataStreamBar : UserControl
+    public partial class DataStreamBar : UserControl, INotifyPropertyChanged, IDisposable
     {
-        public List<StreamSettings> ConfiguredDataStreams { get; private set; } = new List<StreamSettings>();
-        public List<IDataStream> ConnectedDataStreams { get; } = new List<IDataStream>();
+        // Core channel management - channels contain stream references
+        public ObservableCollection<Channel> Channels { get; private set; } = new ObservableCollection<Channel>();
 
         // Event to notify when channels need to be updated
         public event System.Action<int> ChannelsChanged;
@@ -23,12 +25,38 @@ namespace SerialPlotDN_WPF.View.UserControls
         // Event to notify when streams have changed (added/removed)
         public event System.Action StreamsChanged;
 
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        /// <summary>
+        /// Gets the total number of channels across all streams
+        /// </summary>
+        public int TotalChannelCount 
+        { 
+            get { return Channels.Count; } 
+        }
+
+        /// <summary>
+        /// Gets all unique data streams from channels
+        /// </summary>
+        public List<IDataStream> ConnectedDataStreams
+        {
+            get
+            {
+                List<IDataStream> uniqueStreams = new List<IDataStream>();
+                foreach (Channel channel in Channels)
+                {
+                    if (!uniqueStreams.Contains(channel.OwnerStream))
+                    {
+                        uniqueStreams.Add(channel.OwnerStream);
+                    }
+                }
+                return uniqueStreams;
+            }
+        }
+
         public DataStreamBar()
         {
             InitializeComponent();
-            
-            // No need to initialize a single DataStreamManager
-            //ItemsControl_Streams.ItemsSource = DataStreamManagers.SelectMany(m => m.StreamViewModels);
         }
 
         private void Button_AddStream_Click(object sender, RoutedEventArgs e)
@@ -41,21 +69,161 @@ namespace SerialPlotDN_WPF.View.UserControls
                 // Use the existing UpdateFromWindow method to ensure all properties are properly transferred
                 settings.UpdateFromWindow(configWindow);
                 
-                // Add to configured streams
-                ConfiguredDataStreams.Add(settings);
-
                 // Create and connect IDataStream from config
-                var dataStream = CreateDataStreamFromUserInput(settings);
+                IDataStream dataStream = CreateDataStreamFromUserInput(settings);
                 dataStream.Connect();
                 dataStream.StartStreaming();
 
-                ConnectedDataStreams.Add(dataStream);
+                // Add channels for the stream - this automatically manages the stream
+                AddChannelsForStream(dataStream);
+
+                // Add UI panel for the stream
+                AddStreamInfoPanel(settings, dataStream);
 
                 UpdateChannels();
                 
-                // Notify that streams have changed so PlotManager can update channel settings
+                // Notify that streams have changed
                 StreamsChanged?.Invoke();
             }
+        }
+
+        /// <summary>
+        /// Creates channels for a data stream and adds them to the collection
+        /// </summary>
+        /// <param name="dataStream">The data stream to create channels for</param>
+        /// <param name="channelColors">Optional array of colors for the channels</param>
+        private void AddChannelsForStream(IDataStream dataStream, Color[] channelColors = null)
+        {
+            if (dataStream == null)
+                return;
+
+            // Create channels for this stream
+            for (int localIndex = 0; localIndex < dataStream.ChannelCount; localIndex++)
+            {
+                int globalIndex = Channels.Count;
+                
+                // Create channel settings
+                ChannelSettings channelSettings = new ChannelSettings();
+                channelSettings.Label = $"CH{globalIndex + 1}";
+                channelSettings.ChannelIndex = globalIndex;
+                channelSettings.Gain = 1.0;
+                channelSettings.Offset = 0.0;
+                channelSettings.IsEnabled = true;
+
+                // Set color if provided, otherwise use default palette
+                if (channelColors != null && globalIndex < channelColors.Length)
+                {
+                    channelSettings.Color = channelColors[globalIndex];
+                }
+                else
+                {
+                    channelSettings.Color = PlotManager.GetColor(globalIndex);
+                }
+
+                // Create the channel
+                Channel channel = new Channel(dataStream, localIndex, channelSettings);
+                Channels.Add(channel);
+            }
+
+            OnPropertyChanged(nameof(TotalChannelCount));
+        }
+
+        /// <summary>
+        /// Removes channels associated with a specific data stream
+        /// </summary>
+        /// <param name="dataStream">The data stream whose channels should be removed</param>
+        private void RemoveChannelsForStream(IDataStream dataStream)
+        {
+            if (dataStream == null)
+                return;
+
+            // Find and remove all channels belonging to this stream
+            List<Channel> channelsToRemove = new List<Channel>();
+            foreach (Channel channel in Channels)
+            {
+                if (channel.OwnerStream == dataStream)
+                {
+                    channelsToRemove.Add(channel);
+                }
+            }
+
+            foreach (Channel channel in channelsToRemove)
+            {
+                Channels.Remove(channel);
+                channel.Dispose();
+            }
+
+            // Clean up the stream
+            dataStream.StopStreaming();
+            dataStream.Disconnect();
+            dataStream.Dispose();
+
+            // Update channel indices after removal
+            UpdateChannelIndices();
+            OnPropertyChanged(nameof(TotalChannelCount));
+        }
+
+        /// <summary>
+        /// Updates the global channel indices after changes
+        /// </summary>
+        private void UpdateChannelIndices()
+        {
+            for (int i = 0; i < Channels.Count; i++)
+            {
+                Channels[i].Settings.ChannelIndex = i;
+                Channels[i].Settings.Label = $"CH{i + 1}";
+            }
+        }
+
+        /// <summary>
+        /// Gets a channel by its global index
+        /// </summary>
+        /// <param name="globalIndex">Global channel index</param>
+        /// <returns>The channel at the specified index, or null if not found</returns>
+        public Channel GetChannelByIndex(int globalIndex)
+        {
+            if (globalIndex < 0 || globalIndex >= Channels.Count)
+                return null;
+
+            return Channels[globalIndex];
+        }
+
+        /// <summary>
+        /// Gets all channels belonging to a specific data stream
+        /// </summary>
+        /// <param name="dataStream">The data stream</param>
+        /// <returns>Collection of channels belonging to the stream</returns>
+        public IEnumerable<Channel> GetChannelsForStream(IDataStream dataStream)
+        {
+            if (dataStream == null)
+                return Enumerable.Empty<Channel>();
+
+            List<Channel> streamChannels = new List<Channel>();
+            foreach (Channel channel in Channels)
+            {
+                if (channel.OwnerStream == dataStream)
+                {
+                    streamChannels.Add(channel);
+                }
+            }
+            return streamChannels;
+        }
+
+        /// <summary>
+        /// Gets all enabled channels
+        /// </summary>
+        /// <returns>Collection of enabled channels</returns>
+        public IEnumerable<Channel> GetEnabledChannels()
+        {
+            List<Channel> enabledChannels = new List<Channel>();
+            foreach (Channel channel in Channels)
+            {
+                if (channel.IsEnabled)
+                {
+                    enabledChannels.Add(channel);
+                }
+            }
+            return enabledChannels;
         }
 
         public IDataStream CreateDataStreamFromUserInput(StreamSettings vm)
@@ -64,20 +232,18 @@ namespace SerialPlotDN_WPF.View.UserControls
             switch (vm.StreamSource)
             {
                 case StreamSource.Demo:
-                    var demoSettings = new DemoSettings(vm.NumberOfChannels, vm.DemoSampleRate, vm.DemoSignalType);
-                    var demoStream = new DemoDataStream(demoSettings);
-                    AddStreamInfoPanel(vm, demoStream);
+                    DemoSettings demoSettings = new DemoSettings(vm.NumberOfChannels, vm.DemoSampleRate, vm.DemoSignalType);
+                    DemoDataStream demoStream = new DemoDataStream(demoSettings);
                     return demoStream;
                     
                 case StreamSource.AudioInput:
-                    var audioStream = new AudioDataStream(vm.AudioDevice, vm.AudioSampleRate);
-                    AddStreamInfoPanel(vm, audioStream);
+                    AudioDataStream audioStream = new AudioDataStream(vm.AudioDevice, vm.AudioSampleRate);
                     return audioStream;
                     
                 case StreamSource.SerialPort:
                 default:
                     // Default to SerialDataStream
-                    var sourceSetting = new SourceSetting(vm.Port, vm.Baud, vm.DataBits, vm.StopBits, vm.Parity);
+                    SourceSetting sourceSetting = new SourceSetting(vm.Port, vm.Baud, vm.DataBits, vm.StopBits, vm.Parity);
                     DataParser dataParser;
                     if (vm.DataFormat == DataFormatType.RawBinary)
                     {
@@ -93,8 +259,7 @@ namespace SerialPlotDN_WPF.View.UserControls
                         char separator = ParseDelimiter(vm.Delimiter);
                         dataParser = new DataParser(vm.NumberOfChannels, frameEnd, separator);
                     }
-                    var stream = new SerialDataStream(sourceSetting, dataParser);
-                    AddStreamInfoPanel(vm, stream);
+                    SerialDataStream stream = new SerialDataStream(sourceSetting, dataParser);
                     return stream;
             }
         }
@@ -120,71 +285,54 @@ namespace SerialPlotDN_WPF.View.UserControls
 
         private char ParseDelimiter(string delimiter)
         {
-            if (string.IsNullOrEmpty(delimiter)) return ',';
+            if (string.IsNullOrEmpty(delimiter)) 
+                return ',';
+                
             string lowerDelimiter = delimiter.ToLower();
-            if (lowerDelimiter == "comma" || lowerDelimiter == ",") return ',';
-            else if (lowerDelimiter == "space" || lowerDelimiter == " ") return ' ';
-            else if (lowerDelimiter == "tab" || lowerDelimiter == "\t") return '\t';
-            else if (lowerDelimiter == "semicolon" || lowerDelimiter == ";") return ';';
-            else return delimiter[0];
+            switch (lowerDelimiter)
+            {
+                case "comma":
+                case ",":
+                    return ',';
+                case "space":
+                case " ":
+                    return ' ';
+                case "tab":
+                case "\t":
+                    return '\t';
+                case "semicolon":
+                case ";":
+                    return ';';
+                default:
+                    return delimiter[0];
+            }
         }
 
-        private void AddStreamInfoPanel(StreamSettings viewModel, IDataStream datastream)
+        private void AddStreamInfoPanel(StreamSettings settings, IDataStream datastream)
         {
-            StreamInfoPanel panel = new StreamInfoPanel(datastream, viewModel);
-            panel.OnRemoveClickedEvent += (s, args) => RemoveStream(viewModel);
+            StreamInfoPanel panel = new StreamInfoPanel(datastream, settings);
+            panel.OnRemoveClickedEvent += (s, args) => RemoveStreamByDataStream(datastream);
             Panel_Streams.Children.Add(panel);
         }
                 
         /// <summary>
-        /// Removes a stream and disposes its resources
+        /// Removes a stream by its data stream reference
+        /// Much simpler than the old approach - no complex searching needed
         /// </summary>
-        /// <param name="viewModel">The stream view model to remove</param>
-        public void RemoveStream(StreamSettings viewModel)
+        /// <param name="dataStream">The data stream to remove</param>
+        public void RemoveStreamByDataStream(IDataStream dataStream)
         {
-            if (!ConfiguredDataStreams.Contains(viewModel))
+            if (dataStream == null)
                 return;
 
-            viewModel.PropertyChanged -= DataStreamViewModel_PropertyChanged;
-
-            // Find and remove corresponding IDataStream using switch case
-            IDataStream streamToRemove = viewModel.StreamSource switch
-            {
-                StreamSource.Demo => 
-                    ConnectedDataStreams.FirstOrDefault(ds => ds != null && ds.StreamType == "Demo"),
-                
-                StreamSource.SerialPort => 
-                    ConnectedDataStreams.FirstOrDefault(ds => ds != null && 
-                        ds.StreamType == "Serial" && 
-                        ds is SerialDataStream sds && 
-                        sds.SourceSetting.PortName == viewModel.Port),
-                
-                StreamSource.AudioInput => 
-                    ConnectedDataStreams.FirstOrDefault(ds => ds != null && ds.StreamType == "Audio"),
-                
-                StreamSource.USB => 
-                    ConnectedDataStreams.FirstOrDefault(ds => ds != null && ds.StreamType == "USB"),
-                
-                _ => null
-            };
-
-            // Clean up the stream if found
-            if (streamToRemove != null)
-            {
-                streamToRemove.StopStreaming();
-                streamToRemove.Disconnect();
-                streamToRemove.Dispose();
-                ConnectedDataStreams.Remove(streamToRemove);
-            }
-
-            // Remove from configured streams
-            ConfiguredDataStreams.Remove(viewModel);
+            // Remove channels associated with this stream - this handles everything!
+            RemoveChannelsForStream(dataStream);
 
             // Find and remove the StreamInfoPanel
             for (int i = Panel_Streams.Children.Count - 1; i >= 0; i--)
             {
                 if (Panel_Streams.Children[i] is StreamInfoPanel panel && 
-                    panel.AssociatedStreamSettings == viewModel)
+                    panel.AssociatedDataStream == dataStream)
                 {
                     Panel_Streams.Children.RemoveAt(i);
                     break;
@@ -202,100 +350,50 @@ namespace SerialPlotDN_WPF.View.UserControls
         /// </summary>
         public void Dispose()
         {
-            foreach (var ds in ConnectedDataStreams.ToList())
+            // Dispose all streams through channels
+            List<IDataStream> streamsToDispose = new List<IDataStream>();
+            foreach (Channel channel in Channels)
             {
-                ds.StopStreaming();
-                ds.Disconnect();
-                ds.Dispose();
+                if (!streamsToDispose.Contains(channel.OwnerStream))
+                {
+                    streamsToDispose.Add(channel.OwnerStream);
+                }
             }
-            ConnectedDataStreams.Clear();
-            foreach (var stream in ConfiguredDataStreams.ToList())
+
+            foreach (IDataStream stream in streamsToDispose)
             {
-                stream.PropertyChanged -= DataStreamViewModel_PropertyChanged;
+                stream.StopStreaming();
+                stream.Disconnect();
+                stream.Dispose();
             }
-            ConfiguredDataStreams.Clear();
+            
             Panel_Streams.Children.Clear();
+            
+            // Clean up all channels
+            foreach (Channel channel in Channels)
+            {
+                channel.Dispose();
+            }
+            Channels.Clear();
+            
             ChannelsChanged?.Invoke(0);
         }
 
         /// <summary>
-        /// Handles property changes in DataStreamViewModel to update channels when needed
-        /// </summary>
-        private void DataStreamViewModel_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
-        {
-            // Update channels when NumberOfChannels changes
-            if (e.PropertyName == nameof(StreamSettings.NumberOfChannels))
-            {
-                UpdateChannels();
-            }
-        }
-
-        /// <summary>
-        /// Calculates total channels from connected streams and notifies listeners
+        /// Calculates total channels and notifies listeners
         /// </summary>
         private void UpdateChannels()
         {
-            // Sum up channels from all connected streams
-            int totalChannels = 0;
-            foreach(var vm in ConfiguredDataStreams)
-            {
-                totalChannels = totalChannels + vm.NumberOfChannels;
-            }
-            
             // Notify subscribers about the channel count change
-            ChannelsChanged?.Invoke(totalChannels);
+            ChannelsChanged?.Invoke(TotalChannelCount);
         }
 
-        /// <summary>
-        /// Gets the total number of channels from all connected streams
-        /// </summary>
-        public int GetTotalChannelCount()
+        protected virtual void OnPropertyChanged(string propertyName)
         {
-            int totalChannels = 0;
-            foreach (StreamSettings vm in ConfiguredDataStreams)
+            if (PropertyChanged != null)
             {
-                totalChannels = totalChannels + vm.NumberOfChannels;
+                PropertyChanged.Invoke(this, new PropertyChangedEventArgs(propertyName));
             }
-            return totalChannels;
-        }
-
-        /// <summary>
-        /// Resolves a global channel index to its corresponding data stream and local channel index
-        /// Encapsulates the channel-to-stream mapping logic that was previously duplicated
-        /// </summary>
-        /// <param name="globalChannelIndex">Global channel index across all streams</param>
-        /// <returns>Tuple of (DataStream, LocalChannelIndex) or (null, -1) if not found</returns>
-        public (IDataStream dataStream, int localChannelIndex) ResolveChannelToStream(int globalChannelIndex)
-        {
-            if (globalChannelIndex < 0)
-                return (null, -1);
-
-            int currentChannelOffset = 0;
-            
-            for (int streamIndex = 0; streamIndex < ConfiguredDataStreams.Count; streamIndex++)
-            {
-                StreamSettings streamSettings = ConfiguredDataStreams[streamIndex];
-                
-                if (globalChannelIndex < currentChannelOffset + streamSettings.NumberOfChannels)
-                {
-                    // This stream contains our target channel
-                    int localChannelIndex = globalChannelIndex - currentChannelOffset;
-                    
-                    // Find the corresponding connected data stream
-                    if (streamIndex < ConnectedDataStreams.Count)
-                    {
-                        IDataStream dataStream = ConnectedDataStreams[streamIndex];
-                        return (dataStream, localChannelIndex);
-                    }
-                    else
-                    {
-                        return (null, -1); // Stream not connected
-                    }
-                }
-                currentChannelOffset += streamSettings.NumberOfChannels;
-            }
-            
-            return (null, -1); // Channel not found
         }
     }
 }

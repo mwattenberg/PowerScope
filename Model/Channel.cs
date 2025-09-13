@@ -1,0 +1,221 @@
+using System;
+using System.ComponentModel;
+
+namespace SerialPlotDN_WPF.Model
+{
+    /// <summary>
+    /// Represents a single channel that encapsulates both the data source and settings
+    /// This eliminates the need for global channel indices and complex resolution logic
+    /// </summary>
+    public class Channel : INotifyPropertyChanged
+    {
+        private readonly IDataStream _ownerStream;
+        private readonly int _localChannelIndex;
+        private ChannelSettings _settings;
+        private bool _disposed = false;
+
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        /// <summary>
+        /// Creates a new Channel instance
+        /// </summary>
+        /// <param name="ownerStream">The data stream that owns this channel</param>
+        /// <param name="localChannelIndex">The local index within the owner stream (0-based)</param>
+        /// <param name="settings">Channel settings for display and processing</param>
+        public Channel(IDataStream ownerStream, int localChannelIndex, ChannelSettings settings)
+        {
+            if (ownerStream == null)
+                throw new ArgumentNullException(nameof(ownerStream));
+            if (settings == null)
+                throw new ArgumentNullException(nameof(settings));
+            if (localChannelIndex < 0 || localChannelIndex >= ownerStream.ChannelCount)
+                throw new ArgumentOutOfRangeException(nameof(localChannelIndex));
+
+            _ownerStream = ownerStream;
+            _localChannelIndex = localChannelIndex;
+            _settings = settings;
+
+            // Subscribe to settings changes
+            _settings.PropertyChanged += OnSettingsChanged;
+
+            // Apply settings to the stream if it supports channel configuration
+            if (_ownerStream is IChannelConfigurable configurableStream)
+            {
+                configurableStream.SetChannelSetting(_localChannelIndex, _settings);
+            }
+        }
+
+        /// <summary>
+        /// The data stream that owns this channel
+        /// </summary>
+        public IDataStream OwnerStream 
+        { 
+            get { return _ownerStream; } 
+        }
+
+        /// <summary>
+        /// The local channel index within the owner stream (0-based)
+        /// </summary>
+        public int LocalChannelIndex 
+        { 
+            get { return _localChannelIndex; } 
+        }
+
+        /// <summary>
+        /// Channel settings for display and processing
+        /// </summary>
+        public ChannelSettings Settings
+        {
+            get { return _settings; }
+            set
+            {
+                if (value == null)
+                    throw new ArgumentNullException(nameof(value));
+
+                if (_settings != value)
+                {
+                    // Unsubscribe from old settings
+                    if (_settings != null)
+                        _settings.PropertyChanged -= OnSettingsChanged;
+
+                    _settings = value;
+
+                    // Subscribe to new settings
+                    _settings.PropertyChanged += OnSettingsChanged;
+
+                    // Apply new settings to the stream
+                    if (_ownerStream is IChannelConfigurable configurableStream)
+                    {
+                        configurableStream.SetChannelSetting(_localChannelIndex, _settings);
+                    }
+
+                    OnPropertyChanged(nameof(Settings));
+                }
+            }
+        }
+
+        /// <summary>
+        /// Gets the channel label for display purposes
+        /// </summary>
+        public string Label 
+        { 
+            get { return _settings.Label; } 
+        }
+
+        /// <summary>
+        /// Gets whether this channel is currently enabled
+        /// </summary>
+        public bool IsEnabled 
+        { 
+            get { return _settings.IsEnabled; } 
+        }
+
+        /// <summary>
+        /// Gets the display color for this channel
+        /// </summary>
+        public System.Windows.Media.Color Color 
+        { 
+            get { return _settings.Color; } 
+        }
+
+        /// <summary>
+        /// Copies the latest data from this channel to the destination array
+        /// </summary>
+        /// <param name="destination">Destination array for the data</param>
+        /// <param name="requestedSamples">Number of samples to copy</param>
+        /// <returns>Actual number of samples copied</returns>
+        public int CopyLatestDataTo(double[] destination, int requestedSamples)
+        {
+            if (_disposed)
+                return 0;
+
+            return _ownerStream.CopyLatestTo(_localChannelIndex, destination, requestedSamples);
+        }
+
+        /// <summary>
+        /// Gets whether the owner stream is currently connected
+        /// </summary>
+        public bool IsStreamConnected 
+        { 
+            get { return _ownerStream.IsConnected; } 
+        }
+
+        /// <summary>
+        /// Gets whether the owner stream is currently streaming data
+        /// </summary>
+        public bool IsStreamStreaming 
+        { 
+            get { return _ownerStream.IsStreaming; } 
+        }
+
+        /// <summary>
+        /// Gets the type of the owner stream
+        /// </summary>
+        public string StreamType 
+        { 
+            get { return _ownerStream.StreamType; } 
+        }
+
+        /// <summary>
+        /// Creates a globally unique identifier for this channel
+        /// Useful for tracking channels across UI components
+        /// </summary>
+        public string GetChannelId()
+        {
+            return $"{_ownerStream.GetHashCode()}_{_localChannelIndex}";
+        }
+
+        private void OnSettingsChanged(object sender, PropertyChangedEventArgs e)
+        {
+            // Forward settings property changes
+            OnPropertyChanged($"Settings.{e.PropertyName}");
+
+            // Also forward specific properties that UI might bind to directly
+            switch (e.PropertyName)
+            {
+                case nameof(ChannelSettings.Label):
+                    OnPropertyChanged(nameof(Label));
+                    break;
+                case nameof(ChannelSettings.IsEnabled):
+                    OnPropertyChanged(nameof(IsEnabled));
+                    break;
+                case nameof(ChannelSettings.Color):
+                    OnPropertyChanged(nameof(Color));
+                    break;
+            }
+
+            // Apply updated settings to the stream
+            if (_ownerStream is IChannelConfigurable configurableStream)
+            {
+                configurableStream.SetChannelSetting(_localChannelIndex, _settings);
+            }
+        }
+
+        protected virtual void OnPropertyChanged(string propertyName)
+        {
+            if (PropertyChanged != null)
+            {
+                PropertyChanged.Invoke(this, new PropertyChangedEventArgs(propertyName));
+            }
+        }
+
+        /// <summary>
+        /// Disposes the channel and cleans up resources
+        /// </summary>
+        public void Dispose()
+        {
+            if (!_disposed)
+            {
+                if (_settings != null)
+                    _settings.PropertyChanged -= OnSettingsChanged;
+
+                _disposed = true;
+            }
+        }
+
+        public override string ToString()
+        {
+            return $"Channel: {Label} ({StreamType} Stream, Local Index: {LocalChannelIndex})";
+        }
+    }
+}

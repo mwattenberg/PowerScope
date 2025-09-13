@@ -1,14 +1,32 @@
-﻿using System.Collections.ObjectModel;
+﻿using System;
+using System.Collections.ObjectModel;
 using System.Collections.Specialized;
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using SerialPlotDN_WPF.Model;
-using SerialPlotDN_WPF.View.UserControls;
 
 namespace SerialPlotDN_WPF.View.UserControls
 {
+    /// <summary>
+    /// Event arguments for measurement requests
+    /// </summary>
+    public class MeasurementRequestEventArgs : EventArgs
+    {
+        public int ChannelIndex { get; }
+        public ChannelSettings ChannelSettings { get; }
+        public Channel Channel { get; }
+
+        public MeasurementRequestEventArgs(int channelIndex, ChannelSettings channelSettings, Channel channel)
+        {
+            ChannelIndex = channelIndex;
+            ChannelSettings = channelSettings;
+            Channel = channel;
+        }
+    }
+
     /// <summary>
     /// Simple relay command implementation for MVVM pattern
     /// </summary>
@@ -42,12 +60,13 @@ namespace SerialPlotDN_WPF.View.UserControls
 
     /// <summary>
     /// Interaction logic for ChannelControlBar.xaml
-    /// Manages channel settings collection with direct data binding via DataTemplate
+    /// Works with DataStreamBar for clean channel-centric architecture
     /// </summary>
     public partial class ChannelControlBar : UserControl
     {
         /// <summary>
         /// Collection of ChannelSettings that drives the UI directly via DataTemplate
+        /// Synced with DataStreamBar channels
         /// </summary>
         public ObservableCollection<ChannelSettings> ChannelSettings { get; private set; } = new ObservableCollection<ChannelSettings>();
 
@@ -60,6 +79,11 @@ namespace SerialPlotDN_WPF.View.UserControls
         /// Command to handle measurement requests from ChannelControl instances
         /// </summary>
         public ICommand MeasurementCommand { get; private set; }
+
+        /// <summary>
+        /// Reference to the DataStreamBar for direct channel access
+        /// </summary>
+        public DataStreamBar DataStreamBar { get; set; }
 
         public ChannelControlBar()
         {
@@ -80,54 +104,38 @@ namespace SerialPlotDN_WPF.View.UserControls
 
         private void OnMeasurementRequested(ChannelSettings channelSettings)
         {
-            if (channelSettings != null)
+            if (channelSettings != null && DataStreamBar != null)
             {
-                var args = new MeasurementRequestEventArgs(channelSettings.ChannelIndex, channelSettings);
-                ChannelMeasurementRequested?.Invoke(this, args);
+                // Get the corresponding channel object
+                Channel channel = DataStreamBar.GetChannelByIndex(channelSettings.ChannelIndex);
+                if (channel != null)
+                {
+                    MeasurementRequestEventArgs args = new MeasurementRequestEventArgs(channelSettings.ChannelIndex, channelSettings, channel);
+                    ChannelMeasurementRequested?.Invoke(this, args);
+                }
             }
         }
 
         /// <summary>
-        /// Updates the channel settings based on the total number of channels from active streams
+        /// Updates the channel settings based on the DataStreamBar channels
         /// </summary>
-        /// <param name="totalChannels">Total number of channels needed</param>
-        /// <param name="channelColors">Array of colors for each channel (optional)</param>
-        public void UpdateChannels(int totalChannels, Color[] channelColors = null)
+        /// <param name="dataStreamBar">The data stream bar to sync with</param>
+        public void UpdateFromDataStreamBar(DataStreamBar dataStreamBar)
         {
-            // Remove excess channels
-            while (ChannelSettings.Count > totalChannels)
+            if (dataStreamBar == null)
+                return;
+
+            DataStreamBar = dataStreamBar;
+
+            // Clear existing settings
+            ChannelSettings.Clear();
+
+            // Add settings from all channels in the data stream bar
+            foreach (Channel channel in dataStreamBar.Channels)
             {
-                ChannelSettings.RemoveAt(ChannelSettings.Count - 1);
+                ChannelSettings.Add(channel.Settings);
             }
 
-            // Add missing channels
-            while (ChannelSettings.Count < totalChannels)
-            {
-                int channelIndex = ChannelSettings.Count;
-                
-                // Set color if provided, otherwise use ScottPlot palette
-                Color channelColor;
-                if (channelColors != null && channelIndex < channelColors.Length)
-                {
-                    channelColor = channelColors[channelIndex];
-                }
-                else
-                {
-                    // Use ScottPlot Category10 palette
-                    channelColor = PlotManager.GetColor(channelIndex);
-                }
-
-                ChannelSettings channelSettings = new ChannelSettings();
-                channelSettings.Label = string.Format("CH{0}", channelIndex + 1);
-                channelSettings.Color = channelColor;
-                channelSettings.Gain = 1.0;
-                channelSettings.Offset = 0.0;
-                channelSettings.ChannelIndex = channelIndex; // Set the channel index
-
-                ChannelSettings.Add(channelSettings);
-            }
-            
-            // Update channel indices after changes
             UpdateChannelIndices();
         }
 
