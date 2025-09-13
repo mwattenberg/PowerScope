@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
@@ -74,24 +75,21 @@ namespace SerialPlotDN_WPF
         {
             RunControl.RunStateChanged += RunControl_RunStateChanged;
 
-            DataStreamBar.ChannelsChanged += (totalChannels) => 
-            {
-                _plotManager.SetDataStreams(DataStreamBar.ConnectedDataStreams);
-                
-                // Update ChannelControlBar from DataStreamBar
-                ChannelControlBar.UpdateFromDataStreamBar(DataStreamBar);
-                _plotManager.SetChannelSettings(ChannelControlBar.ChannelSettings);
-                _plotManager.UpdateChannelDisplay(totalChannels);
-                
-                // Refresh measurements when channels change
-                MeasurementBar.RefreshMeasurements();
-            };
+            // Subscribe directly to ObservableCollection.CollectionChanged for automatic notifications
+            DataStreamBar.Channels.CollectionChanged += OnChannelsCollectionChanged;
+        }
+
+        private void OnChannelsCollectionChanged(object sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+        {
+            _plotManager.SetDataStreams(DataStreamBar.ConnectedDataStreams);
             
-            DataStreamBar.StreamsChanged += () =>
-            {
-                // Update data streams when streams are added or removed
-                _plotManager.SetDataStreams(DataStreamBar.ConnectedDataStreams);
-            };
+            // Update ChannelControlBar from DataStreamBar
+            ChannelControlBar.UpdateFromDataStreamBar(DataStreamBar);
+            _plotManager.SetChannelSettings(ChannelControlBar.ChannelSettings);
+            _plotManager.UpdateChannelDisplay(DataStreamBar.TotalChannelCount);
+            
+            // Refresh measurements when channels change
+            MeasurementBar.RefreshMeasurements();
         }
 
         private void RunControl_RunStateChanged(object sender, RunControl.RunStates newState)
@@ -114,7 +112,7 @@ namespace SerialPlotDN_WPF
         private void writeSettingsToXML()
         {
             string filePath = Path.Combine(Directory.GetCurrentDirectory(), "Settings.xml");
-            Serializer.WriteSettingsToXML(filePath, _plotManager, DataStreamBar, ChannelControlBar);
+            Serializer.WriteSettingsToXML(filePath, _plotManager, DataStreamBar);
         }
 
         /// <summary>
@@ -123,7 +121,7 @@ namespace SerialPlotDN_WPF
         private void readSettingsXML()
         {
             string filePath = Path.Combine(Directory.GetCurrentDirectory(), "Settings.xml");
-            Serializer.ReadSettingsFromXML(filePath, _plotManager, DataStreamBar, ChannelControlBar);
+            Serializer.ReadSettingsFromXML(filePath, _plotManager, DataStreamBar);
         }
 
         protected override void OnClosed(EventArgs e)
@@ -143,36 +141,12 @@ namespace SerialPlotDN_WPF
             base.OnClosed(e);
         }
 
-        private void WpfPlot1_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-        {
-            // Restore default axis limits as in initialization
-            //_plotManager.Plot.Plot.Axes.SetLimitsY(_plotManager.Settings.Ymin, _plotManager.Settings.Ymax);
-            //_plotManager.Plot.Refresh();
-        }
-
-        private void WpfPlot1_MouseRightButtonDown(object sender, MouseButtonEventArgs e)
-        {
-            // Restore default axis limits as in initialization
-            //_plotManager.Plot.Plot.Axes.SetLimitsY(_plotManager.Settings.Ymin, _plotManager.Settings.Ymax);
-            //_plotManager.Plot.Refresh();
-        }
 
         private void Button_ConfigPlot_Click(object sender, RoutedEventArgs e)
         {
             // Pass current settings to the window - changes are applied immediately via data binding
             View.UserForms.PlotSettingsWindow settingsWindow = new View.UserForms.PlotSettingsWindow(_plotManager.Settings);
             settingsWindow.Show();
-        }
-
-        private void SetupPlotUserInput()
-        {
-            WpfPlot1.UserInputProcessor.Reset();
-            WpfPlot1.UserInputProcessor.IsEnabled = false;
-
-            // right-click-drag zoom rectangle
-            ScottPlot.Interactivity.MouseButton zoomRectangleButton = ScottPlot.Interactivity.StandardMouseButtons.Right;
-            ScottPlot.Interactivity.UserActionResponses.MouseDragZoomRectangle zoomRectangleResponse = new ScottPlot.Interactivity.UserActionResponses.MouseDragZoomRectangle(zoomRectangleButton);
-            WpfPlot1.UserInputProcessor.UserActionResponses.Add(zoomRectangleResponse);
         }
 
         private void Scrollbar_ValueChanged(object sender, System.Windows.Controls.Primitives.ScrollEventArgs e)

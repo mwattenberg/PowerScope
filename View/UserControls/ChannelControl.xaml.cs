@@ -37,21 +37,6 @@ namespace SerialPlotDN_WPF.View.UserControls
         private static readonly Brush DefaultBrush = new SolidColorBrush(DisabledColor);
 
         /// <summary>
-        /// Dependency property for MeasurementCommand
-        /// </summary>
-        public static readonly DependencyProperty MeasurementCommandProperty =
-            DependencyProperty.Register("MeasurementCommand", typeof(ICommand), typeof(ChannelControl), new PropertyMetadata(null));
-
-        /// <summary>
-        /// Command to execute when measurement is requested (bound from ChannelControlBar)
-        /// </summary>
-        public ICommand MeasurementCommand
-        {
-            get { return (ICommand)GetValue(MeasurementCommandProperty); }
-            set { SetValue(MeasurementCommandProperty, value); }
-        }
-
-        /// <summary>
         /// Gets the ChannelSettings from DataContext
         /// </summary>
         public ChannelSettings Settings 
@@ -102,11 +87,19 @@ namespace SerialPlotDN_WPF.View.UserControls
 
         private void ButtonMeasure_Click(object sender, RoutedEventArgs e)
         {
-            // Use the command approach since it's properly bound via XAML DataTemplate
-            // This will trigger the MeasurementSelection window through the command chain
-            if (MeasurementCommand != null)
+            if (Settings != null)
             {
-                MeasurementCommand.Execute(Settings);
+                // Show measurement selection dialog directly in ChannelControl
+                View.UserForms.MeasurementSelection measurementSelection = new View.UserForms.MeasurementSelection();
+                measurementSelection.Owner = Window.GetWindow(this);
+                
+                if (measurementSelection.ShowDialog() == true && 
+                    measurementSelection.SelectedMeasurementType.HasValue)
+                {
+                    // Request measurement through ChannelSettings event
+                    // The Channel that owns these settings will receive the event and add the measurement
+                    Settings.RequestMeasurement(measurementSelection.SelectedMeasurementType.Value);
+                }
             }
         }
 

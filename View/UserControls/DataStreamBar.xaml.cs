@@ -13,17 +13,12 @@ namespace SerialPlotDN_WPF.View.UserControls
     /// <summary>
     /// Interaction logic for DataStreamBar.xaml
     /// Simplified to focus on channel management - streams are accessed through channels
+    /// ObservableCollection.CollectionChanged provides automatic change notifications
     /// </summary>
     public partial class DataStreamBar : UserControl, INotifyPropertyChanged, IDisposable
     {
         // Core channel management - channels contain stream references
         public ObservableCollection<Channel> Channels { get; private set; } = new ObservableCollection<Channel>();
-
-        // Event to notify when channels need to be updated
-        public event System.Action<int> ChannelsChanged;
-        
-        // Event to notify when streams have changed (added/removed)
-        public event System.Action StreamsChanged;
 
         public event PropertyChangedEventHandler PropertyChanged;
 
@@ -80,10 +75,7 @@ namespace SerialPlotDN_WPF.View.UserControls
                 // Add UI panel for the stream
                 AddStreamInfoPanel(settings, dataStream);
 
-                UpdateChannels();
-                
-                // Notify that streams have changed
-                StreamsChanged?.Invoke();
+                // ObservableCollection.CollectionChanged handles all notifications automatically
             }
         }
 
@@ -105,7 +97,6 @@ namespace SerialPlotDN_WPF.View.UserControls
                 // Create channel settings
                 ChannelSettings channelSettings = new ChannelSettings();
                 channelSettings.Label = $"CH{globalIndex + 1}";
-                channelSettings.ChannelIndex = globalIndex;
                 channelSettings.Gain = 1.0;
                 channelSettings.Offset = 0.0;
                 channelSettings.IsEnabled = true;
@@ -159,20 +150,8 @@ namespace SerialPlotDN_WPF.View.UserControls
             dataStream.Dispose();
 
             // Update channel indices after removal
-            UpdateChannelIndices();
+            UpdateChannelLabels();
             OnPropertyChanged(nameof(TotalChannelCount));
-        }
-
-        /// <summary>
-        /// Updates the global channel indices after changes
-        /// </summary>
-        private void UpdateChannelIndices()
-        {
-            for (int i = 0; i < Channels.Count; i++)
-            {
-                Channels[i].Settings.ChannelIndex = i;
-                Channels[i].Settings.Label = $"CH{i + 1}";
-            }
         }
 
         /// <summary>
@@ -224,6 +203,17 @@ namespace SerialPlotDN_WPF.View.UserControls
                 }
             }
             return enabledChannels;
+        }
+
+        /// <summary>
+        /// Updates channel labels after changes
+        /// </summary>
+        private void UpdateChannelLabels()
+        {
+            for (int i = 0; i < Channels.Count; i++)
+            {
+                Channels[i].Settings.Label = $"CH{i + 1}";
+            }
         }
 
         public IDataStream CreateDataStreamFromUserInput(StreamSettings vm)
@@ -354,10 +344,7 @@ namespace SerialPlotDN_WPF.View.UserControls
                 }
             }
 
-            UpdateChannels();
-
-            // Notify that streams have changed
-            StreamsChanged?.Invoke();
+            // ObservableCollection.CollectionChanged handles all notifications automatically
         }
 
         /// <summary>
@@ -384,31 +371,17 @@ namespace SerialPlotDN_WPF.View.UserControls
             
             Panel_Streams.Children.Clear();
             
-            // Clean up all channels
+            // Clean up all channels - ObservableCollection.CollectionChanged handles notifications
             foreach (Channel channel in Channels)
             {
                 channel.Dispose();
             }
             Channels.Clear();
-            
-            ChannelsChanged?.Invoke(0);
         }
-
-        /// <summary>
-        /// Calculates total channels and notifies listeners
-        /// </summary>
-        private void UpdateChannels()
-        {
-            // Notify subscribers about the channel count change
-            ChannelsChanged?.Invoke(TotalChannelCount);
-        }
-
+        
         protected virtual void OnPropertyChanged(string propertyName)
         {
-            if (PropertyChanged != null)
-            {
-                PropertyChanged.Invoke(this, new PropertyChangedEventArgs(propertyName));
-            }
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
     }
 }

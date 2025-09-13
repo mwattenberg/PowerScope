@@ -12,7 +12,7 @@ namespace SerialPlotDN_WPF.Model
     public class Channel : INotifyPropertyChanged
     {
         private readonly IDataStream _ownerStream;
-        private readonly int _localChannelIndex;
+        private readonly int _indexWithinDatastream;
         private ChannelSettings _settings;
         private bool _disposed = false;
 
@@ -39,16 +39,19 @@ namespace SerialPlotDN_WPF.Model
                 throw new ArgumentOutOfRangeException(nameof(localChannelIndex));
 
             _ownerStream = ownerStream;
-            _localChannelIndex = localChannelIndex;
+            _indexWithinDatastream = localChannelIndex;
             _settings = settings;
 
             // Subscribe to settings changes
             _settings.PropertyChanged += OnSettingsChanged;
+            
+            // Subscribe to measurement requests from the settings
+            _settings.MeasurementRequested += OnMeasurementRequested;
 
             // Apply settings to the stream if it supports channel configuration
             if (_ownerStream is IChannelConfigurable configurableStream)
             {
-                configurableStream.SetChannelSetting(_localChannelIndex, _settings);
+                configurableStream.SetChannelSetting(_indexWithinDatastream, _settings);
             }
         }
 
@@ -65,7 +68,7 @@ namespace SerialPlotDN_WPF.Model
         /// </summary>
         public int LocalChannelIndex 
         { 
-            get { return _localChannelIndex; } 
+            get { return _indexWithinDatastream; } 
         }
 
         /// <summary>
@@ -83,17 +86,21 @@ namespace SerialPlotDN_WPF.Model
                 {
                     // Unsubscribe from old settings
                     if (_settings != null)
+                    {
                         _settings.PropertyChanged -= OnSettingsChanged;
+                        _settings.MeasurementRequested -= OnMeasurementRequested;
+                    }
 
                     _settings = value;
 
                     // Subscribe to new settings
                     _settings.PropertyChanged += OnSettingsChanged;
+                    _settings.MeasurementRequested += OnMeasurementRequested;
 
                     // Apply new settings to the stream
                     if (_ownerStream is IChannelConfigurable configurableStream)
                     {
-                        configurableStream.SetChannelSetting(_localChannelIndex, _settings);
+                        configurableStream.SetChannelSetting(_indexWithinDatastream, _settings);
                     }
 
                     OnPropertyChanged(nameof(Settings));
@@ -136,7 +143,7 @@ namespace SerialPlotDN_WPF.Model
             if (_disposed)
                 return 0;
 
-            return _ownerStream.CopyLatestTo(_localChannelIndex, destination, requestedSamples);
+            return _ownerStream.CopyLatestTo(_indexWithinDatastream, destination, requestedSamples);
         }
 
         /// <summary>
@@ -172,7 +179,7 @@ namespace SerialPlotDN_WPF.Model
             if (!IsStreamConnected)
                 return;
 
-            Measurement measurement = new Measurement(measurementType, _ownerStream, _localChannelIndex, _settings);
+            Measurement measurement = new Measurement(measurementType, _ownerStream, _indexWithinDatastream, _settings);
             
             // Subscribe to removal request
             measurement.RemoveRequested += OnMeasurementRemoveRequested;
@@ -218,7 +225,7 @@ namespace SerialPlotDN_WPF.Model
         /// </summary>
         public string GetChannelId()
         {
-            return $"{_ownerStream.GetHashCode()}_{_localChannelIndex}";
+            return $"{_ownerStream.GetHashCode()}_{_indexWithinDatastream}";
         }
 
         private void OnMeasurementRemoveRequested(object sender, EventArgs e)
@@ -227,6 +234,16 @@ namespace SerialPlotDN_WPF.Model
             {
                 RemoveMeasurement(measurement);
             }
+        }
+
+        /// <summary>
+        /// Handles measurement requests from the ChannelSettings
+        /// </summary>
+        /// <param name="sender">ChannelSettings that requested the measurement</param>
+        /// <param name="measurementType">Type of measurement to add</param>
+        private void OnMeasurementRequested(object sender, MeasurementType measurementType)
+        {
+            AddMeasurement(measurementType);
         }
 
         private void OnSettingsChanged(object sender, PropertyChangedEventArgs e)
@@ -251,7 +268,7 @@ namespace SerialPlotDN_WPF.Model
             // Apply updated settings to the stream
             if (_ownerStream is IChannelConfigurable configurableStream)
             {
-                configurableStream.SetChannelSetting(_localChannelIndex, _settings);
+                configurableStream.SetChannelSetting(_indexWithinDatastream, _settings);
             }
         }
 
@@ -279,7 +296,10 @@ namespace SerialPlotDN_WPF.Model
                 Measurements.Clear();
 
                 if (_settings != null)
+                {
                     _settings.PropertyChanged -= OnSettingsChanged;
+                    _settings.MeasurementRequested -= OnMeasurementRequested;
+                }
 
                 _disposed = true;
             }

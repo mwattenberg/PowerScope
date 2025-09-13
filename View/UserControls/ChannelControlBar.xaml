@@ -14,8 +14,7 @@
                 <!-- DataTemplate: Automatically creates ChannelControl for each ChannelSettings -->
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
-                        <local:ChannelControl 
-                            MeasurementCommand="{Binding MeasurementCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+                        <local:ChannelControl />
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>

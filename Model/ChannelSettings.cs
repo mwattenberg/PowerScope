@@ -4,21 +4,6 @@ using System.Windows.Media;
 
 namespace SerialPlotDN_WPF.Model
 {
-    /// <summary>
-    /// Event args for measurement request
-    /// </summary>
-    public class MeasurementRequestEventArgs : EventArgs
-    {
-        public int ChannelIndex { get; }
-        public ChannelSettings ChannelSettings { get; }
-
-        public MeasurementRequestEventArgs(int channelIndex, ChannelSettings channelSettings)
-        {
-            ChannelIndex = channelIndex;
-            ChannelSettings = channelSettings;
-        }
-    }
-
     public class ChannelSettings : INotifyPropertyChanged
     {
         private string _label = "Channel";
@@ -27,7 +12,12 @@ namespace SerialPlotDN_WPF.Model
         private double _gain = 1.0;
         private double _offset = 0.0;
         private IDigitalFilter? _filter = null;
-        private int _channelIndex = -1;
+
+        /// <summary>
+        /// Event raised when a measurement is requested for this channel
+        /// Channel subscribes to this and handles the measurement creation
+        /// </summary>
+        public event EventHandler<MeasurementType> MeasurementRequested;
 
         public string Label
         {
@@ -91,7 +81,6 @@ namespace SerialPlotDN_WPF.Model
                 {
                     _gain = value;
                     OnPropertyChanged(nameof(Gain));
-                    //OnPropertyChanged(nameof(GainOffsetDisplayText));
                 }
             }
         }
@@ -108,7 +97,6 @@ namespace SerialPlotDN_WPF.Model
                 {
                     _offset = value;
                     OnPropertyChanged(nameof(Offset));
-                    //OnPropertyChanged(nameof(GainOffsetDisplayText));
                 }
             }
         }
@@ -129,25 +117,6 @@ namespace SerialPlotDN_WPF.Model
             }
         }
 
-        /// <summary>
-        /// Channel index for this settings instance
-        /// </summary>
-        public int ChannelIndex
-        {
-            get 
-            { 
-                return _channelIndex; 
-            }
-            set
-            {
-                if (_channelIndex != value)
-                {
-                    _channelIndex = value;
-                    OnPropertyChanged(nameof(ChannelIndex));
-                }
-            }
-        }
-
         public Color DisplayColor
         {
             get
@@ -159,16 +128,15 @@ namespace SerialPlotDN_WPF.Model
             }
         }
 
-        //public string GainOffsetDisplayText
-        //{
-        //    get
-        //    {
-        //        if (_offset >= 0)
-        //            return string.Format("= y * {0:F2} + {1:F2}", _gain, _offset);
-        //        else
-        //            return string.Format("= y * {0:F2} - {1:F2}", _gain, Math.Abs(_offset));
-        //    }
-        //}
+        /// <summary>
+        /// Requests a measurement of the specified type to be added to this channel
+        /// Called by UI controls, handled by the Channel that owns these settings
+        /// </summary>
+        /// <param name="measurementType">Type of measurement to add</param>
+        public void RequestMeasurement(MeasurementType measurementType)
+        {
+            MeasurementRequested?.Invoke(this, measurementType);
+        }
 
         public event PropertyChangedEventHandler PropertyChanged;
 

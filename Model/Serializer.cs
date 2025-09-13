@@ -11,15 +11,15 @@ namespace SerialPlotDN_WPF.Model
 {
     public static class Serializer
     {
-        public static void WriteSettingsToXML(string filePath, PlotManager plotManager, DataStreamBar dataStreamBar, ChannelControlBar channelControlBar)
+        public static void WriteSettingsToXML(string filePath, PlotManager plotManager, DataStreamBar dataStreamBar)
         {
             XElement settingsXml = new XElement("PlotSettings");
             WritePlotSettings(settingsXml, plotManager);
-            WriteDataStreamsWithChannels(settingsXml, dataStreamBar, channelControlBar);
+            WriteDataStreamsWithChannels(settingsXml, dataStreamBar);
             settingsXml.Save(filePath);
         }
 
-        public static void ReadSettingsFromXML(string filePath, PlotManager plotManager, DataStreamBar dataStreamBar, ChannelControlBar channelControlBar)
+        public static void ReadSettingsFromXML(string filePath, PlotManager plotManager, DataStreamBar dataStreamBar)
         {
             if (!File.Exists(filePath)) 
                 return;
@@ -27,7 +27,7 @@ namespace SerialPlotDN_WPF.Model
             {
                 XElement settingsXml = XElement.Load(filePath);
                 ReadPlotSettings(settingsXml, plotManager);
-                ReadDataStreamsWithChannels(settingsXml, dataStreamBar, channelControlBar);
+                ReadDataStreamsWithChannels(settingsXml, dataStreamBar);
             }
             catch { /* Ignore errors and use defaults */ }
         }
@@ -46,7 +46,7 @@ namespace SerialPlotDN_WPF.Model
             parent.Add(new XElement("Ymax", plotManager.Settings.Ymax));
         }
 
-        private static void WriteDataStreamsWithChannels(XElement parent, DataStreamBar dataStreamBar, ChannelControlBar channelControlBar)
+        private static void WriteDataStreamsWithChannels(XElement parent, DataStreamBar dataStreamBar)
         {
             XElement dataStreamsElement = new XElement("DataStreams");
             
@@ -131,7 +131,7 @@ namespace SerialPlotDN_WPF.Model
                     );
                 }
 
-                // Save channels for this stream
+                // Save channels for this stream - all data comes directly from DataStreamBar.Channels
                 XElement channelsElement = new XElement("Channels");
                 foreach (Channel channel in channels)
                 {
@@ -279,7 +279,7 @@ namespace SerialPlotDN_WPF.Model
             plotManager.Plot.Refresh();
         }
 
-        private static void ReadDataStreamsWithChannels(XElement settingsXml, DataStreamBar dataStreamBar, ChannelControlBar channelControlBar)
+        private static void ReadDataStreamsWithChannels(XElement settingsXml, DataStreamBar dataStreamBar)
         {
             XElement dataStreamsElement = settingsXml.Element("DataStreams");
             if (dataStreamsElement == null) 
@@ -380,7 +380,7 @@ namespace SerialPlotDN_WPF.Model
                 dataStream.Connect();
                 dataStream.StartStreaming();
 
-                // Load channel settings and measurements
+                // Load channel settings and measurements directly to channels
                 XElement channelsElement = streamElement.Element("Channels");
                 if (channelsElement != null)
                 {
@@ -471,14 +471,14 @@ namespace SerialPlotDN_WPF.Model
                     Color[] channelColors = channelSettingsList.Select(cs => cs.Color).ToArray();
                     dataStreamBar.AddChannelsForStream(dataStream, channelColors);
 
-                    // Apply loaded settings and measurements to the created channels
+                    // Apply loaded settings and measurements directly to the created channels
                     var streamChannels = dataStreamBar.GetChannelsForStream(dataStream).ToList();
                     for (int i = 0; i < Math.Min(channelSettingsList.Count, streamChannels.Count); i++)
                     {
                         Channel channel = streamChannels[i];
                         ChannelSettings settings = channelSettingsList[i];
 
-                        // Update channel settings
+                        // Update channel settings directly
                         channel.Settings.Label = settings.Label;
                         channel.Settings.Color = settings.Color;
                         channel.Settings.IsEnabled = settings.IsEnabled;
@@ -501,9 +501,8 @@ namespace SerialPlotDN_WPF.Model
                     dataStreamBar.AddStreamInfoPanel(streamSettings, dataStream);
                 }
             }
-
-            // Update ChannelControlBar with the loaded channels
-            channelControlBar.UpdateFromDataStreamBar(dataStreamBar);
+            
+            // No need to update ChannelControlBar - MainWindow handles this automatically via CollectionChanged events
         }
 
         private static Color ParseColor(string colorString)
@@ -518,16 +517,6 @@ namespace SerialPlotDN_WPF.Model
             catch
             {
                 return Colors.Blue; // Default color if parsing fails
-            }
-        }
-
-        private static void ApplyChannelSettings(ChannelControlBar channelControlBar, List<ChannelSettings> channelSettings)
-        {
-            // Clear existing settings and add loaded ones
-            channelControlBar.ChannelSettings.Clear();
-            foreach (ChannelSettings setting in channelSettings)
-            {
-                channelControlBar.ChannelSettings.Add(setting);
             }
         }
 
