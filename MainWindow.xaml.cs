@@ -146,15 +146,15 @@ namespace SerialPlotDN_WPF
         private void WpfPlot1_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             // Restore default axis limits as in initialization
-            _plotManager.Plot.Plot.Axes.SetLimitsY(_plotManager.Settings.Ymin, _plotManager.Settings.Ymax);
-            _plotManager.Plot.Refresh();
+            //_plotManager.Plot.Plot.Axes.SetLimitsY(_plotManager.Settings.Ymin, _plotManager.Settings.Ymax);
+            //_plotManager.Plot.Refresh();
         }
 
         private void WpfPlot1_MouseRightButtonDown(object sender, MouseButtonEventArgs e)
         {
             // Restore default axis limits as in initialization
-            _plotManager.Plot.Plot.Axes.SetLimitsY(_plotManager.Settings.Ymin, _plotManager.Settings.Ymax);
-            _plotManager.Plot.Refresh();
+            //_plotManager.Plot.Plot.Axes.SetLimitsY(_plotManager.Settings.Ymin, _plotManager.Settings.Ymax);
+            //_plotManager.Plot.Refresh();
         }
 
         private void Button_ConfigPlot_Click(object sender, RoutedEventArgs e)

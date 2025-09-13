@@ -383,25 +383,28 @@ namespace SerialPlotDN_WPF.Model
 
         public void SetupPlotUserInput()
         {
-            _plot.UserInputProcessor.RemoveAll<ScottPlot.Interactivity.IUserActionResponse>();
+            // Clear existing input handlers
+            _plot.UserInputProcessor.UserActionResponses.Clear();
             _plot.UserInputProcessor.IsEnabled = true;
             
-            // Left-click drag zoom rectangle
-            ScottPlot.Interactivity.UserActionResponses.MouseDragZoomRectangle zoomRectangleResponse = new ScottPlot.Interactivity.UserActionResponses.MouseDragZoomRectangle(ScottPlot.Interactivity.StandardMouseButtons.Left);
+            // Left-click-drag pan
+            var panButton = ScottPlot.Interactivity.StandardMouseButtons.Left;
+            var panResponse = new ScottPlot.Interactivity.UserActionResponses.MouseDragPan(panButton);
+            _plot.UserInputProcessor.UserActionResponses.Add(panResponse);
+
+            // Middle-click-drag zoom rectangle
+            var zoomRectangleButton = ScottPlot.Interactivity.StandardMouseButtons.Middle;
+            var zoomRectangleResponse = new ScottPlot.Interactivity.UserActionResponses.MouseDragZoomRectangle(zoomRectangleButton);
             _plot.UserInputProcessor.UserActionResponses.Add(zoomRectangleResponse);
+
+            // Right-click auto-scale
+            var autoscaleButton = ScottPlot.Interactivity.StandardMouseButtons.Right;
+            var autoscaleResponse = new ScottPlot.Interactivity.UserActionResponses.SingleClickAutoscale(autoscaleButton);
+            _plot.UserInputProcessor.UserActionResponses.Add(autoscaleResponse);
 
             // Mouse wheel zoom with modifier keys
             ScottPlot.Interactivity.UserActionResponses.MouseWheelZoom wheelZoomResponse = new ScottPlot.Interactivity.UserActionResponses.MouseWheelZoom(ScottPlot.Interactivity.StandardKeys.Shift, ScottPlot.Interactivity.StandardKeys.Control);
             _plot.UserInputProcessor.UserActionResponses.Add(wheelZoomResponse);
-
-            // Right-click auto-scale X
-            _plot.MouseRightButtonUp += PlotMouseRightButtonUp;
-        }
-
-        private void PlotMouseRightButtonUp(object sender, System.Windows.Input.MouseButtonEventArgs e)
-        {
-            _plot.Plot.Axes.AutoScaleX();
-            _plot.Refresh();
         }
 
         private void UpdateDataStreamChannelSettings()
