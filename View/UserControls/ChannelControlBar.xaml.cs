@@ -11,23 +11,6 @@ using SerialPlotDN_WPF.Model;
 namespace SerialPlotDN_WPF.View.UserControls
 {
     /// <summary>
-    /// Event arguments for measurement requests
-    /// </summary>
-    public class MeasurementRequestEventArgs : EventArgs
-    {
-        public int ChannelIndex { get; }
-        public ChannelSettings ChannelSettings { get; }
-        public Channel Channel { get; }
-
-        public MeasurementRequestEventArgs(int channelIndex, ChannelSettings channelSettings, Channel channel)
-        {
-            ChannelIndex = channelIndex;
-            ChannelSettings = channelSettings;
-            Channel = channel;
-        }
-    }
-
-    /// <summary>
     /// Simple relay command implementation for MVVM pattern
     /// </summary>
     public class RelayCommand<T> : ICommand
@@ -61,6 +44,7 @@ namespace SerialPlotDN_WPF.View.UserControls
     /// <summary>
     /// Interaction logic for ChannelControlBar.xaml
     /// Works with DataStreamBar for clean channel-centric architecture
+    /// Now directly calls Channel.AddMeasurement() instead of events
     /// </summary>
     public partial class ChannelControlBar : UserControl
     {
@@ -69,11 +53,6 @@ namespace SerialPlotDN_WPF.View.UserControls
         /// Synced with DataStreamBar channels
         /// </summary>
         public ObservableCollection<ChannelSettings> ChannelSettings { get; private set; } = new ObservableCollection<ChannelSettings>();
-
-        /// <summary>
-        /// Event raised when a measurement is requested for a specific channel
-        /// </summary>
-        public event System.EventHandler<MeasurementRequestEventArgs> ChannelMeasurementRequested;
 
         /// <summary>
         /// Command to handle measurement requests from ChannelControl instances
@@ -110,8 +89,15 @@ namespace SerialPlotDN_WPF.View.UserControls
                 Channel channel = DataStreamBar.GetChannelByIndex(channelSettings.ChannelIndex);
                 if (channel != null)
                 {
-                    MeasurementRequestEventArgs args = new MeasurementRequestEventArgs(channelSettings.ChannelIndex, channelSettings, channel);
-                    ChannelMeasurementRequested?.Invoke(this, args);
+                    // Show measurement selection dialog directly
+                    View.UserForms.MeasurementSelection measurementSelection = new View.UserForms.MeasurementSelection();
+                    
+                    if (measurementSelection.ShowDialog() == true && 
+                        measurementSelection.SelectedMeasurementType.HasValue)
+                    {
+                        // Add measurement directly to the channel - no event chain needed!
+                        channel.AddMeasurement(measurementSelection.SelectedMeasurementType.Value);
+                    }
                 }
             }
         }

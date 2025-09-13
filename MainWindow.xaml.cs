@@ -56,8 +56,8 @@ namespace SerialPlotDN_WPF
             HorizontalControl.Settings = _plotManager.Settings;
             VerticalControl.Settings = _plotManager.Settings;
             
-            // Set dependencies for MeasurementBar - simplified with channel-centric approach
-            MeasurementBar.DataStreamBar = DataStreamBar;
+            // Set dependencies for MeasurementBar - now gets channels from ChannelControlBar!
+            MeasurementBar.ChannelControlBar = ChannelControlBar;
             
             // Set PlotManager as DataContext for RunControl (it now handles its own running state)
             RunControl.DataContext = _plotManager;
@@ -82,6 +82,9 @@ namespace SerialPlotDN_WPF
                 ChannelControlBar.UpdateFromDataStreamBar(DataStreamBar);
                 _plotManager.SetChannelSettings(ChannelControlBar.ChannelSettings);
                 _plotManager.UpdateChannelDisplay(totalChannels);
+                
+                // Refresh measurements when channels change
+                MeasurementBar.RefreshMeasurements();
             };
             
             DataStreamBar.StreamsChanged += () =>
@@ -89,26 +92,6 @@ namespace SerialPlotDN_WPF
                 // Update data streams when streams are added or removed
                 _plotManager.SetDataStreams(DataStreamBar.ConnectedDataStreams);
             };
-            
-            // Handle measurement requests from individual channel controls
-            ChannelControlBar.ChannelMeasurementRequested += ChannelControlBar_MeasurementRequested;
-        }
-
-        /// <summary>
-        /// Handle measurement request from ChannelControlBar
-        /// Uses the channel-centric approach
-        /// </summary>
-        private void ChannelControlBar_MeasurementRequested(object sender, View.UserControls.MeasurementRequestEventArgs e)
-        {
-            // Show measurement selection dialog
-            MeasurementSelection measurementSelection = new MeasurementSelection();
-            
-            if (measurementSelection.ShowDialog() == true && 
-                measurementSelection.SelectedMeasurementType.HasValue &&
-                e.Channel != null)
-            {
-                MeasurementBar.AddMeasurementForChannel(measurementSelection.SelectedMeasurementType.Value, e.Channel);
-            }
         }
 
         private void RunControl_RunStateChanged(object sender, RunControl.RunStates newState)

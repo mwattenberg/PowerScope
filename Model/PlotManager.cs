@@ -64,9 +64,9 @@ namespace SerialPlotDN_WPF.Model
             _channelSettings = new ObservableCollection<ChannelSettings>();
 
             
-            // Initialize update timer
+            // Initialize update timer with correct interval from settings
             _updateTimer = new DispatcherTimer(DispatcherPriority.Render);
-            _updateTimer.Interval = TimeSpan.FromMilliseconds(16.67); // 60 FPS
+            _updateTimer.Interval = TimeSpan.FromMilliseconds(Settings.TimerInterval); // Use settings, not hardcoded!
             _updateTimer.Tick += UpdatePlot;
 
             Settings.PropertyChanged += OnSettingsChanged;

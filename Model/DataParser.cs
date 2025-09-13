@@ -8,7 +8,7 @@ namespace SerialPlotDN_WPF.Model
         private readonly int numberOfBytesPerChannel;
 
 
-        public enum ParserMode { ASCII, BinarySimple, BinaryCustom }
+        public enum ParserMode { ASCII, Binary }
         public enum BinaryFormat { int16_t, uint16_t, int32_t, uint32_t, float_t }
         public ParserMode Mode { get; init; }
         public int NumberOfChannels { get; init; }
@@ -27,7 +27,7 @@ namespace SerialPlotDN_WPF.Model
 
         public DataParser(BinaryFormat format, int numberOfChannels, byte[] frameStart)
         {
-            this.Mode = ParserMode.BinaryCustom;
+            this.Mode = ParserMode.Binary;
             this.NumberOfChannels = numberOfChannels;
             this.format = format;
             this.FrameStart = frameStart;
@@ -46,7 +46,7 @@ namespace SerialPlotDN_WPF.Model
 
         public DataParser(BinaryFormat format, int numberOfChannels)
         {
-            this.Mode = ParserMode.BinarySimple;
+            this.Mode = ParserMode.Binary;
             this.NumberOfChannels = numberOfChannels;
             this.format = format;
 
@@ -68,121 +68,145 @@ namespace SerialPlotDN_WPF.Model
             double[][] numbers = new double[NumberOfChannels][];
             byte[]? residue = null;
 
-            int numberOfLines;
-
             switch (Mode)
             {
-                case ParserMode.BinarySimple:
-                    numberOfLines = data.Length / numberOfBytePerSample;
+                case ParserMode.ASCII:
+                    // Parse ASCII data (text format with separators)
+                    string textData = System.Text.Encoding.UTF8.GetString(data);
+                    return ParseAsciiData(textData);
 
-                    // Initialize arrays for all channels
-                    for (int i = 0; i < NumberOfChannels; i++)
+                case ParserMode.Binary:
+                    // Handle both simple binary and binary with frame start
+                    if (FrameStart != null && FrameStart.Length > 0)
                     {
-                        numbers[i] = new double[numberOfLines];
+                        // Binary with frame start (custom framing)
+                        return ParseBinaryWithFrameStart(data);
                     }
-
-                    for (int currentLine = 0; currentLine < numberOfLines; currentLine++)
+                    else
                     {
-                        for (int channel = 0; channel < NumberOfChannels; channel++)
-                        {
-                            switch (format)
-                            {
-                                case BinaryFormat.int16_t:
-                                    numbers[channel][currentLine] = BinaryPrimitives.ReadInt16LittleEndian(
-                                        data.Slice(channel * numberOfBytesPerChannel + currentLine * numberOfBytePerSample));
-                                    break;
-                                case BinaryFormat.uint16_t:
-                                    numbers[channel][currentLine] = BinaryPrimitives.ReadUInt16LittleEndian(
-                                        data.Slice(channel * numberOfBytesPerChannel + currentLine * numberOfBytePerSample));
-                                    numbers[channel][currentLine] = numbers[channel][currentLine] % 4095;
-                                    break;
-                                case BinaryFormat.int32_t:
-                                    numbers[channel][currentLine] = BinaryPrimitives.ReadInt32LittleEndian(
-                                        data.Slice(channel * numberOfBytesPerChannel + currentLine * numberOfBytePerSample));
-                                    break;
-                                case BinaryFormat.uint32_t:
-                                    numbers[channel][currentLine] = BinaryPrimitives.ReadUInt32LittleEndian(
-                                        data.Slice(channel * numberOfBytesPerChannel + currentLine * numberOfBytePerSample));
-                                    break;
-                                case BinaryFormat.float_t:
-                                    numbers[channel][currentLine] = BinaryPrimitives.ReadSingleLittleEndian(
-                                        data.Slice(channel * numberOfBytesPerChannel + currentLine * numberOfBytePerSample));
-                                    break;
-                                default:
-                                    numbers[channel][currentLine] = 0;
-                                    break;
-                            }
-                        }
+                        // Simple binary (no framing)
+                        return ParseSimpleBinary(data);
                     }
-
-                    break;
-
-                case ParserMode.BinaryCustom:
-                    var sequences = FindCompleteSequences(data);
-                    numberOfLines = sequences.Count;
-
-                    // Initialize arrays for all channels
-                    for (int i = 0; i < NumberOfChannels; i++)
-                    {
-                        numbers[i] = new double[numberOfLines];
-                    }
-
-                    // Process each complete sequence
-                    for (int seqIndex = 0; seqIndex < sequences.Count; seqIndex++)
-                    {
-                        var sequenceStart = sequences[seqIndex];
-                        // Skip the frame start bytes to get to the data
-                        var dataStart = sequenceStart + FrameStart.Length;
-
-                        for (int channel = 0; channel < NumberOfChannels; channel++)
-                        {
-                            var channelDataStart = dataStart + (channel * numberOfBytesPerChannel);
-                            
-                            switch (format)
-                            {
-                                case BinaryFormat.int16_t:
-                                    numbers[channel][seqIndex] = BinaryPrimitives.ReadInt16LittleEndian(
-                                        data.Slice(channelDataStart, numberOfBytesPerChannel));
-                                    break;
-                                case BinaryFormat.uint16_t:
-                                    numbers[channel][seqIndex] = BinaryPrimitives.ReadUInt16LittleEndian(
-                                        data.Slice(channelDataStart, numberOfBytesPerChannel));
-                                    break;
-                                case BinaryFormat.int32_t:
-                                    numbers[channel][seqIndex] = BinaryPrimitives.ReadInt32LittleEndian(
-                                        data.Slice(channelDataStart, numberOfBytesPerChannel));
-                                    break;
-                                case BinaryFormat.uint32_t:
-                                    numbers[channel][seqIndex] = BinaryPrimitives.ReadUInt32LittleEndian(
-                                        data.Slice(channelDataStart, numberOfBytesPerChannel));
-                                    break;
-                                case BinaryFormat.float_t:
-                                    numbers[channel][seqIndex] = BinaryPrimitives.ReadSingleLittleEndian(
-                                        data.Slice(channelDataStart, numberOfBytesPerChannel));
-                                    break;
-                            }
-                        }
-                    }
-
-                    // Calculate residue - data after the last complete sequence
-                    if (sequences.Count > 0)
-                    {
-                        var lastSequenceEnd = sequences[^1] + FrameStart.Length + numberOfBytePerSample;
-                        if (lastSequenceEnd < data.Length)
-                        {
-                            residue = data.Slice(lastSequenceEnd).ToArray();
-                        }
-                    }
-                    else if (data.Length > 0)
-                    {
-                        // No complete sequences found, all data becomes residue
-                        residue = data.ToArray();
-                    }
-
-                    break;
 
                 default:
                     throw new Exception("Unsupported parsing mode");
+            }
+        }
+
+        private ParsedData ParseSimpleBinary(Span<byte> data)
+        {
+            double[][] numbers = new double[NumberOfChannels][];
+            byte[]? residue = null;
+
+            int numberOfLines = data.Length / numberOfBytePerSample;
+
+            // Initialize arrays for all channels
+            for (int i = 0; i < NumberOfChannels; i++)
+            {
+                numbers[i] = new double[numberOfLines];
+            }
+
+            for (int currentLine = 0; currentLine < numberOfLines; currentLine++)
+            {
+                for (int channel = 0; channel < NumberOfChannels; channel++)
+                {
+                    switch (format)
+                    {
+                        case BinaryFormat.int16_t:
+                            numbers[channel][currentLine] = BinaryPrimitives.ReadInt16LittleEndian(
+                                data.Slice(channel * numberOfBytesPerChannel + currentLine * numberOfBytePerSample));
+                            break;
+                        case BinaryFormat.uint16_t:
+                            numbers[channel][currentLine] = BinaryPrimitives.ReadUInt16LittleEndian(
+                                data.Slice(channel * numberOfBytesPerChannel + currentLine * numberOfBytePerSample));
+                            numbers[channel][currentLine] = numbers[channel][currentLine] % 4095;
+                            break;
+                        case BinaryFormat.int32_t:
+                            numbers[channel][currentLine] = BinaryPrimitives.ReadInt32LittleEndian(
+                                data.Slice(channel * numberOfBytesPerChannel + currentLine * numberOfBytePerSample));
+                            break;
+                        case BinaryFormat.uint32_t:
+                            numbers[channel][currentLine] = BinaryPrimitives.ReadUInt32LittleEndian(
+                                data.Slice(channel * numberOfBytesPerChannel + currentLine * numberOfBytePerSample));
+                            break;
+                        case BinaryFormat.float_t:
+                            numbers[channel][currentLine] = BinaryPrimitives.ReadSingleLittleEndian(
+                                data.Slice(channel * numberOfBytesPerChannel + currentLine * numberOfBytePerSample));
+                            break;
+                        default:
+                            numbers[channel][currentLine] = 0;
+                            break;
+                    }
+                }
+            }
+
+            return new ParsedData(numbers, residue);
+        }
+
+        private ParsedData ParseBinaryWithFrameStart(Span<byte> data)
+        {
+            double[][] numbers = new double[NumberOfChannels][];
+            byte[]? residue = null;
+
+            var sequences = FindCompleteSequences(data);
+            int numberOfLines = sequences.Count;
+
+            // Initialize arrays for all channels
+            for (int i = 0; i < NumberOfChannels; i++)
+            {
+                numbers[i] = new double[numberOfLines];
+            }
+
+            // Process each complete sequence
+            for (int seqIndex = 0; seqIndex < sequences.Count; seqIndex++)
+            {
+                var sequenceStart = sequences[seqIndex];
+                // Skip the frame start bytes to get to the data
+                var dataStart = sequenceStart + FrameStart.Length;
+
+                for (int channel = 0; channel < NumberOfChannels; channel++)
+                {
+                    var channelDataStart = dataStart + (channel * numberOfBytesPerChannel);
+                    
+                    switch (format)
+                    {
+                        case BinaryFormat.int16_t:
+                            numbers[channel][seqIndex] = BinaryPrimitives.ReadInt16LittleEndian(
+                                data.Slice(channelDataStart, numberOfBytesPerChannel));
+                            break;
+                        case BinaryFormat.uint16_t:
+                            numbers[channel][seqIndex] = BinaryPrimitives.ReadUInt16LittleEndian(
+                                data.Slice(channelDataStart, numberOfBytesPerChannel));
+                            break;
+                        case BinaryFormat.int32_t:
+                            numbers[channel][seqIndex] = BinaryPrimitives.ReadInt32LittleEndian(
+                                data.Slice(channelDataStart, numberOfBytesPerChannel));
+                            break;
+                        case BinaryFormat.uint32_t:
+                            numbers[channel][seqIndex] = BinaryPrimitives.ReadUInt32LittleEndian(
+                                data.Slice(channelDataStart, numberOfBytesPerChannel));
+                            break;
+                        case BinaryFormat.float_t:
+                            numbers[channel][seqIndex] = BinaryPrimitives.ReadSingleLittleEndian(
+                                data.Slice(channelDataStart, numberOfBytesPerChannel));
+                            break;
+                    }
+                }
+            }
+
+            // Calculate residue - data after the last complete sequence
+            if (sequences.Count > 0)
+            {
+                var lastSequenceEnd = sequences[^1] + FrameStart.Length + numberOfBytePerSample;
+                if (lastSequenceEnd < data.Length)
+                {
+                    residue = data.Slice(lastSequenceEnd).ToArray();
+                }
+            }
+            else if (data.Length > 0)
+            {
+                // No complete sequences found, all data becomes residue
+                residue = data.ToArray();
             }
 
             return new ParsedData(numbers, residue);
@@ -220,6 +244,61 @@ namespace SerialPlotDN_WPF.Model
             return true;
         }
 
+        private ParsedData ParseAsciiData(string textData)
+        {
+            var lines = textData.Split(FrameEnd, StringSplitOptions.RemoveEmptyEntries);
+            var numbers = new List<double[]>();
+            string residueText = "";
+
+            foreach (string line in lines)
+            {
+                if (string.IsNullOrWhiteSpace(line))
+                    continue;
+
+                string[] values = line.Trim().Split(Separator, StringSplitOptions.RemoveEmptyEntries);
+                
+                if (values.Length >= NumberOfChannels)
+                {
+                    double[] lineData = new double[NumberOfChannels];
+                    bool validLine = true;
+                    
+                    for (int i = 0; i < NumberOfChannels; i++)
+                    {
+                        if (!double.TryParse(values[i].Trim(), out lineData[i]))
+                        {
+                            validLine = false;
+                            break;
+                        }
+                    }
+                    
+                    if (validLine)
+                    {
+                        numbers.Add(lineData);
+                    }
+                }
+                else if (values.Length > 0)
+                {
+                    // Incomplete line - treat as residue
+                    residueText = line;
+                }
+            }
+
+            // Convert to channel-based arrays
+            double[][] channelData = new double[NumberOfChannels][];
+            for (int ch = 0; ch < NumberOfChannels; ch++)
+            {
+                channelData[ch] = new double[numbers.Count];
+                for (int sample = 0; sample < numbers.Count; sample++)
+                {
+                    channelData[ch][sample] = numbers[sample][ch];
+                }
+            }
+
+            // Convert residue back to bytes
+            byte[] residue = string.IsNullOrEmpty(residueText) ? null : System.Text.Encoding.UTF8.GetBytes(residueText);
+
+            return new ParsedData(channelData, residue);
+        }
     }
 
     public class ParsedData

@@ -50,46 +50,142 @@ namespace SerialPlotDN_WPF.Model
         {
             XElement dataStreamsElement = new XElement("DataStreams");
             
-            // TODO: Implement new serialization approach for channel-centric architecture
-            // For now, just save channel settings without stream configurations
-            XElement channelsElement = new XElement("Channels");
-            for (int i = 0; i < channelControlBar.ChannelSettings.Count; i++)
+            // Group channels by their owner stream to save stream configurations
+            var streamGroups = dataStreamBar.Channels
+                .GroupBy(channel => channel.OwnerStream)
+                .ToList();
+
+            foreach (var streamGroup in streamGroups)
             {
-                ChannelSettings channelSettings = channelControlBar.ChannelSettings[i];
-                XElement channelElement = new XElement("Channel",
-                    new XElement("Index", i),
-                    new XElement("Label", channelSettings.Label),
-                    new XElement("Color", channelSettings.Color.ToString()),
-                    new XElement("IsEnabled", channelSettings.IsEnabled),
-                    new XElement("Gain", channelSettings.Gain.ToString(System.Globalization.CultureInfo.InvariantCulture)),
-                    new XElement("Offset", channelSettings.Offset.ToString(System.Globalization.CultureInfo.InvariantCulture))
-                );
+                IDataStream stream = streamGroup.Key;
+                List<Channel> channels = streamGroup.ToList();
 
-                // Add filter information if a filter is configured
-                if (channelSettings.Filter != null)
+                // Create stream element with configuration
+                XElement streamElement = new XElement("Stream");
+
+                // Save stream configuration - we need to reverse-engineer this from the stream
+                if (stream is DemoDataStream demoStream)
                 {
-                    XElement filterElement = new XElement("Filter",
-                        new XElement("Type", channelSettings.Filter.GetFilterType())
+                    streamElement.Add(
+                        new XElement("StreamSource", "Demo"),
+                        new XElement("NumberOfChannels", demoStream.ChannelCount),
+                        new XElement("DemoSampleRate", demoStream.DemoSettings.SampleRate),
+                        new XElement("DemoSignalType", demoStream.DemoSettings.SignalType.ToString())
                     );
-
-                    // Add filter parameters
-                    Dictionary<string, double> parameters = channelSettings.Filter.GetFilterParameters();
-                    XElement parametersElement = new XElement("Parameters");
-                    foreach (KeyValuePair<string, double> parameter in parameters)
+                }
+                else if (stream is AudioDataStream audioStream)
+                {
+                    streamElement.Add(
+                        new XElement("StreamSource", "AudioInput"),
+                        new XElement("NumberOfChannels", audioStream.ChannelCount),
+                        new XElement("AudioDevice", audioStream.DeviceName ?? "Default"),
+                        new XElement("AudioSampleRate", audioStream.SampleRate)
+                    );
+                }
+                else if (stream is SerialDataStream serialStream)
+                {
+                    // Determine data format from the parser mode - back to the simple approach
+                    string dataFormatStr = serialStream.Parser.Mode == DataParser.ParserMode.ASCII ? "ASCII" : "RawBinary";
+                    
+                    // Get delimiter from parser if it's ASCII mode
+                    string delimiterStr = ","; // Default
+                    if (serialStream.Parser.Mode == DataParser.ParserMode.ASCII)
                     {
-                        parametersElement.Add(new XElement("Parameter",
-                            new XAttribute("Name", parameter.Key),
-                            new XAttribute("Value", parameter.Value.ToString(System.Globalization.CultureInfo.InvariantCulture))
-                        ));
+                        char sep = serialStream.Parser.Separator;
+                        delimiterStr = sep switch
+                        {
+                            ',' => ",",
+                            ' ' => "Space",
+                            '\t' => "Tab",
+                            ';' => ";",
+                            _ => sep.ToString()
+                        };
                     }
-                    filterElement.Add(parametersElement);
-                    channelElement.Add(filterElement);
+                    
+                    // Get frame start from parser if it's binary mode with frame start
+                    string frameStartStr = "0xAA,0xAA"; // Default
+                    if (serialStream.Parser.Mode == DataParser.ParserMode.Binary && serialStream.Parser.FrameStart != null)
+                    {
+                        frameStartStr = string.Join(",", serialStream.Parser.FrameStart.Select(b => $"0x{b:X2}"));
+                    }
+                    
+                    // Get binary format if it's binary mode
+                    string binaryFormatStr = "uint16_t"; // Default
+                    if (serialStream.Parser.Mode == DataParser.ParserMode.Binary)
+                    {
+                        binaryFormatStr = serialStream.Parser.format.ToString();
+                    }
+
+                    streamElement.Add(
+                        new XElement("StreamSource", "SerialPort"),
+                        new XElement("NumberOfChannels", serialStream.ChannelCount),
+                        new XElement("Port", serialStream.SourceSetting.PortName),
+                        new XElement("Baud", serialStream.SourceSetting.BaudRate),
+                        new XElement("DataBits", serialStream.SourceSetting.DataBits),
+                        new XElement("StopBits", serialStream.SourceSetting.StopBits),
+                        new XElement("Parity", serialStream.SourceSetting.Parity.ToString()),
+                        new XElement("DataFormat", dataFormatStr), // Back to simple DataFormat
+                        new XElement("NumberType", binaryFormatStr.Replace("_t", "").Replace("uint", "Uint").Replace("int", "Int").Replace("float", "Float")), // Map to NumberType
+                        new XElement("Delimiter", delimiterStr),
+                        new XElement("FrameStart", frameStartStr)
+                    );
                 }
 
-                channelsElement.Add(channelElement);
+                // Save channels for this stream
+                XElement channelsElement = new XElement("Channels");
+                foreach (Channel channel in channels)
+                {
+                    XElement channelElement = new XElement("Channel",
+                        new XElement("LocalIndex", channel.LocalChannelIndex),
+                        new XElement("Label", channel.Settings.Label),
+                        new XElement("Color", channel.Settings.Color.ToString()),
+                        new XElement("IsEnabled", channel.Settings.IsEnabled),
+                        new XElement("Gain", channel.Settings.Gain.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+                        new XElement("Offset", channel.Settings.Offset.ToString(System.Globalization.CultureInfo.InvariantCulture))
+                    );
+
+                    // Add filter information if a filter is configured
+                    if (channel.Settings.Filter != null)
+                    {
+                        XElement filterElement = new XElement("Filter",
+                            new XElement("Type", channel.Settings.Filter.GetFilterType())
+                        );
+
+                        // Add filter parameters
+                        Dictionary<string, double> parameters = channel.Settings.Filter.GetFilterParameters();
+                        XElement parametersElement = new XElement("Parameters");
+                        foreach (KeyValuePair<string, double> parameter in parameters)
+                        {
+                            parametersElement.Add(new XElement("Parameter",
+                                new XAttribute("Name", parameter.Key),
+                                new XAttribute("Value", parameter.Value.ToString(System.Globalization.CultureInfo.InvariantCulture))
+                            ));
+                        }
+                        filterElement.Add(parametersElement);
+                        channelElement.Add(filterElement);
+                    }
+
+                    // Save measurements for this channel
+                    if (channel.Measurements.Count > 0)
+                    {
+                        XElement measurementsElement = new XElement("Measurements");
+                        foreach (Measurement measurement in channel.Measurements)
+                        {
+                            XElement measurementElement = new XElement("Measurement",
+                                new XElement("Type", measurement.Type.ToString())
+                            );
+                            measurementsElement.Add(measurementElement);
+                        }
+                        channelElement.Add(measurementsElement);
+                    }
+
+                    channelsElement.Add(channelElement);
+                }
+
+                streamElement.Add(channelsElement);
+                dataStreamsElement.Add(streamElement);
             }
             
-            dataStreamsElement.Add(channelsElement);
             parent.Add(dataStreamsElement);
         }
 
@@ -189,89 +285,225 @@ namespace SerialPlotDN_WPF.Model
             if (dataStreamsElement == null) 
                 return;
 
-            // For now, just load channel settings without recreating streams
-            // TODO: Implement proper stream recreation in channel-centric architecture
-            XElement channelsElement = dataStreamsElement.Element("Channels");
-            if (channelsElement == null)
-                return;
-
-            List<ChannelSettings> channelSettings = new List<ChannelSettings>();
-
-            foreach (XElement channelElement in channelsElement.Elements("Channel"))
+            // Load and recreate streams with their channels
+            foreach (XElement streamElement in dataStreamsElement.Elements("Stream"))
             {
-                ChannelSettings setting = new ChannelSettings();
+                // Load stream configuration
+                StreamSettings streamSettings = new StreamSettings();
                 
-                XElement labelElement = channelElement.Element("Label");
-                if (labelElement != null)
-                    setting.Label = labelElement.Value;
-                else
-                    setting.Label = "";
-
-                XElement colorElement = channelElement.Element("Color");
-                string colorValue;
-                if (colorElement != null)
-                    colorValue = colorElement.Value;
-                else
-                    colorValue = null;
-                setting.Color = ParseColor(colorValue);
-
-                XElement isEnabledElement = channelElement.Element("IsEnabled");
-                if (isEnabledElement != null && bool.TryParse(isEnabledElement.Value, out bool enabled))
-                    setting.IsEnabled = enabled;
-                else
-                    setting.IsEnabled = true;
-
-                XElement gainElement = channelElement.Element("Gain");
-                if (gainElement != null && double.TryParse(gainElement.Value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double gain))
-                    setting.Gain = gain;
-                else
-                    setting.Gain = 1.0;
-
-                XElement offsetElement = channelElement.Element("Offset");
-                if (offsetElement != null && double.TryParse(offsetElement.Value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double offset))
-                    setting.Offset = offset;
-                else
-                    setting.Offset = 0.0;
-
-                // Load filter information
-                XElement filterElement = channelElement.Element("Filter");
-                if (filterElement != null)
+                XElement streamSourceElement = streamElement.Element("StreamSource");
+                if (streamSourceElement != null && Enum.TryParse<StreamSource>(streamSourceElement.Value, out StreamSource streamSource))
                 {
-                    XElement typeElement = filterElement.Element("Type");
-                    if (typeElement != null)
-                    {
-                        string filterType = typeElement.Value;
-                        XElement parametersElement = filterElement.Element("Parameters");
-                        
-                        if (parametersElement != null)
-                        {
-                            Dictionary<string, double> parameters = new Dictionary<string, double>();
-                            foreach (XElement paramElement in parametersElement.Elements("Parameter"))
-                            {
-                                string paramName = paramElement.Attribute("Name")?.Value;
-                                string paramValue = paramElement.Attribute("Value")?.Value;
-                                
-                                if (!string.IsNullOrEmpty(paramName) && !string.IsNullOrEmpty(paramValue) &&
-                                    double.TryParse(paramValue, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double value))
-                                {
-                                    parameters[paramName] = value;
-                                }
-                            }
-                            
-                            // Create the appropriate filter based on type and parameters
-                            setting.Filter = CreateFilterFromTypeAndParameters(filterType, parameters);
-                        }
-                    }
+                    streamSettings.StreamSource = streamSource;
                 }
 
-                channelSettings.Add(setting);
+                XElement numberOfChannelsElement = streamElement.Element("NumberOfChannels");
+                if (numberOfChannelsElement != null && int.TryParse(numberOfChannelsElement.Value, out int numberOfChannels))
+                {
+                    streamSettings.NumberOfChannels = numberOfChannels;
+                }
+
+                // Load stream-specific settings
+                switch (streamSettings.StreamSource)
+                {
+                    case StreamSource.Demo:
+                        XElement demoSampleRateElement = streamElement.Element("DemoSampleRate");
+                        if (demoSampleRateElement != null && int.TryParse(demoSampleRateElement.Value, out int demoSampleRate))
+                            streamSettings.DemoSampleRate = demoSampleRate;
+
+                        XElement demoSignalTypeElement = streamElement.Element("DemoSignalType");
+                        if (demoSignalTypeElement != null)
+                            streamSettings.DemoSignalType = demoSignalTypeElement.Value;
+                        break;
+
+                    case StreamSource.AudioInput:
+                        XElement audioDeviceElement = streamElement.Element("AudioDevice");
+                        if (audioDeviceElement != null)
+                            streamSettings.AudioDevice = audioDeviceElement.Value;
+
+                        XElement audioSampleRateElement = streamElement.Element("AudioSampleRate");
+                        if (audioSampleRateElement != null && int.TryParse(audioSampleRateElement.Value, out int audioSampleRate))
+                            streamSettings.AudioSampleRate = audioSampleRate;
+                        break;
+
+                    case StreamSource.SerialPort:
+                        XElement portElement = streamElement.Element("Port");
+                        if (portElement != null)
+                            streamSettings.Port = portElement.Value;
+
+                        XElement baudElement = streamElement.Element("Baud");
+                        if (baudElement != null && int.TryParse(baudElement.Value, out int baud))
+                            streamSettings.Baud = baud;
+
+                        XElement dataBitsElement = streamElement.Element("DataBits");
+                        if (dataBitsElement != null && int.TryParse(dataBitsElement.Value, out int dataBits))
+                            streamSettings.DataBits = dataBits;
+
+                        XElement stopBitsElement = streamElement.Element("StopBits");
+                        if (stopBitsElement != null && int.TryParse(stopBitsElement.Value, out int stopBits))
+                            streamSettings.StopBits = stopBits;
+
+                        XElement parityElement = streamElement.Element("Parity");
+                        if (parityElement != null && Enum.TryParse<Parity>(parityElement.Value, out Parity parity))
+                            streamSettings.Parity = parity;
+
+                        // Simplified: Back to DataFormat only, with ASCII as default fallback
+                        XElement dataFormatElement = streamElement.Element("DataFormat");
+                        if (dataFormatElement != null && Enum.TryParse<DataFormatType>(dataFormatElement.Value, out DataFormatType dataFormat))
+                        {
+                            streamSettings.DataFormat = dataFormat;
+                        }
+                        else
+                        {
+                            streamSettings.DataFormat = DataFormatType.ASCII; // Default fallback as requested
+                        }
+
+                        // Get number type 
+                        XElement numberTypeElement = streamElement.Element("NumberType");
+                        if (numberTypeElement != null && Enum.TryParse<NumberTypeEnum>(numberTypeElement.Value, out NumberTypeEnum numberType))
+                        {
+                            streamSettings.NumberType = numberType;
+                        }
+
+                        XElement delimiterElement = streamElement.Element("Delimiter");
+                        if (delimiterElement != null)
+                            streamSettings.Delimiter = delimiterElement.Value;
+
+                        XElement frameStartElement = streamElement.Element("FrameStart");
+                        if (frameStartElement != null)
+                            streamSettings.FrameStart = frameStartElement.Value;
+                        break;
+                }
+
+                // Create the data stream
+                IDataStream dataStream = dataStreamBar.CreateDataStreamFromUserInput(streamSettings);
+                dataStream.Connect();
+                dataStream.StartStreaming();
+
+                // Load channel settings and measurements
+                XElement channelsElement = streamElement.Element("Channels");
+                if (channelsElement != null)
+                {
+                    List<ChannelSettings> channelSettingsList = new List<ChannelSettings>();
+                    List<List<MeasurementType>> channelMeasurementsList = new List<List<MeasurementType>>();
+
+                    foreach (XElement channelElement in channelsElement.Elements("Channel"))
+                    {
+                        ChannelSettings setting = new ChannelSettings();
+                        
+                        XElement labelElement = channelElement.Element("Label");
+                        if (labelElement != null)
+                            setting.Label = labelElement.Value;
+                        else
+                            setting.Label = "";
+
+                        XElement colorElement = channelElement.Element("Color");
+                        setting.Color = ParseColor(colorElement?.Value);
+
+                        XElement isEnabledElement = channelElement.Element("IsEnabled");
+                        if (isEnabledElement != null && bool.TryParse(isEnabledElement.Value, out bool enabled))
+                            setting.IsEnabled = enabled;
+                        else
+                            setting.IsEnabled = true;
+
+                        XElement gainElement = channelElement.Element("Gain");
+                        if (gainElement != null && double.TryParse(gainElement.Value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double gain))
+                            setting.Gain = gain;
+                        else
+                            setting.Gain = 1.0;
+
+                        XElement offsetElement = channelElement.Element("Offset");
+                        if (offsetElement != null && double.TryParse(offsetElement.Value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double offset))
+                            setting.Offset = offset;
+                        else
+                            setting.Offset = 0.0;
+
+                        // Load filter information
+                        XElement filterElement = channelElement.Element("Filter");
+                        if (filterElement != null)
+                        {
+                            XElement typeElement = filterElement.Element("Type");
+                            if (typeElement != null)
+                            {
+                                string filterType = typeElement.Value;
+                                XElement parametersElement = filterElement.Element("Parameters");
+                                
+                                if (parametersElement != null)
+                                {
+                                    Dictionary<string, double> parameters = new Dictionary<string, double>();
+                                    foreach (XElement paramElement in parametersElement.Elements("Parameter"))
+                                    {
+                                        string paramName = paramElement.Attribute("Name")?.Value;
+                                        string paramValue = paramElement.Attribute("Value")?.Value;
+                                        
+                                        if (!string.IsNullOrEmpty(paramName) && !string.IsNullOrEmpty(paramValue) &&
+                                            double.TryParse(paramValue, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double value))
+                                        {
+                                            parameters[paramName] = value;
+                                        }
+                                    }
+                                    
+                                    setting.Filter = CreateFilterFromTypeAndParameters(filterType, parameters);
+                                }
+                            }
+                        }
+
+                        // Load measurements for this channel
+                        List<MeasurementType> measurements = new List<MeasurementType>();
+                        XElement measurementsElement = channelElement.Element("Measurements");
+                        if (measurementsElement != null)
+                        {
+                            foreach (XElement measurementElement in measurementsElement.Elements("Measurement"))
+                            {
+                                XElement typeElement = measurementElement.Element("Type");
+                                if (typeElement != null && Enum.TryParse<MeasurementType>(typeElement.Value, out MeasurementType measurementType))
+                                {
+                                    measurements.Add(measurementType);
+                                }
+                            }
+                        }
+
+                        channelSettingsList.Add(setting);
+                        channelMeasurementsList.Add(measurements);
+                    }
+
+                    // Create channels for this stream with loaded settings
+                    Color[] channelColors = channelSettingsList.Select(cs => cs.Color).ToArray();
+                    dataStreamBar.AddChannelsForStream(dataStream, channelColors);
+
+                    // Apply loaded settings and measurements to the created channels
+                    var streamChannels = dataStreamBar.GetChannelsForStream(dataStream).ToList();
+                    for (int i = 0; i < Math.Min(channelSettingsList.Count, streamChannels.Count); i++)
+                    {
+                        Channel channel = streamChannels[i];
+                        ChannelSettings settings = channelSettingsList[i];
+
+                        // Update channel settings
+                        channel.Settings.Label = settings.Label;
+                        channel.Settings.Color = settings.Color;
+                        channel.Settings.IsEnabled = settings.IsEnabled;
+                        channel.Settings.Gain = settings.Gain;
+                        channel.Settings.Offset = settings.Offset;
+                        channel.Settings.Filter = settings.Filter;
+
+                        // Add measurements to channel
+                        if (i < channelMeasurementsList.Count)
+                        {
+                            List<MeasurementType> measurements = channelMeasurementsList[i];
+                            foreach (MeasurementType measurementType in measurements)
+                            {
+                                channel.AddMeasurement(measurementType);
+                            }
+                        }
+                    }
+
+                    // Add stream info panel to UI
+                    dataStreamBar.AddStreamInfoPanel(streamSettings, dataStream);
+                }
             }
 
-            // Apply channel settings - only works if channels already exist
-            if (channelSettings.Count > 0)
-            {
-                ApplyChannelSettings(channelControlBar, channelSettings);
-            }
+            // Update ChannelControlBar with the loaded channels
+            channelControlBar.UpdateFromDataStreamBar(dataStreamBar);
         }
 
         private static Color ParseColor(string colorString)

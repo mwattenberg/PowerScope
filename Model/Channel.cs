@@ -1,11 +1,13 @@
 using System;
 using System.ComponentModel;
+using System.Collections.ObjectModel;
 
 namespace SerialPlotDN_WPF.Model
 {
     /// <summary>
     /// Represents a single channel that encapsulates both the data source and settings
     /// This eliminates the need for global channel indices and complex resolution logic
+    /// Now also manages its own measurements
     /// </summary>
     public class Channel : INotifyPropertyChanged
     {
@@ -15,6 +17,11 @@ namespace SerialPlotDN_WPF.Model
         private bool _disposed = false;
 
         public event PropertyChangedEventHandler PropertyChanged;
+
+        /// <summary>
+        /// Collection of measurements for this channel
+        /// </summary>
+        public ObservableCollection<Measurement> Measurements { get; private set; } = new ObservableCollection<Measurement>();
 
         /// <summary>
         /// Creates a new Channel instance
@@ -157,12 +164,69 @@ namespace SerialPlotDN_WPF.Model
         }
 
         /// <summary>
+        /// Adds a measurement to this channel
+        /// </summary>
+        /// <param name="measurementType">Type of measurement to add</param>
+        public void AddMeasurement(MeasurementType measurementType)
+        {
+            if (!IsStreamConnected)
+                return;
+
+            Measurement measurement = new Measurement(measurementType, _ownerStream, _localChannelIndex, _settings);
+            
+            // Subscribe to removal request
+            measurement.RemoveRequested += OnMeasurementRemoveRequested;
+            
+            Measurements.Add(measurement);
+        }
+
+        /// <summary>
+        /// Removes a specific measurement from this channel
+        /// </summary>
+        /// <param name="measurement">The measurement to remove</param>
+        public void RemoveMeasurement(Measurement measurement)
+        {
+            if (measurement != null && Measurements.Contains(measurement))
+            {
+                measurement.RemoveRequested -= OnMeasurementRemoveRequested;
+                measurement.Dispose();
+                Measurements.Remove(measurement);
+            }
+        }
+
+        /// <summary>
+        /// Updates all measurements for this channel
+        /// Called by MeasurementBar timer
+        /// </summary>
+        public void UpdateAllMeasurements()
+        {
+            if (_disposed)
+                return;
+
+            foreach (Measurement measurement in Measurements)
+            {
+                if (!measurement.IsDisposed)
+                {
+                    measurement.UpdateMeasurement();
+                }
+            }
+        }
+
+        /// <summary>
         /// Creates a globally unique identifier for this channel
         /// Useful for tracking channels across UI components
         /// </summary>
         public string GetChannelId()
         {
             return $"{_ownerStream.GetHashCode()}_{_localChannelIndex}";
+        }
+
+        private void OnMeasurementRemoveRequested(object sender, EventArgs e)
+        {
+            if (sender is Measurement measurement)
+            {
+                RemoveMeasurement(measurement);
+            }
         }
 
         private void OnSettingsChanged(object sender, PropertyChangedEventArgs e)
@@ -206,6 +270,14 @@ namespace SerialPlotDN_WPF.Model
         {
             if (!_disposed)
             {
+                // Dispose all measurements
+                foreach (Measurement measurement in Measurements)
+                {
+                    measurement.RemoveRequested -= OnMeasurementRemoveRequested;
+                    measurement.Dispose();
+                }
+                Measurements.Clear();
+
                 if (_settings != null)
                     _settings.PropertyChanged -= OnSettingsChanged;
 
@@ -215,7 +287,7 @@ namespace SerialPlotDN_WPF.Model
 
         public override string ToString()
         {
-            return $"Channel: {Label} ({StreamType} Stream, Local Index: {LocalChannelIndex})";
+            return $"Channel: {Label} ({StreamType} Stream, Local Index: {LocalChannelIndex}, {Measurements.Count} measurements)";
         }
     }
 }

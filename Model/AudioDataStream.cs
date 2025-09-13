@@ -50,6 +50,14 @@ namespace SerialPlotDN_WPF.Model
             get { return _sampleRate; } 
         }
 
+        /// <summary>
+        /// Gets the name of the audio device being used
+        /// </summary>
+        public string DeviceName 
+        { 
+            get { return _deviceName; } 
+        }
+
         public event PropertyChangedEventHandler PropertyChanged;
 
         protected virtual void OnPropertyChanged(string propertyName)

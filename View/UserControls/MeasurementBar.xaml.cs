@@ -6,22 +6,24 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
 using SerialPlotDN_WPF.Model;
+using System.Collections.Generic;
 
 namespace SerialPlotDN_WPF.View.UserControls
 {
     /// <summary>
     /// Interaction logic for MeasurementBar.xaml
-    /// Now uses simplified DataStreamBar channel management
+    /// Gets channels from ChannelControlBar and displays all their measurements
+    /// Much simpler - no XAML flattening needed!
     /// </summary>
     public partial class MeasurementBar : UserControl, IDisposable
     {
         /// <summary>
-        /// Collection of Measurements that drives the UI via DataTemplate
+        /// Flattened collection of all measurements from all channels for UI binding
         /// </summary>
-        public ObservableCollection<Measurement> Measurements { get; private set; } = new ObservableCollection<Measurement>();
+        public ObservableCollection<Measurement> AllMeasurements { get; private set; } = new ObservableCollection<Measurement>();
 
-        // Dependencies - simplified with direct channel management
-        private DataStreamBar _dataStreamBar;
+        // Dependencies
+        private ChannelControlBar _channelControlBar;
         
         // Self-managed timer for measurement updates
         private readonly DispatcherTimer _measurementTimer;
@@ -32,24 +34,27 @@ namespace SerialPlotDN_WPF.View.UserControls
         /// </summary>
         public bool IsRunning { get; private set; }
 
-        public DataStreamBar DataStreamBar
+        public ChannelControlBar ChannelControlBar
         {
             get 
             { 
-                return _dataStreamBar; 
+                return _channelControlBar; 
             }
             set 
             { 
                 if (value == null)
                     throw new ArgumentNullException(nameof(value));
-                _dataStreamBar = value;
+                _channelControlBar = value;
+                RefreshAllMeasurements();
             }
         }
 
         public MeasurementBar()
         {
             InitializeComponent();
-            MeasurementItemsControl.ItemsSource = Measurements;
+            
+            // Bind UI to the flattened measurements collection
+            MeasurementItemsControl.ItemsSource = AllMeasurements;
             
             // Initialize measurement update timer
             _measurementTimer = new DispatcherTimer(DispatcherPriority.Background);
@@ -59,18 +64,63 @@ namespace SerialPlotDN_WPF.View.UserControls
 
         private void MeasurementTimer_Tick(object sender, EventArgs e)
         {
+            // Update all measurements and refresh the flattened collection
+            UpdateAllChannelMeasurements();
+            RefreshAllMeasurements();
+        }
+
+        /// <summary>
+        /// Updates all measurements across all channels
+        /// Simple iteration through channels from ChannelControlBar
+        /// </summary>
+        private void UpdateAllChannelMeasurements()
+        {
+            if (_channelControlBar?.DataStreamBar == null)
+                return;
+
             // Update measurements on background thread for CPU-intensive calculations
             Task.Run(() =>
             {
-                Measurement[] measurementsToUpdate = Measurements.ToArray(); // Copy to avoid collection modification
-                Parallel.ForEach(measurementsToUpdate, measurement =>
+                // Get all channels from the ChannelControlBar's DataStreamBar
+                Channel[] channels = _channelControlBar.DataStreamBar.Channels.ToArray();
+                
+                // Update all measurements in all channels
+                Parallel.ForEach(channels, channel =>
                 {
-                    if (!measurement.IsDisposed)
-                    {
-                        measurement.UpdateMeasurement();
-                    }
+                    channel.UpdateAllMeasurements();
                 });
             });
+        }
+
+        /// <summary>
+        /// Refreshes the flattened measurements collection for UI binding
+        /// Called when channels change or measurements are added/removed
+        /// </summary>
+        private void RefreshAllMeasurements()
+        {
+            if (_channelControlBar?.DataStreamBar == null)
+                return;
+
+            // Clear the flattened collection
+            AllMeasurements.Clear();
+
+            // Add all measurements from all channels
+            foreach (Channel channel in _channelControlBar.DataStreamBar.Channels)
+            {
+                foreach (Measurement measurement in channel.Measurements)
+                {
+                    AllMeasurements.Add(measurement);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Public method to refresh measurements when channels change
+        /// Called by external components when measurements are added/removed
+        /// </summary>
+        public void RefreshMeasurements()
+        {
+            RefreshAllMeasurements();
         }
 
         /// <summary>
@@ -103,105 +153,6 @@ namespace SerialPlotDN_WPF.View.UserControls
         }
 
         /// <summary>
-        /// Add a measurement for a specific channel and measurement type
-        /// Uses the simplified channel-centric approach
-        /// </summary>
-        /// <param name="measurementType">Type of measurement to create</param>
-        /// <param name="channelIndex">Zero-based channel index</param>
-        public void AddMeasurement(MeasurementType measurementType, int channelIndex)
-        {
-            // Validation - much simpler with direct channel management
-            if (_dataStreamBar == null)
-            {
-                MessageBox.Show("DataStreamBar is not initialized.", "Configuration Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                return;
-            }
-
-            if (_dataStreamBar.TotalChannelCount == 0)
-            {
-                MessageBox.Show("No channels are available.", "No Data Available", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
-
-            // Get the channel directly - no complex resolution needed!
-            Channel channel = _dataStreamBar.GetChannelByIndex(channelIndex);
-            if (channel == null)
-            {
-                MessageBox.Show($"Channel {channelIndex + 1} is not available.", "Channel Not Available", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
-
-            if (!channel.IsStreamConnected)
-            {
-                MessageBox.Show($"Channel {channelIndex + 1} stream is not connected.", "Stream Not Connected", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
-
-            // Create measurement using the channel - much cleaner!
-            Measurement measurement = new Measurement(measurementType, channel.OwnerStream, channel.LocalChannelIndex, channel.Settings);
-
-            // Subscribe to removal request
-            measurement.RemoveRequested += OnMeasurementRemoveRequested;
-
-            // Add to collection - UI updates automatically!
-            Measurements.Add(measurement);
-        }
-
-        /// <summary>
-        /// Add a measurement for a specific channel object
-        /// This is the preferred method with the new architecture
-        /// </summary>
-        /// <param name="measurementType">Type of measurement to create</param>
-        /// <param name="channel">The channel to create a measurement for</param>
-        public void AddMeasurementForChannel(MeasurementType measurementType, Channel channel)
-        {
-            if (channel == null)
-            {
-                MessageBox.Show("Invalid channel.", "Channel Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                return;
-            }
-
-            if (!channel.IsStreamConnected)
-            {
-                MessageBox.Show($"Channel '{channel.Label}' stream is not connected.", "Stream Not Connected", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
-
-            // Create measurement using the channel
-            Measurement measurement = new Measurement(measurementType, channel.OwnerStream, channel.LocalChannelIndex, channel.Settings);
-
-            // Subscribe to removal request
-            measurement.RemoveRequested += OnMeasurementRemoveRequested;
-
-            // Add to collection - UI updates automatically!
-            Measurements.Add(measurement);
-        }
-
-        private void OnMeasurementRemoveRequested(object sender, EventArgs e)
-        {
-            if (sender is Measurement measurement)
-            {
-                measurement.RemoveRequested -= OnMeasurementRemoveRequested;
-                measurement.Dispose();
-                Measurements.Remove(measurement);
-            }
-        }
-
-        /// <summary>
-        /// Clear all measurements
-        /// </summary>
-        public void ClearAllMeasurements()
-        {
-            // Dispose all measurements
-            foreach (Measurement measurement in Measurements)
-            {
-                measurement.Dispose();
-            }
-            
-            Measurements.Clear();
-        }
-
-        /// <summary>
         /// Dispose of all resources
         /// </summary>
         public void Dispose()
@@ -210,8 +161,7 @@ namespace SerialPlotDN_WPF.View.UserControls
             {
                 _disposed = true;
                 StopUpdates();
-                // DispatcherTimer doesn't have Dispose method, just stop it
-                ClearAllMeasurements();
+                // Measurements are owned by channels, so they'll be disposed when channels are disposed
             }
         }
     }

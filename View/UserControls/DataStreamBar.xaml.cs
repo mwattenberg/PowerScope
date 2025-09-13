@@ -92,7 +92,7 @@ namespace SerialPlotDN_WPF.View.UserControls
         /// </summary>
         /// <param name="dataStream">The data stream to create channels for</param>
         /// <param name="channelColors">Optional array of colors for the channels</param>
-        private void AddChannelsForStream(IDataStream dataStream, Color[] channelColors = null)
+        public void AddChannelsForStream(IDataStream dataStream, Color[] channelColors = null)
         {
             if (dataStream == null)
                 return;
@@ -245,20 +245,35 @@ namespace SerialPlotDN_WPF.View.UserControls
                     // Default to SerialDataStream
                     SourceSetting sourceSetting = new SourceSetting(vm.Port, vm.Baud, vm.DataBits, vm.StopBits, vm.Parity);
                     DataParser dataParser;
-                    if (vm.DataFormat == DataFormatType.RawBinary)
+                    
+                    // Convert NumberType to BinaryFormat
+                    DataParser.BinaryFormat binaryFormat = vm.NumberType switch
                     {
-                        byte[] frameStartBytes = ParseFrameStartBytes(vm.FrameStart);
-                        if (frameStartBytes != null && frameStartBytes.Length > 0)
-                            dataParser = new DataParser(DataParser.BinaryFormat.uint16_t, vm.NumberOfChannels, frameStartBytes);
-                        else
-                            dataParser = new DataParser(DataParser.BinaryFormat.uint16_t, vm.NumberOfChannels);
-                    }
-                    else
+                        NumberTypeEnum.Int16 => DataParser.BinaryFormat.int16_t,
+                        NumberTypeEnum.Uint16 => DataParser.BinaryFormat.uint16_t,
+                        NumberTypeEnum.Int32 => DataParser.BinaryFormat.int32_t,
+                        NumberTypeEnum.Uint32 => DataParser.BinaryFormat.uint32_t,
+                        NumberTypeEnum.Float => DataParser.BinaryFormat.float_t,
+                        _ => DataParser.BinaryFormat.uint16_t // Default fallback
+                    };
+                    
+                    // Simple approach: ASCII or RawBinary
+                    if (vm.DataFormat == DataFormatType.ASCII)
                     {
                         char frameEnd = '\n';
                         char separator = ParseDelimiter(vm.Delimiter);
                         dataParser = new DataParser(vm.NumberOfChannels, frameEnd, separator);
                     }
+                    else
+                    {
+                        // RawBinary - check if frame start is provided
+                        byte[] frameStartBytes = ParseFrameStartBytes(vm.FrameStart);
+                        if (frameStartBytes != null && frameStartBytes.Length > 0)
+                            dataParser = new DataParser(binaryFormat, vm.NumberOfChannels, frameStartBytes);
+                        else
+                            dataParser = new DataParser(binaryFormat, vm.NumberOfChannels);
+                    }
+                    
                     SerialDataStream stream = new SerialDataStream(sourceSetting, dataParser);
                     return stream;
             }
@@ -308,7 +323,7 @@ namespace SerialPlotDN_WPF.View.UserControls
             }
         }
 
-        private void AddStreamInfoPanel(StreamSettings settings, IDataStream datastream)
+        public void AddStreamInfoPanel(StreamSettings settings, IDataStream datastream)
         {
             StreamInfoPanel panel = new StreamInfoPanel(datastream, settings);
             panel.OnRemoveClickedEvent += (s, args) => RemoveStreamByDataStream(datastream);
