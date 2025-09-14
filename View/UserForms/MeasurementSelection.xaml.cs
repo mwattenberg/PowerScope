@@ -2,9 +2,9 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using SerialPlotDN_WPF.Model;
+using PowerScope.Model;
 
-namespace SerialPlotDN_WPF.View.UserForms
+namespace PowerScope.View.UserForms
 {
     /// <summary>
     /// Interaction logic for MeasurementSelection.xaml

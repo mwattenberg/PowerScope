@@ -6,10 +6,10 @@ using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
-using SerialPlotDN_WPF.Model;
-using SerialPlotDN_WPF.View.UserForms;
+using PowerScope.Model;
+using PowerScope.View.UserForms;
 
-namespace SerialPlotDN_WPF.View.UserControls
+namespace PowerScope.View.UserControls
 {
     public class ColorToBrushConverter : IValueConverter
     {

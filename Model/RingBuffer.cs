@@ -2,7 +2,7 @@
 using System.Collections;
 using System.Collections.Generic;
 
-namespace SerialPlotDN_WPF.Model
+namespace PowerScope.Model
 {
     public class RingBuffer<T> : IEnumerable<T>
     {

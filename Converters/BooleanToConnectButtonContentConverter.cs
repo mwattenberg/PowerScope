@@ -2,7 +2,7 @@ using System;
 using System.Globalization;
 using System.Windows.Data;
 
-namespace SerialPlotDN_WPF.Converters
+namespace PowerScope.Converters
 {
     /// <summary>
     /// Converts boolean IsConnected value to button content text

@@ -2,7 +2,7 @@ using System;
 using System.ComponentModel;
 using System.Collections.ObjectModel;
 
-namespace SerialPlotDN_WPF.Model
+namespace PowerScope.Model
 {
     /// <summary>
     /// Represents a single channel that encapsulates both the data source and settings

@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace SerialPlotDN_WPF.Model
+namespace PowerScope.Model
 {
     public interface IDigitalFilter
     {

@@ -5,7 +5,7 @@ using System; // Add for IDisposable
 using System.Collections.Generic; // Add for List<T>
 using System.Windows.Controls; // Add for ComboBoxItem
 
-namespace SerialPlotDN_WPF.Model
+namespace PowerScope.Model
 {
     public enum DataFormatType
     {

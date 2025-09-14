@@ -11,9 +11,9 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
-using SerialPlotDN_WPF.Model;
+using PowerScope.Model;
 
-namespace SerialPlotDN_WPF.View.UserForms
+namespace PowerScope.View.UserForms
 {
     /// <summary>
     /// Interaction logic for FilterConfigWindow.xaml

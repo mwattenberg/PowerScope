@@ -5,10 +5,10 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using ScottPlot.Plottables;
-using SerialPlotDN_WPF.Model;
-using SerialPlotDN_WPF.View.UserForms;
+using PowerScope.Model;
+using PowerScope.View.UserForms;
 
-namespace SerialPlotDN_WPF.View.UserControls
+namespace PowerScope.View.UserControls
 {
     public partial class StreamInfoPanel : UserControl
     {

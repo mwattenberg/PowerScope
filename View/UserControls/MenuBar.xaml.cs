@@ -13,7 +13,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
 
-namespace SerialPlotDN_WPF.View.UserControls
+namespace PowerScope.View.UserControls
 {
     /// <summary>
     /// Interaction logic for MenuBar.xaml

@@ -11,11 +11,11 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Xml.Linq;
 using ScottPlot.Plottables;
-using SerialPlotDN_WPF.Model;
-using SerialPlotDN_WPF.View.UserControls;
-using SerialPlotDN_WPF.View.UserForms;
+using PowerScope.Model;
+using PowerScope.View.UserControls;
+using PowerScope.View.UserForms;
 
-namespace SerialPlotDN_WPF
+namespace PowerScope
 {
     /// <summary>
     /// Interaction logic for MainWindow.xaml

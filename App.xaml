@@ -1,8 +1,8 @@
-﻿<Application x:Class="SerialPlotDN_WPF.App"
+﻿<Application x:Class="PowerScope.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:ScottPlot="clr-namespace:ScottPlot.WPF;assembly=ScottPlot.WPF"
-             xmlns:local="clr-namespace:SerialPlotDN_WPF"
+             xmlns:local="clr-namespace:PowerScope"
              StartupUri="MainWindow.xaml">
     <Application.Resources>
         <!-- General color resources for PlotSettingsWindow -->

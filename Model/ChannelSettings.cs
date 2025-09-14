@@ -2,7 +2,7 @@ using System;
 using System.ComponentModel;
 using System.Windows.Media;
 
-namespace SerialPlotDN_WPF.Model
+namespace PowerScope.Model
 {
     public class ChannelSettings : INotifyPropertyChanged
     {

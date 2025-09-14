@@ -3,7 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 
-namespace SerialPlotDN_WPF.View.UserControls
+namespace PowerScope.View.UserControls
 {
     public partial class RunControl : UserControl
     {

@@ -5,10 +5,10 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Windows.Media;
 using System.Linq;
-using SerialPlotDN_WPF.Model;
-using SerialPlotDN_WPF.View.UserForms;
+using PowerScope.Model;
+using PowerScope.View.UserForms;
 
-namespace SerialPlotDN_WPF.View.UserControls
+namespace PowerScope.View.UserControls
 {
     /// <summary>
     /// Interaction logic for DataStreamBar.xaml

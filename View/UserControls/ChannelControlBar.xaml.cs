@@ -2,9 +2,9 @@
 using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Controls;
-using SerialPlotDN_WPF.Model;
+using PowerScope.Model;
 
-namespace SerialPlotDN_WPF.View.UserControls
+namespace PowerScope.View.UserControls
 {
     /// <summary>
     /// Interaction logic for ChannelControlBar.xaml

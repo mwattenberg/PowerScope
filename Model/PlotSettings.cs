@@ -1,7 +1,7 @@
 using System;
 using System.ComponentModel;
 
-namespace SerialPlotDN_WPF.Model
+namespace PowerScope.Model
 {
     /// <summary>
     /// Predefined FPS values for plot update rate

@@ -5,7 +5,7 @@ using System.Diagnostics;
 using System.Threading;
 using System.ComponentModel;
 
-namespace SerialPlotDN_WPF.Model
+namespace PowerScope.Model
 {
     /// <summary>
     /// Exception thrown when a serial port is not found on the system

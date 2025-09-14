@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.ComponentModel;
 
-namespace SerialPlotDN_WPF.Model
+namespace PowerScope.Model
 {
     /// <summary>
     /// Measurement types that can be calculated

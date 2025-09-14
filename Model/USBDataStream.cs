@@ -9,7 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Win32.SafeHandles;
 
-namespace SerialPlotDN_WPF.Model
+namespace PowerScope.Model
 {
     /// <summary>
     /// Exception thrown when a USB device is not found on the system

@@ -3,7 +3,7 @@ using System.Globalization;
 using System.Windows.Data;
 using System.Windows.Media;
 
-namespace SerialPlotDN_WPF.Converters
+namespace PowerScope.Converters
 {
     /// <summary>
     /// Converts boolean IsConnected value to button background brush

@@ -1,6 +1,6 @@
 ﻿using System.Buffers.Binary;
 
-namespace SerialPlotDN_WPF.Model
+namespace PowerScope.Model
 {
     public class DataParser
     {

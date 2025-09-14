@@ -2,11 +2,11 @@
 using System.Windows;
 using System.Windows.Input;
 using System.Text.RegularExpressions;
-using SerialPlotDN_WPF.Model;
+using PowerScope.Model;
 using System.Linq;
 using System.Collections.Generic;
 
-namespace SerialPlotDN_WPF.View.UserForms
+namespace PowerScope.View.UserForms
 {
     /// <summary>
     /// Interaction logic for PlotSettingsWindow.xaml

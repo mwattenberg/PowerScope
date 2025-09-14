@@ -3,7 +3,7 @@ using System.Data;
 using System.Windows;
 //using ScottPlot.WPF;
 
-namespace SerialPlotDN_WPF
+namespace PowerScope
 {
     /// <summary>
     /// Interaction logic for App.xaml

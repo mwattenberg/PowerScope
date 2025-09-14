@@ -1,13 +1,13 @@
 ﻿using System;
 using System.IO;
 using System.Xml.Linq;
-using SerialPlotDN_WPF.View.UserControls;
+using PowerScope.View.UserControls;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows.Media;
 using System.IO.Ports;
 
-namespace SerialPlotDN_WPF.Model
+namespace PowerScope.Model
 {
     public static class Serializer
     {

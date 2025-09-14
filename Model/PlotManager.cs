@@ -9,10 +9,10 @@ using System.Windows.Threading;
 using ScottPlot;
 using ScottPlot.WPF;
 using ScottPlot.Plottables;
-using SerialPlotDN_WPF.Model;
+using PowerScope.Model;
 using Color = System.Windows.Media.Color;
 
-namespace SerialPlotDN_WPF.Model
+namespace PowerScope.Model
 {
     /// <summary>
     /// Manager class for ScottPlot integration in WPF

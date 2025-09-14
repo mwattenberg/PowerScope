@@ -4,9 +4,9 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
-using SerialPlotDN_WPF.Model;
+using PowerScope.Model;
 
-namespace SerialPlotDN_WPF.View.UserControls
+namespace PowerScope.View.UserControls
 {
     /// <summary>
     /// Interaction logic for MeasurementBar.xaml

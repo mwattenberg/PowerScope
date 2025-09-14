@@ -8,9 +8,9 @@ using NAudio.CoreAudioApi;
 using System.Management;
 using System.Collections.Generic;
 using System.Windows.Input;
-using SerialPlotDN_WPF.Model;
+using PowerScope.Model;
 
-namespace SerialPlotDN_WPF.View.UserForms
+namespace PowerScope.View.UserForms
 {
     /// <summary>
     /// Interaction logic for SerialConfigWindow.xaml

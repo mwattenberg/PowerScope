@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 using NAudio.CoreAudioApi;
 using NAudio.Wave;
 
-namespace SerialPlotDN_WPF.Model
+namespace PowerScope.Model
 {
     public class AudioDataStream : IDataStream, IChannelConfigurable, IDisposable
     {
