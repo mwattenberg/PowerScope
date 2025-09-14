@@ -10,6 +10,9 @@
 	<Platforms>x64</Platforms>
 	<Configurations>Debug;Release;Performance</Configurations>
 	
+	<!-- Application Icon - using new multi-size logo.ico -->
+	<ApplicationIcon>Icons\logo.ico</ApplicationIcon>
+	
 	<!-- Single-file publishing settings -->
 	<PublishSingleFile>true</PublishSingleFile>
 	<SelfContained>true</SelfContained>
