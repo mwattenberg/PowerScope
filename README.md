@@ -16,8 +16,8 @@ __Key features:__
 [__See User Guide here__](UserGuide.md)
 
 ## Philosophy
-- Targeted application: Plotting of high-speed data for development and degugging.
-- Functionality limited. Similar to modern oscilloscopes. There are other tools for that.
-- Built for engineers in the field of control engineering, power electronics and robotics.
+- Targeted application: Plotting of high-speed data for development and debugging.
+- Focused functionality. Similar to modern oscilloscopes. No customizable GUI or plugins.
+- Built for engineers in the field of control engineering, power electronics and motor drives / robotics.
 - Currently Windows 10 / 11 only. 
 
