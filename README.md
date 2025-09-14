@@ -13,7 +13,7 @@ __Key features:__
   - Filtering of incoming data in real-time
   - Large data set handling. Recording depth only limited by available RAM.
 
-[?? User Guide](UserGuide.md)
+[__See User Guide here__](UserGuide.md)
 
 ## Philosophy
 - Targeted application: Plotting of high-speed data for development and degugging.
