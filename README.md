@@ -1,6 +1,6 @@
 # PowerScope
 A tool for plotting and analyzing data from embedded targets like MCUs and FPGAs.
-"See" with the eye of your embedded system.
+"See" with the eyes of your embedded system.
 
  ![Demo animation](demo.gif)
 
