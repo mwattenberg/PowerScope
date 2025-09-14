@@ -4,14 +4,11 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:PowerScope.View.UserControls"
-             xmlns:converters="clr-namespace:PowerScope.Converters"
              mc:Ignorable="d" 
              d:DesignHeight="120" d:DesignWidth="150">
     
     <UserControl.Resources>
-        <converters:BooleanToConnectButtonContentConverter x:Key="BooleanToContentConverter"/>
-        <converters:BooleanToConnectButtonBackgroundConverter x:Key="BooleanToBackgroundConverter"/>
-        
+       
         <!-- Styles for info display -->
         <Style x:Key="InfoTextStyle" TargetType="TextBlock">
             <Setter Property="Foreground" Value="White"/>

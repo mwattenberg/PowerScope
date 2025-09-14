@@ -7,8 +7,16 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
 	<PublishAot>false</PublishAot>
-	<Platforms>AnyCPU;x64</Platforms>
+	<Platforms>x64</Platforms>
 	<Configurations>Debug;Release;Performance</Configurations>
+	
+	<!-- Single-file publishing settings -->
+	<PublishSingleFile>true</PublishSingleFile>
+	<SelfContained>true</SelfContained>
+	<RuntimeIdentifier>win-x64</RuntimeIdentifier>
+	<PublishTrimmed>false</PublishTrimmed>
+	<TrimMode>link</TrimMode>
+	<IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
   </PropertyGroup>
 
   <ItemGroup>
