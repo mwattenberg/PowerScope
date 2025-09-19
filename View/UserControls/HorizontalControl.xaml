@@ -4,17 +4,17 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:PowerScope.View.UserControls"
+             xmlns:svgc="http://sharpvectors.codeplex.com/svgc/"
              mc:Ignorable="d" 
-             Width="280" Height="auto" BorderThickness="2" Margin="2">
-    
+             MinWidth="150" Height="auto" BorderThickness="2" Margin="2"
+             FontFamily="{DynamicResource {x:Static SystemFonts.MessageFontFamily}}"
+             FontSize="{DynamicResource {x:Static SystemFonts.MessageFontSize}}">
+
     <UserControl.Resources>
-        <!-- Button style matching ChannelControl -->
-        <Style TargetType="Button">
-            <Setter Property="Background" Value="{DynamicResource PlotSettings_TextBoxBackgroundBrush}"/>
+        <!-- Button style matching global styles -->
+        <Style TargetType="Button" BasedOn="{StaticResource ButtonStyle}">
             <Setter Property="Foreground" Value="White"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource PlotSettings_BorderBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="FontSize" Value="14"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
@@ -36,85 +36,109 @@
                 </Setter.Value>
             </Setter>
         </Style>
-        
+
         <!-- TextBox style for horizontal label -->
-        <Style x:Key="HorizontalLabelTextBoxStyle" TargetType="TextBox">
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="TextAlignment" Value="Center"/>
-            <Setter Property="IsReadOnly" Value="True"/>
-            <Setter Property="VerticalContentAlignment" Value="Center"/>
-            <Setter Property="FontSize" Value="14"/>
+        <Style x:Key="HorizontalLabelTextBoxStyle" TargetType="TextBox" BasedOn="{StaticResource ControlLabelTextBoxStyle}">
+            <!-- Inherits all properties from the unified ControlLabelTextBoxStyle in App.xaml -->
         </Style>
-        
+
         <!-- TextBox style for input fields -->
-        <Style x:Key="InputTextBoxStyle" TargetType="TextBox">
+        <Style x:Key="InputTextBoxStyle" TargetType="TextBox" BasedOn="{StaticResource TextBoxStyle}">
             <Setter Property="Foreground" Value="White"/>
-            <Setter Property="Background" Value="{DynamicResource PlotSettings_TextBoxBackgroundBrush}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource PlotSettings_BorderBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="FontSize" Value="12"/>
             <Setter Property="TextAlignment" Value="Center"/>
             <Setter Property="Padding" Value="2"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
         </Style>
-        
+
         <!-- Label style -->
-        <Style x:Key="LabelTextStyle" TargetType="TextBlock">
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="FontSize" Value="12"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
+        <Style x:Key="LabelTextStyle" TargetType="TextBlock" BasedOn="{StaticResource ControlTextStyle}">
             <Setter Property="Margin" Value="5,0,5,0"/>
         </Style>
+
+        <!-- Style for wide control buttons with icons -->
+        <Style x:Key="WideButtonStyle" TargetType="Button" BasedOn="{StaticResource ButtonStyle}">
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="{DynamicResource PlotSettings_ButtonHoverBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter Property="Background" Value="{DynamicResource PlotSettings_ButtonPressedBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </UserControl.Resources>
-    
-    <Border Height="Auto" Background="{DynamicResource PlotSettings_BackgroundBrush}" CornerRadius="4"
+
+    <Border Height="Auto" Background="{DynamicResource PlotSettings_BackgroundBrush}" CornerRadius="2"
             BorderBrush="{DynamicResource PlotSettings_BorderBrush}" BorderThickness="2">
         <Grid x:Name="RootGrid" Background="{DynamicResource PlotSettings_BackgroundBrush}">
             <Grid.RowDefinitions>
-                <RowDefinition Height="32"/>  <!-- Top color bar -->
-                <RowDefinition Height="40"/>  <!-- Buttons -->
-                <RowDefinition Height="*"/>  <!-- Samples row -->
-                <RowDefinition Height="*"/>  <!-- Buffer Size row -->
+                <RowDefinition Height="32"/>
+                <!-- Top color bar -->
+                <RowDefinition Height="75"/>
+                <!-- Buttons -->
+                <RowDefinition Height="*"/>
+                <!-- Samples row -->
+                <RowDefinition Height="*"/>
+                <!-- Buffer Size row -->
             </Grid.RowDefinitions>
-            
+
             <!-- Top color bar with dark grey background and "Horizontal" label -->
             <Border x:Name="TopColorBar" Grid.Row="0" Background="Gray" CornerRadius="2" Height="20" Margin="2">
                 <TextBox x:Name="HorizontalLabelTextBox" Text="Horizontal" Style="{StaticResource HorizontalLabelTextBoxStyle}"/>
             </Border>
-            
-            <!-- Two wider buttons with "~~" and "~" text -->
+
+            <!-- Two wider buttons with expand/shrink icons -->
             <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="2">
-                <Button x:Name="ButtonGrow" VerticalAlignment="Center" Width="120" Height="25" Margin="5" Content="~~" FontSize="18" FontWeight="Bold" Click="ButtonGrow_Click"/>
-                <Button x:Name="ButtonShrink" VerticalAlignment="Center" Width="120" Height="25" Margin="5" Content="~" FontSize="18" FontWeight="Bold" Click="ButtonShrink_Click"/>
+                <Button x:Name="ButtonGrow" VerticalAlignment="Center" MinWidth="60" Height="60" Margin="1" 
+                        Style="{StaticResource WideButtonStyle}" Click="ButtonGrow_Click"
+                        ToolTip="Expand horizontal scale">
+                    <svgc:SvgViewbox Source="/Icons/xExpand.svg" Width="32" Height="32" />
+                </Button>
+                <Button x:Name="ButtonShrink" VerticalAlignment="Center" MinWidth="60" Height="60" Margin="1" 
+                        Style="{StaticResource WideButtonStyle}" Click="ButtonShrink_Click"
+                        ToolTip="Shrink horizontal scale">
+                    <svgc:SvgViewbox Source="/Icons/xShring.svg" Width="32" Height="32" />
+                </Button>
             </StackPanel>
-            
+
             <!-- Samples row with label on left and textbox on right (bound to PlotSettings.Xmax) -->
             <Grid Grid.Row="2" Margin="5,2,5,2">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
-                
+
                 <TextBlock Grid.Column="0" Text="Samples:" Style="{StaticResource LabelTextStyle}"/>
                 <TextBox Grid.Column="1" x:Name="SamplesTextBox" Style="{StaticResource InputTextBoxStyle}" 
                          Text="{Binding Xmax}" Width="120" HorizontalAlignment="Right" Margin="5,0,0,0" 
                          TextChanged="SamplesTextBox_TextChanged"/>
             </Grid>
-            
+
             <!-- Buffer Size row with label on left and textbox on right -->
             <Grid Grid.Row="3" Margin="5,2,5,2">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
-                
+
                 <TextBlock Grid.Column="0" Text="Buffer Size:" Style="{StaticResource LabelTextStyle}"/>
                 <TextBox Grid.Column="1" x:Name="BufferSizeTextBox" Style="{StaticResource InputTextBoxStyle}" 
-                         Text="1000" Width="120" HorizontalAlignment="Right" Margin="5,0,0,0" TextChanged="BufferSizeTextBox_TextChanged"/>
+                         Text="{Binding BufferSize}" Width="120" HorizontalAlignment="Right" Margin="5,0,0,0" 
+                         TextChanged="BufferSizeTextBox_TextChanged"/>
             </Grid>
         </Grid>
     </Border>

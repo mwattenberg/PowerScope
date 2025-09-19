@@ -8,19 +8,19 @@
         AllowsTransparency="True"
         ResizeMode="NoResize" 
         WindowStartupLocation="CenterScreen"
-        Background="Transparent">
+        Background="Transparent"
+        FontFamily="{DynamicResource {x:Static SystemFonts.MessageFontFamily}}"
+        FontSize="{DynamicResource {x:Static SystemFonts.MessageFontSize}}">
     <Window.Resources>
-        <!-- Dark theme styles using global resources -->
-        <Style TargetType="Label">
-            <Setter Property="Foreground" Value="{DynamicResource PlotSettings_LabelForegroundBrush}"/>
-            <Setter Property="FontSize" Value="12"/>
+        <!-- Dark theme styles using global resources and system fonts -->
+        <Style TargetType="Label" BasedOn="{StaticResource LabelStyle}">
+            <!-- Inherits system font settings from LabelStyle in App.xaml -->
         </Style>
-        <Style TargetType="ComboBox">
+        <Style TargetType="ComboBox" BasedOn="{StaticResource SystemFontStyle}">
             <Setter Property="Background" Value="{DynamicResource PlotSettings_TextBoxBackgroundBrush}"/>
             <Setter Property="Foreground" Value="{DynamicResource PlotSettings_LabelForegroundBrush}"/>
             <Setter Property="BorderBrush" Value="{DynamicResource PlotSettings_BorderBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="FontSize" Value="12"/>
             <Setter Property="Padding" Value="5,3"/>
             <Setter Property="Template">
                 <Setter.Value>
@@ -120,11 +120,10 @@
                 </Setter.Value>
             </Setter>
         </Style>
-        <Style TargetType="ComboBoxItem">
+        <Style TargetType="ComboBoxItem" BasedOn="{StaticResource SystemFontStyle}">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="Foreground" Value="{DynamicResource PlotSettings_LabelForegroundBrush}"/>
             <Setter Property="Padding" Value="8,4"/>
-            <Setter Property="FontSize" Value="12"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ComboBoxItem">
@@ -146,28 +145,25 @@
                 </Setter.Value>
             </Setter>
         </Style>
-        <Style TargetType="TextBox">
-            <Setter Property="Background" Value="{DynamicResource PlotSettings_TextBoxBackgroundBrush}"/>
-            <Setter Property="Foreground" Value="{DynamicResource PlotSettings_LabelForegroundBrush}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource PlotSettings_BorderBrush}"/>
+        <Style TargetType="TextBox" BasedOn="{StaticResource TextBoxStyle}">
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Padding" Value="5,3"/>
-            <Setter Property="FontSize" Value="12"/>
         </Style>
-        <Style TargetType="RadioButton">
+        <Style TargetType="RadioButton" BasedOn="{StaticResource SystemFontStyle}">
             <Setter Property="Foreground" Value="{DynamicResource PlotSettings_LabelForegroundBrush}"/>
-            <Setter Property="FontSize" Value="12"/>
         </Style>
-        <Style TargetType="TabControl">
+        <Style TargetType="CheckBox" BasedOn="{StaticResource SystemFontStyle}">
+            <Setter Property="Foreground" Value="{DynamicResource PlotSettings_LabelForegroundBrush}"/>
+        </Style>
+        <Style TargetType="TabControl" BasedOn="{StaticResource SystemFontStyle}">
             <Setter Property="Background" Value="{DynamicResource PlotSettings_BackgroundBrush}"/>
             <Setter Property="BorderBrush" Value="{DynamicResource PlotSettings_BorderBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
         </Style>
-        <Style TargetType="TabItem">
+        <Style TargetType="TabItem" BasedOn="{StaticResource SystemFontStyle}">
             <Setter Property="Background" Value="{DynamicResource PlotSettings_TextBoxBackgroundBrush}"/>
             <Setter Property="Foreground" Value="{DynamicResource PlotSettings_LabelForegroundBrush}"/>
             <Setter Property="BorderBrush" Value="{DynamicResource PlotSettings_BorderBrush}"/>
-            <Setter Property="FontSize" Value="12"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="TabItem">
@@ -194,13 +190,9 @@
                 </Setter.Value>
             </Setter>
         </Style>
-        <Style TargetType="Button">
-            <Setter Property="Background" Value="{DynamicResource PlotSettings_TextBoxBackgroundBrush}"/>
-            <Setter Property="Foreground" Value="{DynamicResource PlotSettings_ButtonForegroundBrush}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource PlotSettings_BorderBrush}"/>
+        <Style TargetType="Button" BasedOn="{StaticResource ButtonStyle}">
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Padding" Value="10,5"/>
-            <Setter Property="FontSize" Value="12"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
@@ -249,6 +241,17 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        <!-- Style for bold labels -->
+        <Style x:Key="BoldLabelStyle" TargetType="Label" BasedOn="{StaticResource LabelStyle}">
+            <Setter Property="FontWeight" Value="Bold"/>
+        </Style>
+        <!-- Style for italic text -->
+        <Style x:Key="ItalicTextStyle" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="{DynamicResource {x:Static SystemFonts.MessageFontFamily}}"/>
+            <Setter Property="FontSize" Value="{DynamicResource {x:Static SystemFonts.MessageFontSize}}"/>
+            <Setter Property="FontStyle" Value="Italic"/>
+            <Setter Property="Foreground" Value="Gray"/>
+        </Style>
     </Window.Resources>
     <!-- Main container with border and drop shadow -->
     <Border Background="{DynamicResource PlotSettings_BackgroundBrush}" 
@@ -273,7 +276,7 @@
                 </Grid.ColumnDefinitions>
                 <TextBlock Grid.Column="0" Text="Input Stream Configuration" 
                            Foreground="{DynamicResource PlotSettings_LabelForegroundBrush}" 
-                           FontSize="14" FontWeight="SemiBold"
+                           FontWeight="SemiBold"
                            VerticalAlignment="Center" 
                            Margin="15,8"/>
                 <!-- Close button -->
@@ -299,8 +302,10 @@
                                 </StackPanel>
                                 <!-- Baud -->
                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
-                                    <Label Content="Baud:" VerticalAlignment="Center" ToolTip="Set the baud rate for serial communication. Custom baud rates are possible and only depend on the device." Width="80"/>
-                                    <ComboBox x:Name="ComboBox_Baud" Width="200" IsEditable="True" Text="{Binding Baud, Mode=TwoWay}" />
+                                    <Label Content="Baud:" VerticalAlignment="Center" ToolTip="Set the baud rate for serial communication. You can use scientific notation (e.g., 1e6 for 1000000)." Width="80"/>
+                                    <TextBox x:Name="TextBox_Baud" Width="200" Text="{Binding Baud, Mode=TwoWay}" 
+                                             PreviewTextInput="BaudOnly_PreviewTextInput" 
+                                             ToolTip="Enter baud rate (numbers and 'e' for exponent, e.g., 115200 or 1e6)" />
                                 </StackPanel>
                                 <!-- Databits -->
                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
@@ -331,17 +336,10 @@
                                 </StackPanel>
                                 <!-- Channels -->
                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
-                                    <Label Content="Channels:" VerticalAlignment="Center" ToolTip="Set the number of data channels. Custom value can be entered." Width="80"/>
-                                    <ComboBox x:Name="ComboBox_Channels" Width="200" IsEditable="True" Text="{Binding NumberOfChannels, Mode=TwoWay}" SelectedValuePath="Content">
-                                        <ComboBoxItem Content="1" IsSelected="True"/>
-                                        <ComboBoxItem Content="2"/>
-                                        <ComboBoxItem Content="3"/>
-                                        <ComboBoxItem Content="4"/>
-                                        <ComboBoxItem Content="5"/>
-                                        <ComboBoxItem Content="6"/>
-                                        <ComboBoxItem Content="7"/>
-                                        <ComboBoxItem Content="8"/>
-                                    </ComboBox>
+                                    <Label Content="Channels:" VerticalAlignment="Center" ToolTip="Set the number of data channels (numbers only)." Width="80"/>
+                                    <TextBox x:Name="TextBox_Channels" Width="200" Text="{Binding NumberOfChannels, Mode=TwoWay}" 
+                                             PreviewTextInput="NumbersOnly_PreviewTextInput" 
+                                             ToolTip="Enter number of channels (numbers only, e.g., 1, 2, 8)" />
                                 </StackPanel>
                                 <!-- Data format -->
                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
@@ -420,22 +418,15 @@
                     <!-- Demo Tab -->
                     <TabItem Header="Demo" x:Name="TabItem_Demo">
                         <StackPanel Margin="10" VerticalAlignment="Top">
-                            <Label Content="Demo Mode Configuration" FontWeight="Bold" FontSize="14" Margin="0,0,0,10"/>
+                            <Label Content="Demo Mode Configuration" Style="{StaticResource BoldLabelStyle}" Margin="0,0,0,10"/>
                             <Label Content="This mode generates simulated data for testing and demonstration purposes."/>
                             <Label Content="No external hardware required." Margin="0,0,0,10"/>
                             
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                                 <Label Content="Channels:" VerticalAlignment="Center" Width="80"/>
-                                <ComboBox x:Name="ComboBox_DemoChannels" Width="200" IsEditable="True" Text="{Binding NumberOfChannels, Mode=TwoWay}" SelectedValuePath="Content">
-                                    <ComboBoxItem Content="1"/>
-                                    <ComboBoxItem Content="2"/>
-                                    <ComboBoxItem Content="3"/>
-                                    <ComboBoxItem Content="4"/>
-                                    <ComboBoxItem Content="5"/>
-                                    <ComboBoxItem Content="6"/>
-                                    <ComboBoxItem Content="7"/>
-                                    <ComboBoxItem Content="8" IsSelected="True"/>
-                                </ComboBox>
+                                <TextBox x:Name="TextBox_DemoChannels" Width="200" Text="{Binding NumberOfChannels, Mode=TwoWay}" 
+                                         PreviewTextInput="NumbersOnly_PreviewTextInput" 
+                                         ToolTip="Enter number of channels (numbers only, e.g., 1, 2, 8)" />
                             </StackPanel>
                             
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
@@ -461,7 +452,7 @@
                             </StackPanel>
                             
                             <TextBlock Text="Demo mode will generate continuous data streams for visualization and testing." 
-                                      Margin="0,20,0,0" FontStyle="Italic" Foreground="Gray"/>
+                                      Margin="0,20,0,0" Style="{StaticResource ItalicTextStyle}"/>
                         </StackPanel>
                     </TabItem>
                 </TabControl>

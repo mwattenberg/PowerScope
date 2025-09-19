@@ -10,36 +10,28 @@
         AllowsTransparency="True"
         ResizeMode="NoResize" 
         WindowStartupLocation="CenterOwner"
-        Background="Transparent">
+        Background="Transparent"
+        FontFamily="{DynamicResource {x:Static SystemFonts.MessageFontFamily}}"
+        FontSize="{DynamicResource {x:Static SystemFonts.MessageFontSize}}">
     <Window.Resources>
-        <!-- Dark theme styles using global resources -->
-        <Style TargetType="Label">
-            <Setter Property="Foreground" Value="{DynamicResource PlotSettings_LabelForegroundBrush}"/>
-            <Setter Property="FontSize" Value="12"/>
+        <!-- Dark theme styles using global resources and system fonts -->
+        <Style TargetType="Label" BasedOn="{StaticResource LabelStyle}">
+            <!-- Inherits system font settings from LabelStyle in App.xaml -->
         </Style>
-        <Style TargetType="ComboBox">
-            <Setter Property="Background" Value="{DynamicResource PlotSettings_TextBoxBackgroundBrush}"/>
-            <Setter Property="Foreground" Value="{DynamicResource PlotSettings_LabelForegroundBrush}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource PlotSettings_BorderBrush}"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="FontSize" Value="12"/>
-            <Setter Property="Padding" Value="5,3"/>
-        </Style>
-        <Style TargetType="TextBox">
+        <Style TargetType="ComboBox" BasedOn="{StaticResource SystemFontStyle}">
             <Setter Property="Background" Value="{DynamicResource PlotSettings_TextBoxBackgroundBrush}"/>
             <Setter Property="Foreground" Value="{DynamicResource PlotSettings_LabelForegroundBrush}"/>
             <Setter Property="BorderBrush" Value="{DynamicResource PlotSettings_BorderBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Padding" Value="5,3"/>
-            <Setter Property="FontSize" Value="12"/>
         </Style>
-        <Style TargetType="Button">
-            <Setter Property="Background" Value="{DynamicResource PlotSettings_TextBoxBackgroundBrush}"/>
-            <Setter Property="Foreground" Value="{DynamicResource PlotSettings_ButtonForegroundBrush}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource PlotSettings_BorderBrush}"/>
+        <Style TargetType="TextBox" BasedOn="{StaticResource TextBoxStyle}">
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="5,3"/>
+        </Style>
+        <Style TargetType="Button" BasedOn="{StaticResource ButtonStyle}">
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Padding" Value="10,5"/>
-            <Setter Property="FontSize" Value="12"/>
         </Style>
         <!-- Custom close button style -->
         <Style x:Key="CloseButtonStyle" TargetType="Button">
@@ -75,7 +67,7 @@
                 </Grid.ColumnDefinitions>
                 <TextBlock Grid.Column="0" Text="Filter Configuration" 
                            Foreground="{DynamicResource PlotSettings_LabelForegroundBrush}" 
-                           FontSize="14" FontWeight="SemiBold"
+                           FontWeight="SemiBold"
                            VerticalAlignment="Center" 
                            Margin="15,8"/>
                 <!-- Close button -->
@@ -116,7 +108,7 @@
                     
                     <!-- Information text about immediate application -->
                     <TextBlock Text="Changes are applied immediately" 
-                              FontSize="11" FontStyle="Italic" 
+                              FontStyle="Italic" 
                               Foreground="{DynamicResource PlotSettings_LabelForegroundBrush}" 
                               Opacity="0.7" 
                               HorizontalAlignment="Center" 

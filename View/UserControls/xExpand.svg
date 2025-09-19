@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title">
+  <title>Scale X — expand (more cycles)</title>
+  <!-- Sine: more cycles -->
+  <path d="M8 24 C10 16,14 16,16 24 S22 32,24 24 S30 16,32 24 S38 32,40 24"
+        stroke="#E6EAF2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <!-- Outward horizontal arrows -->
+  <line x1="24" y1="36" x2="12" y2="36" stroke="#22D3EE" stroke-width="2" stroke-linecap="round"/>
+  <path d="M14 34 L12 36 L14 38" stroke="#22D3EE" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <line x1="24" y1="36" x2="36" y2="36" stroke="#22D3EE" stroke-width="2" stroke-linecap="round"/>
+  <path d="M34 34 L36 36 L34 38" stroke="#22D3EE" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>

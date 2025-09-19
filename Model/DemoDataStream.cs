@@ -6,7 +6,7 @@ using System.Collections.Generic;
 
 namespace PowerScope.Model
 {
-    public class DemoDataStream : IDataStream, IChannelConfigurable
+    public class DemoDataStream : IDataStream, IChannelConfigurable, IBufferResizable
     {
         private bool _disposed = false;
         private bool _isConnected = false;
@@ -87,11 +87,7 @@ namespace PowerScope.Model
             
             // Initialize ring buffers for each channel
             int ringBufferSize = Math.Max(500000, demoSettings.SampleRate * 10); // 10 seconds of data
-            ReceivedData = new RingBuffer<double>[ChannelCount];
-            for (int i = 0; i < ChannelCount; i++)
-            {
-                ReceivedData[i] = new RingBuffer<double>(ringBufferSize);
-            }
+            InitializeRingBuffers(ringBufferSize);
             
             // Initialize channel processing arrays
             _channelSettings = new ChannelSettings[ChannelCount];
@@ -99,6 +95,74 @@ namespace PowerScope.Model
             
             StatusMessage = "Disconnected";
         }
+
+        private void InitializeRingBuffers(int bufferSize)
+        {
+            ReceivedData = new RingBuffer<double>[ChannelCount];
+            for (int i = 0; i < ChannelCount; i++)
+            {
+                ReceivedData[i] = new RingBuffer<double>(bufferSize);
+            }
+        }
+
+        #region IBufferResizable Implementation
+
+        public int BufferSize 
+        { 
+            get 
+            { 
+                lock (_dataLock)
+                {
+                    return ReceivedData?[0]?.Capacity ?? 0;
+                }
+            }
+        }
+
+        public void SetBufferSize(int newBufferSize)
+        {
+            if (newBufferSize <= 0)
+                return;
+
+            lock (_dataLock)
+            {
+                // Store streaming state
+                bool wasStreaming = _isStreaming;
+                
+                // Temporarily stop streaming if running
+                if (wasStreaming)
+                {
+                    StopStreaming();
+                }
+
+                // Clear existing data
+                if (ReceivedData != null)
+                {
+                    foreach (var buffer in ReceivedData)
+                    {
+                        buffer?.Clear();
+                    }
+                }
+
+                // Recreate ring buffers with new size
+                InitializeRingBuffers(newBufferSize);
+                
+                // Reset statistics
+                TotalSamples = 0;
+                TotalBits = 0;
+                _timeAccumulator = 0;
+
+                // Restart streaming if it was running before
+                if (wasStreaming && _isConnected)
+                {
+                    StartStreaming();
+                }
+            }
+            
+            // Notify that buffer size changed
+            OnPropertyChanged(nameof(BufferSize));
+        }
+
+        #endregion
 
         #region IChannelConfigurable Implementation
 

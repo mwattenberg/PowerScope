@@ -5,45 +5,36 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:PowerScope.View.UserForms"
         mc:Ignorable="d"
-        Title="Plot Settings" Height="528" Width="400" 
+        Title="Plot Settings" Height="432" Width="401" 
         WindowStyle="None"
         AllowsTransparency="True"
         ResizeMode="NoResize" 
         WindowStartupLocation="CenterScreen"
-        Background="Transparent">
+        Background="Transparent"
+        FontFamily="{DynamicResource {x:Static SystemFonts.MessageFontFamily}}"
+        FontSize="{DynamicResource {x:Static SystemFonts.MessageFontSize}}">
     <Window.Resources>
-        <!-- Dark theme styles using global resources -->
-        <Style TargetType="Label">
-            <Setter Property="Foreground" Value="{DynamicResource PlotSettings_LabelForegroundBrush}"/>
-            <Setter Property="FontSize" Value="12"/>
+        <!-- Dark theme styles using global resources and system fonts -->
+        <Style TargetType="Label" BasedOn="{StaticResource LabelStyle}">
+            <!-- Inherits system font settings from LabelStyle in App.xaml -->
         </Style>
-        <Style TargetType="TextBox">
+        <Style TargetType="TextBox" BasedOn="{StaticResource TextBoxStyle}">
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="5,3"/>
+        </Style>
+        <Style TargetType="CheckBox" BasedOn="{StaticResource SystemFontStyle}">
+            <Setter Property="Foreground" Value="{DynamicResource PlotSettings_LabelForegroundBrush}"/>
+        </Style>
+        <Style TargetType="ComboBox" BasedOn="{StaticResource SystemFontStyle}">
             <Setter Property="Background" Value="{DynamicResource PlotSettings_TextBoxBackgroundBrush}"/>
             <Setter Property="Foreground" Value="{DynamicResource PlotSettings_LabelForegroundBrush}"/>
             <Setter Property="BorderBrush" Value="{DynamicResource PlotSettings_BorderBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Padding" Value="5,3"/>
-            <Setter Property="FontSize" Value="12"/>
         </Style>
-        <Style TargetType="CheckBox">
-            <Setter Property="Foreground" Value="{DynamicResource PlotSettings_LabelForegroundBrush}"/>
-            <Setter Property="FontSize" Value="12"/>
-        </Style>
-        <Style TargetType="ComboBox">
-            <Setter Property="Background" Value="{DynamicResource PlotSettings_TextBoxBackgroundBrush}"/>
-            <Setter Property="Foreground" Value="{DynamicResource PlotSettings_LabelForegroundBrush}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource PlotSettings_BorderBrush}"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Padding" Value="5,3"/>
-            <Setter Property="FontSize" Value="12"/>
-        </Style>
-        <Style TargetType="Button">
-            <Setter Property="Background" Value="{DynamicResource PlotSettings_TextBoxBackgroundBrush}"/>
-            <Setter Property="Foreground" Value="{DynamicResource PlotSettings_ButtonForegroundBrush}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource PlotSettings_BorderBrush}"/>
+        <Style TargetType="Button" BasedOn="{StaticResource ButtonStyle}">
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Padding" Value="10,5"/>
-            <Setter Property="FontSize" Value="12"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
@@ -92,16 +83,20 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        <!-- Style for small control buttons -->
+        <Style x:Key="SmallButtonStyle" TargetType="Button" BasedOn="{StaticResource ButtonStyle}">
+            <Setter Property="FontSize" Value="8"/>
+        </Style>
     </Window.Resources>
     <!-- Main container with border and drop shadow -->
     <Border Background="{DynamicResource PlotSettings_BackgroundBrush}" 
             BorderBrush="{DynamicResource PlotSettings_BorderBrush}" 
             BorderThickness="1"
-            CornerRadius="5">
+            CornerRadius="5" Margin="0,0,0,10">
         <Border.Effect>
             <DropShadowEffect Color="{DynamicResource PlotSettings_ShadowColor}" BlurRadius="10" ShadowDepth="3" Opacity="0.5"/>
         </Border.Effect>
-        <Grid Margin="0">
+        <Grid Margin="0,0,-1,110">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
@@ -116,7 +111,7 @@
                 </Grid.ColumnDefinitions>
                 <TextBlock Grid.Column="0" Text="Plot Settings" 
                            Foreground="{DynamicResource PlotSettings_LabelForegroundBrush}" 
-                           FontSize="14" FontWeight="SemiBold"
+                           FontWeight="SemiBold"
                            VerticalAlignment="Center" 
                            Margin="15,8"/>
                 <!-- Close button -->
@@ -128,157 +123,166 @@
             </Grid>
             <!-- Header -->
             <TextBlock Grid.Row="1" Text="Configure plot and rendering settings" 
-                       FontSize="12" 
                        Foreground="{DynamicResource PlotSettings_HeaderForegroundBrush}" 
-                       Margin="20,15,20,5"/>
+                       Margin="14,10,14,3"/>
             <!-- Settings Content -->
-            <StackPanel Grid.Row="2" Margin="20,10,20,0">
+            <StackPanel Grid.Row="2" Margin="14,7,14,-99" Grid.RowSpan="2">
                 <!-- Plot Update Rate (FPS) -->
-                <Grid Margin="0,0,0,15">
+                <Grid Margin="0,0,0,10">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="150"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
-                    
+
                     <Label Grid.Column="0" Content="Plot Update Rate (FPS):" VerticalAlignment="Center"/>
                     <ComboBox x:Name="ComboBoxPlotFPS" Grid.Column="1" VerticalAlignment="Center" 
                               SelectedValue="{Binding PlotUpdateRateFpsOption}"
                               DisplayMemberPath="DisplayText"
                               SelectedValuePath="Value"/>
                 </Grid>
-                
+
                 <!-- Line Width -->
-                <Grid Margin="0,0,0,15">
+                <Grid Margin="0,0,0,10">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="150"/>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="60"/>
                     </Grid.ColumnDefinitions>
-                    
+
                     <Label Grid.Column="0" Content="Line Width:" VerticalAlignment="Center"/>
                     <TextBox x:Name="TextBoxLineWidth" Grid.Column="1" VerticalAlignment="Center" 
                              Text="{Binding LineWidth}"
                              PreviewTextInput="NumbersOnly_PreviewTextInput"/>
-                    <StackPanel Grid.Column="2" Orientation="Vertical" Margin="5,0,0,0">
-                        <Button x:Name="ButtonLineWidthUp" Content="▲" Height="15" FontSize="8" 
+                    <StackPanel Grid.Column="2" Orientation="Vertical" Margin="3,0,0,0">
+                        <Button x:Name="ButtonLineWidthUp" Content="▲" Height="15" 
+                                Style="{StaticResource SmallButtonStyle}"
                                 Click="ButtonLineWidthUp_Click" Margin="0,0,0,1"/>
-                        <Button x:Name="ButtonLineWidthDown" Content="▼" Height="15" FontSize="8" 
+                        <Button x:Name="ButtonLineWidthDown" Content="▼" Height="15" 
+                                Style="{StaticResource SmallButtonStyle}"
                                 Click="ButtonLineWidthDown_Click"/>
                     </StackPanel>
                 </Grid>
-                
+
                 <!-- Anti-Aliasing -->
-                <Grid Margin="0,0,0,15">
+                <Grid Margin="0,0,0,10">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="150"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
-                    
+
                     <Label Grid.Column="0" Content="Anti-Aliasing:" VerticalAlignment="Center"/>
                     <CheckBox x:Name="CheckBoxAntiAliasing" Grid.Column="1" VerticalAlignment="Center" 
                               IsChecked="{Binding AntiAliasing}"/>
                 </Grid>
-                
+
                 <!-- Show Render Time -->
-                <Grid Margin="0,0,0,15">
+                <Grid Margin="0,0,0,10">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="150"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
-                    
+
                     <Label Grid.Column="0" Content="Show Render Time:" VerticalAlignment="Center"/>
                     <CheckBox x:Name="CheckBoxShowRenderTime" Grid.Column="1" VerticalAlignment="Center" 
                               IsChecked="{Binding ShowRenderTime}"/>
                 </Grid>
 
                 <!-- Y-Axis Auto Scale -->
-                <Grid Margin="0,0,0,15">
+                <Grid Margin="0,0,0,10">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="150"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
-                    
+
                     <Label Grid.Column="0" Content="Y-Axis Auto Scale:" VerticalAlignment="Center"/>
                     <CheckBox x:Name="CheckBoxYAutoScale" Grid.Column="1" VerticalAlignment="Center" 
                               IsChecked="{Binding YAutoScale}"/>
                 </Grid>
 
                 <!-- X Min -->
-                <Grid Margin="0,0,0,15">
+                <Grid Margin="0,0,0,10">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="150"/>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="60"/>
                     </Grid.ColumnDefinitions>
-                    
+
                     <Label Grid.Column="0" Content="X Min:" VerticalAlignment="Center"/>
                     <TextBox x:Name="TextBoxXMin" Grid.Column="1" VerticalAlignment="Center" 
                              Text="{Binding Xmin}"
                              PreviewTextInput="NumbersOnly_PreviewTextInput"/>
-                    <StackPanel Grid.Column="2" Orientation="Vertical" Margin="5,0,0,0">
-                        <Button x:Name="ButtonXMinUp" Content="▲" Height="15" FontSize="8" 
+                    <StackPanel Grid.Column="2" Orientation="Vertical" Margin="3,0,0,0">
+                        <Button x:Name="ButtonXMinUp" Content="▲" Height="15" 
+                                Style="{StaticResource SmallButtonStyle}"
                                 Click="ButtonXMinUp_Click" Margin="0,0,0,1"/>
-                        <Button x:Name="ButtonXMinDown" Content="▼" Height="15" FontSize="8" 
+                        <Button x:Name="ButtonXMinDown" Content="▼" Height="15" 
+                                Style="{StaticResource SmallButtonStyle}"
                                 Click="ButtonXMinDown_Click"/>
                     </StackPanel>
                 </Grid>
 
                 <!-- X Max -->
-                <Grid Margin="0,0,0,15">
+                <Grid Margin="0,0,0,10">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="150"/>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="60"/>
                     </Grid.ColumnDefinitions>
-                    
+
                     <Label Grid.Column="0" Content="X Max:" VerticalAlignment="Center"/>
                     <TextBox x:Name="TextBoxXMax" Grid.Column="1" VerticalAlignment="Center" 
                              Text="{Binding Xmax}"
                              PreviewTextInput="NumbersOnly_PreviewTextInput"/>
-                    <StackPanel Grid.Column="2" Orientation="Vertical" Margin="5,0,0,0">
-                        <Button x:Name="ButtonXMaxUp" Content="▲" Height="15" FontSize="8" 
+                    <StackPanel Grid.Column="2" Orientation="Vertical" Margin="3,0,0,0">
+                        <Button x:Name="ButtonXMaxUp" Content="▲" Height="15" 
+                                Style="{StaticResource SmallButtonStyle}"
                                 Click="ButtonXMaxUp_Click" Margin="0,0,0,1"/>
-                        <Button x:Name="ButtonXMaxDown" Content="▼" Height="15" FontSize="8" 
+                        <Button x:Name="ButtonXMaxDown" Content="▼" Height="15" 
+                                Style="{StaticResource SmallButtonStyle}"
                                 Click="ButtonXMaxDown_Click"/>
                     </StackPanel>
                 </Grid>
 
                 <!-- Y Min -->
-                <Grid Margin="0,0,0,15">
+                <Grid Margin="0,0,0,10">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="150"/>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="60"/>
                     </Grid.ColumnDefinitions>
-                    
+
                     <Label Grid.Column="0" Content="Y Min:" VerticalAlignment="Center"/>
                     <TextBox x:Name="TextBoxYMin" Grid.Column="1" VerticalAlignment="Center" 
                              Text="{Binding Ymin}"
                              PreviewTextInput="SignedNumbersOnly_PreviewTextInput"/>
-                    <StackPanel Grid.Column="2" Orientation="Vertical" Margin="5,0,0,0">
-                        <Button x:Name="ButtonYMinUp" Content="▲" Height="15" FontSize="8" 
+                    <StackPanel Grid.Column="2" Orientation="Vertical" Margin="3,0,0,0">
+                        <Button x:Name="ButtonYMinUp" Content="▲" Height="15" 
+                                Style="{StaticResource SmallButtonStyle}"
                                 Click="ButtonYMinUp_Click" Margin="0,0,0,1"/>
-                        <Button x:Name="ButtonYMinDown" Content="▼" Height="15" FontSize="8" 
+                        <Button x:Name="ButtonYMinDown" Content="▼" Height="15" 
+                                Style="{StaticResource SmallButtonStyle}"
                                 Click="ButtonYMinDown_Click"/>
                     </StackPanel>
                 </Grid>
 
                 <!-- Y Max -->
-                <Grid Margin="0,0,0,15">
+                <Grid Margin="0,0,0,10">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="150"/>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="60"/>
                     </Grid.ColumnDefinitions>
-                    
+
                     <Label Grid.Column="0" Content="Y Max:" VerticalAlignment="Center"/>
                     <TextBox x:Name="TextBoxYMax" Grid.Column="1" VerticalAlignment="Center" 
                              Text="{Binding Ymax}"
                              PreviewTextInput="SignedNumbersOnly_PreviewTextInput"/>
-                    <StackPanel Grid.Column="2" Orientation="Vertical" Margin="5,0,0,0">
-                        <Button x:Name="ButtonYMaxUp" Content="▲" Height="15" FontSize="8" 
+                    <StackPanel Grid.Column="2" Orientation="Vertical" Margin="3,0,0,0">
+                        <Button x:Name="ButtonYMaxUp" Content="▲" Height="15" 
+                                Style="{StaticResource SmallButtonStyle}"
                                 Click="ButtonYMaxUp_Click" Margin="0,0,0,1"/>
-                        <Button x:Name="ButtonYMaxDown" Content="▼" Height="15" FontSize="8" 
+                        <Button x:Name="ButtonYMaxDown" Content="▼" Height="15" 
+                                Style="{StaticResource SmallButtonStyle}"
                                 Click="ButtonYMaxDown_Click"/>
                     </StackPanel>
                 </Grid>

@@ -101,6 +101,7 @@ namespace PowerScope.Model
         private int _ymin = -200;
         private int _ymax = 4000;
         private bool _yAutoScale = true;
+        private int _bufferSize = 1000;
 
         /// <summary>
         /// Plot refresh rate option (enum-based)
@@ -266,6 +267,22 @@ namespace PowerScope.Model
                 {
                     _yAutoScale = value;
                     OnPropertyChanged(nameof(YAutoScale));
+                }
+            }
+        }
+
+        /// <summary>
+        /// Buffer size for the plot
+        /// </summary>
+        public int BufferSize
+        {
+            get { return _bufferSize; }
+            set
+            {
+                if (_bufferSize != value)
+                {
+                    _bufferSize = value;
+                    OnPropertyChanged(nameof(BufferSize));
                 }
             }
         }

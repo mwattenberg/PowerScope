@@ -1,4 +1,5 @@
 ﻿using System;
+using System.ComponentModel;
 using System.Globalization;
 using System.Text.RegularExpressions;
 using System.Windows;
@@ -50,9 +51,42 @@ namespace PowerScope.View.UserControls
         public ChannelControl()
         {
             InitializeComponent();
+            // Subscribe to DataContext changes to update play/pause button
+            DataContextChanged += ChannelControl_DataContextChanged;
+            // Subscribe to Loaded event to ensure initial state is set
+            Loaded += ChannelControl_Loaded;
         }
 
-        private void TopColorBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        private void ChannelControl_Loaded(object sender, RoutedEventArgs e)
+        {
+            UpdatePlayPauseButton();
+        }
+
+        private void ChannelControl_DataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
+        {
+            // Unsubscribe from old settings
+            if (e.OldValue is ChannelSettings oldSettings)
+            {
+                oldSettings.PropertyChanged -= Settings_PropertyChanged;
+            }
+
+            // Subscribe to new settings
+            if (e.NewValue is ChannelSettings newSettings)
+            {
+                newSettings.PropertyChanged += Settings_PropertyChanged;
+                UpdatePlayPauseButton(); // Update button when DataContext changes
+            }
+        }
+
+        private void Settings_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(ChannelSettings.IsEnabled))
+            {
+                UpdatePlayPauseButton();
+            }
+        }
+
+        private void PlayPauseButton_Click(object sender, RoutedEventArgs e)
         {
             // Toggle the enabled state
             if (Settings != null)
@@ -60,6 +94,26 @@ namespace PowerScope.View.UserControls
 
             // Prevent the event from bubbling up to RootGrid
             e.Handled = true;
+        }
+
+        private void UpdatePlayPauseButton()
+        {
+            var playPauseIcon = this.FindName("PlayPauseIcon") as TextBlock;
+            var playPauseButton = this.FindName("PlayPauseButton") as Button;
+            
+            if (playPauseIcon != null && playPauseButton != null && Settings != null)
+            {
+                if (Settings.IsEnabled)
+                {
+                    playPauseIcon.Text = "⏸"; // Pause symbol for enabled (running) state
+                    playPauseButton.ToolTip = "Disable channel";
+                }
+                else
+                {
+                    playPauseIcon.Text = "▶"; // Play symbol for disabled (stopped) state
+                    playPauseButton.ToolTip = "Enable channel";
+                }
+            }
         }
 
         private void ButtonGainUp_Click(object sender, RoutedEventArgs e)

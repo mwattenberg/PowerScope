@@ -41,14 +41,8 @@ namespace PowerScope
 
             readSettingsXML();
             
-            // Initialize channel display based on current streams
-            int totalChannels = DataStreamBar.TotalChannelCount;
-            _plotManager.SetDataStreams(DataStreamBar.ConnectedDataStreams);
-            
-            // Update ChannelControlBar from DataStreamBar
-            ChannelControlBar.UpdateFromDataStreamBar(DataStreamBar);
-            _plotManager.SetChannelSettings(ChannelControlBar.ChannelSettings);
-            _plotManager.UpdateChannelDisplay(totalChannels);
+            // Initialize channel display based on current streams - simplified with Channel-centric approach
+            _plotManager.SetChannels(DataStreamBar.Channels);
         }
 
         void InitializeControls()
@@ -68,12 +62,14 @@ namespace PowerScope
             _plotManager.Settings.Ymax = 4000;
             _plotManager.Settings.Ymin = 0;
             
-            HorizontalControl.BufferSize = 5000000; // Set initial buffer size
+            // Set initial buffer size in PlotSettings (automatically propagates to UI via data binding)
+            _plotManager.Settings.BufferSize = 5000000;
         }
 
         private void InitializeEventHandlers()
         {
             RunControl.RunStateChanged += RunControl_RunStateChanged;
+            RunControl.ClearClicked += RunControl_ClearClicked;
 
             // Subscribe directly to ObservableCollection.CollectionChanged for automatic notifications
             DataStreamBar.Channels.CollectionChanged += OnChannelsCollectionChanged;
@@ -81,12 +77,11 @@ namespace PowerScope
 
         private void OnChannelsCollectionChanged(object sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
         {
-            _plotManager.SetDataStreams(DataStreamBar.ConnectedDataStreams);
+            // Channel-centric approach: simply pass the channels collection to PlotManager
+            _plotManager.SetChannels(DataStreamBar.Channels);
             
             // Update ChannelControlBar from DataStreamBar
             ChannelControlBar.UpdateFromDataStreamBar(DataStreamBar);
-            _plotManager.SetChannelSettings(ChannelControlBar.ChannelSettings);
-            _plotManager.UpdateChannelDisplay(DataStreamBar.TotalChannelCount);
             
             // Refresh measurements when channels change
             MeasurementBar.RefreshMeasurements();
@@ -104,6 +99,11 @@ namespace PowerScope
                 _plotManager.StopUpdates();
                 MeasurementBar.StopUpdates();
             }
+        }
+
+        private void RunControl_ClearClicked(object sender, EventArgs e)
+        {
+            _plotManager.Clear();
         }
 
         /// <summary>
@@ -149,9 +149,5 @@ namespace PowerScope
             settingsWindow.Show();
         }
 
-        private void Scrollbar_ValueChanged(object sender, System.Windows.Controls.Primitives.ScrollEventArgs e)
-        {
-            double test = e.NewValue;
-        }
     }
 }

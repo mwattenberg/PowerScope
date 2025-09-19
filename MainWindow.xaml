@@ -9,7 +9,8 @@
         xmlns:local="clr-namespace:PowerScope"
         mc:Ignorable="d"
         Title="PowerScope" Height="850" Width="1600"
-        
+        FontFamily="{DynamicResource {x:Static SystemFonts.MessageFontFamily}}"
+        FontSize="{DynamicResource {x:Static SystemFonts.MessageFontSize}}"
         Background="{DynamicResource PlotSettings_BackgroundBrush}">
     <Grid Background="{DynamicResource PlotSettings_BackgroundBrush}">
         <Grid.RowDefinitions>
@@ -36,7 +37,6 @@
                 </Grid.RowDefinitions>
                 <ScottPlot:WpfPlotGL x:Name="WpfPlot1" Grid.Row="0" Margin="15"/>
                 <Button x:Name="Button_ConfigPlot" Panel.ZIndex="1" Height="20" Width="20" HorizontalAlignment="Right" VerticalAlignment="Top" Content="🔨" Margin="5,5,5,5" Click="Button_ConfigPlot_Click" Grid.Row="0"/>
-                <ScrollBar x:Name="PlotScrollBar" Grid.Row="1" Orientation="Horizontal" Height="6" Margin="0,2,0,0" Background="{DynamicResource PlotSettings_BackgroundBrush}" Maximum="100" SmallChange="0.5" Value="100" Cursor="ScrollWE" ViewportSize="5" Foreground="Black" BorderBrush="{DynamicResource PlotSettings_BorderBrush}" Scroll="Scrollbar_ValueChanged"/>
             </Grid>
             <!-- MeasurementBar (right) -->
             <UserControls:MeasurementBar Grid.Column="2" x:Name="MeasurementBar" Height="609" VerticalAlignment="Top"/>

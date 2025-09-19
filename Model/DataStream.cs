@@ -61,4 +61,22 @@ namespace PowerScope.Model
         /// </summary>
         void ResetChannelFilters();
     }
+
+    /// <summary>
+    /// Interface for data streams that support runtime buffer size changes
+    /// </summary>
+    public interface IBufferResizable
+    {
+        /// <summary>
+        /// Gets the current buffer size (capacity of ring buffers)
+        /// </summary>
+        int BufferSize { get; }
+        
+        /// <summary>
+        /// Updates the buffer size for all channels
+        /// Note: This will clear existing data and recreate ring buffers
+        /// </summary>
+        /// <param name="newBufferSize">New buffer size to set</param>
+        void SetBufferSize(int newBufferSize);
+    }
 }

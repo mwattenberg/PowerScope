@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title">
+  <title>Scale Y — expand (greater amplitude)</title>
+  <!-- Sine: larger amplitude -->
+  <path d="M8 24 C14 14,18 14,24 24 S34 34,40 24"
+        stroke="#E6EAF2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <!-- Outward vertical arrows -->
+  <line x1="42" y1="24" x2="42" y2="14" stroke="#22D3EE" stroke-width="2" stroke-linecap="round"/>
+  <path d="M40 16 L42 14 L44 16" stroke="#22D3EE" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <line x1="42" y1="24" x2="42" y2="34" stroke="#22D3EE" stroke-width="2" stroke-linecap="round"/>
+  <path d="M40 32 L42 34 L44 32" stroke="#22D3EE" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>

@@ -11,20 +11,17 @@
         AllowsTransparency="True"
         ResizeMode="NoResize" 
         WindowStartupLocation="CenterScreen"
-        Background="Transparent">
+        Background="Transparent"
+        FontFamily="{DynamicResource {x:Static SystemFonts.MessageFontFamily}}"
+        FontSize="{DynamicResource {x:Static SystemFonts.MessageFontSize}}">
     <Window.Resources>
-        <!-- Dark theme styles using global resources (same as StreamConfigWindow) -->
-        <Style TargetType="Label">
-            <Setter Property="Foreground" Value="{DynamicResource PlotSettings_LabelForegroundBrush}"/>
-            <Setter Property="FontSize" Value="12"/>
+        <!-- Dark theme styles using global resources and system fonts -->
+        <Style TargetType="Label" BasedOn="{StaticResource LabelStyle}">
+            <!-- Inherits system font settings from LabelStyle in App.xaml -->
         </Style>
-        <Style TargetType="Button">
-            <Setter Property="Background" Value="{DynamicResource PlotSettings_TextBoxBackgroundBrush}"/>
-            <Setter Property="Foreground" Value="{DynamicResource PlotSettings_ButtonForegroundBrush}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource PlotSettings_BorderBrush}"/>
+        <Style TargetType="Button" BasedOn="{StaticResource ButtonStyle}">
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Padding" Value="10,5"/>
-            <Setter Property="FontSize" Value="12"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
@@ -81,6 +78,13 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        <!-- Style for small text labels under icons -->
+        <Style x:Key="SmallLabelStyle" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="{DynamicResource {x:Static SystemFonts.MessageFontFamily}}"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="Foreground" Value="{DynamicResource PlotSettings_LabelForegroundBrush}"/>
+        </Style>
     </Window.Resources>
     
     <!-- Main container with border and drop shadow -->
@@ -106,7 +110,7 @@
                 </Grid.ColumnDefinitions>
                 <TextBlock Grid.Column="0" Text="Select Measurement Type" 
                            Foreground="{DynamicResource PlotSettings_LabelForegroundBrush}" 
-                           FontSize="14" FontWeight="SemiBold"
+                           FontWeight="SemiBold"
                            VerticalAlignment="Center" 
                            Margin="15,8"/>
                 <!-- Close button -->
@@ -129,8 +133,7 @@
                             ToolTip="Minimum value in the data set">
                         <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
                             <svgc:SvgViewbox Source="/Icons/min.svg" Width="32" Height="32" Margin="5"/>
-                            <TextBlock Text="Minimum" FontSize="11" HorizontalAlignment="Center" 
-                                      Foreground="{DynamicResource PlotSettings_LabelForegroundBrush}"/>
+                            <TextBlock Text="Minimum" Style="{StaticResource SmallLabelStyle}"/>
                         </StackPanel>
                     </Button>
 
@@ -142,8 +145,7 @@
                             ToolTip="Maximum value in the data set">
                         <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
                             <svgc:SvgViewbox Source="/Icons/max.svg" Width="32" Height="32" Margin="5"/>
-                            <TextBlock Text="Maximum" FontSize="11" HorizontalAlignment="Center" 
-                                      Foreground="{DynamicResource PlotSettings_LabelForegroundBrush}"/>
+                            <TextBlock Text="Maximum" Style="{StaticResource SmallLabelStyle}"/>
                         </StackPanel>
                     </Button>
 
@@ -155,8 +157,7 @@
                             ToolTip="Average (mean) value of the data set">
                         <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
                             <svgc:SvgViewbox Source="/Icons/AVG.svg" Width="32" Height="32" Margin="5"/>
-                            <TextBlock Text="Mean" FontSize="11" HorizontalAlignment="Center" 
-                                      Foreground="{DynamicResource PlotSettings_LabelForegroundBrush}"/>
+                            <TextBlock Text="Mean" Style="{StaticResource SmallLabelStyle}"/>
                         </StackPanel>
                     </Button>
 
@@ -168,8 +169,7 @@
                             ToolTip="Root Mean Square (RMS) value">
                         <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
                             <svgc:SvgViewbox Source="/Icons/RMS.svg" Width="32" Height="32" Margin="5"/>
-                            <TextBlock Text="RMS" FontSize="11" HorizontalAlignment="Center" 
-                                      Foreground="{DynamicResource PlotSettings_LabelForegroundBrush}"/>
+                            <TextBlock Text="RMS" Style="{StaticResource SmallLabelStyle}"/>
                         </StackPanel>
                     </Button>
 
@@ -181,8 +181,7 @@
                             ToolTip="Standard deviation of the data set">
                         <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
                             <svgc:SvgViewbox Source="/Icons/StdDev.svg" Width="32" Height="32" Margin="5"/>
-                            <TextBlock Text="Std Dev" FontSize="11" HorizontalAlignment="Center" 
-                                      Foreground="{DynamicResource PlotSettings_LabelForegroundBrush}"/>
+                            <TextBlock Text="Std Dev" Style="{StaticResource SmallLabelStyle}"/>
                         </StackPanel>
                     </Button>
 
@@ -194,8 +193,7 @@
                             ToolTip="Variance of the data set">
                         <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
                             <svgc:SvgViewbox Source="/Icons/Var.svg" Width="32" Height="32" Margin="5"/>
-                            <TextBlock Text="Variance" FontSize="11" HorizontalAlignment="Center" 
-                                      Foreground="{DynamicResource PlotSettings_LabelForegroundBrush}"/>
+                            <TextBlock Text="Variance" Style="{StaticResource SmallLabelStyle}"/>
                         </StackPanel>
                     </Button>
 
@@ -207,8 +205,7 @@
                             ToolTip="Peak-to-Peak value (Maximum - Minimum)">
                         <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
                             <svgc:SvgViewbox Source="/Icons/PkPk.svg" Width="32" Height="32" Margin="5"/>
-                            <TextBlock Text="Peak-Peak" FontSize="11" HorizontalAlignment="Center" 
-                                      Foreground="{DynamicResource PlotSettings_LabelForegroundBrush}"/>
+                            <TextBlock Text="Peak-Peak" Style="{StaticResource SmallLabelStyle}"/>
                         </StackPanel>
                     </Button>
 

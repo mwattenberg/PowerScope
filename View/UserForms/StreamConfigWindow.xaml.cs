@@ -8,6 +8,7 @@ using NAudio.CoreAudioApi;
 using System.Management;
 using System.Collections.Generic;
 using System.Windows.Input;
+using System.Text.RegularExpressions;
 using PowerScope.Model;
 
 namespace PowerScope.View.UserForms
@@ -88,11 +89,6 @@ namespace PowerScope.View.UserForms
             ComboBox_Port.SelectedValuePath = "Port";
 
             // Pre-populate baud rates, allow user to edit
-            ComboBox_Baud.ItemsSource = new string[]
-            {
-                "9600", "19200", "57600", "115200", "256000"
-            };
-            ComboBox_Baud.IsEditable = true;
         }
 
         private void SerialConfigWindow_Loaded_AudioDevices(object sender, RoutedEventArgs e)
@@ -298,10 +294,17 @@ namespace PowerScope.View.UserForms
         {
             get
             {
-                int.TryParse(ComboBox_Baud.Text, out int baud);
-                return baud;
+                var textBox = this.FindName("TextBox_Baud") as TextBox;
+                if (textBox != null && int.TryParse(textBox.Text, out int baud))
+                    return baud;
+                return 0;
             }
-            set { ComboBox_Baud.Text = value.ToString(); }
+            set 
+            { 
+                var textBox = this.FindName("TextBox_Baud") as TextBox;
+                if (textBox != null)
+                    textBox.Text = value.ToString(); 
+            }
         }
 
         public int SelectedDataBits
@@ -536,6 +539,55 @@ namespace PowerScope.View.UserForms
                 }
                 // USB tab would set StreamSource.USB when implemented
             }
+        }
+
+        // Input validation methods
+        private void NumbersOnly_PreviewTextInput(object sender, TextCompositionEventArgs e)
+        {
+            // Allow only digits
+            e.Handled = !IsNumeric(e.Text);
+        }
+
+        private void BaudOnly_PreviewTextInput(object sender, TextCompositionEventArgs e)
+        {
+            var textBox = sender as TextBox;
+            var newText = textBox.Text.Insert(textBox.SelectionStart, e.Text);
+            // Allow numbers and 'e' for scientific notation (e.g., 1e6 for 1000000)
+            e.Handled = !IsBaudRate(newText);
+        }
+
+        private static bool IsNumeric(string text)
+        {
+            return Regex.IsMatch(text, @"^[0-9]+$");
+        }
+
+        private static bool IsBaudRate(string text)
+        {
+            // Allow empty string (for typing)
+            if (string.IsNullOrEmpty(text))
+                return true;
+                
+            // Allow numbers and one 'e' or 'E' for scientific notation
+            // Examples: 115200, 1e6, 2e5, 1E6
+            
+            // Basic pattern: digits, optional decimal point, more digits, optional e/E, optional digits
+            if (!Regex.IsMatch(text, @"^[0-9]*\.?[0-9]*[eE]?[0-9]*$"))
+                return false;
+                
+            // Additional validations
+            if (text == "." || text == "e" || text == "E" || text.EndsWith(".."))
+                return false;
+                
+            // Check for multiple 'e' or 'E'
+            var lowerText = text.ToLower();
+            if (lowerText.Count(c => c == 'e') > 1)
+                return false;
+                
+            // Don't allow 'e' at the beginning
+            if (text.StartsWith("e") || text.StartsWith("E"))
+                return false;
+                
+            return true;
         }
     }
 

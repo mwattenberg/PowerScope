@@ -20,6 +20,7 @@
 	<PublishTrimmed>false</PublishTrimmed>
 	<TrimMode>link</TrimMode>
 	<IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+	<ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
 
   <ItemGroup>
@@ -34,6 +35,14 @@
 
   <ItemGroup>
     <Resource Include="Icons\*.svg" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="View\UserControls\xExpand.svg" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="View\UserControls\xExpand.svg" />
   </ItemGroup>
 
 </Project>

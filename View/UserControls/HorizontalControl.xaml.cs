@@ -25,50 +25,15 @@ namespace PowerScope.View.UserControls
             }
         }
 
-        // Events
-        public event EventHandler<int> BufferSizeChanged;
-
-        // Properties
-        private int _bufferSize = 1000;
-
-        public int BufferSize
-        {
-            get 
-            { 
-                return _bufferSize; 
-            }
-            set
-            {
-                _bufferSize = Math.Clamp(value, 1000, 5000000);
-                BufferSizeTextBox.Text = _bufferSize.ToString();
-                if (BufferSizeChanged != null)
-                    BufferSizeChanged.Invoke(this, _bufferSize);
-            }
-        }
-
         public HorizontalControl()
         {
             InitializeComponent();
         }
 
-
-
-        private void Settings_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
-        {
-            if (e.PropertyName == nameof(PlotSettings.Xmax))
-                Dispatcher.BeginInvoke(new Action(UpdateUIFromSettings));
-        }
-
-        private void UpdateUIFromSettings()
-        {
-            if (Settings != null && SamplesTextBox != null)
-                SamplesTextBox.Text = Settings.Xmax.ToString();
-        }
-
         private void ButtonGrow_Click(object sender, RoutedEventArgs e)
         {
             if (Settings != null)
-                Settings.Xmax = Math.Min(Settings.Xmax * 2, BufferSize);
+                Settings.Xmax = Math.Min(Settings.Xmax * 2, Settings.BufferSize);
         }
 
         private void ButtonShrink_Click(object sender, RoutedEventArgs e)
@@ -79,15 +44,15 @@ namespace PowerScope.View.UserControls
 
         private void BufferSizeTextBox_TextChanged(object sender, TextChangedEventArgs e)
         {
-            int bufferSize;
-            if (int.TryParse(BufferSizeTextBox.Text, out bufferSize) && bufferSize != _bufferSize)
-                BufferSize = bufferSize;
+            if (int.TryParse(BufferSizeTextBox.Text, out int bufferSize) && Settings != null && bufferSize != Settings.BufferSize)
+            {
+                Settings.BufferSize = Math.Clamp(bufferSize, 1000, 100000000);
+            }
         }
 
         private void SamplesTextBox_TextChanged(object sender, TextChangedEventArgs e)
         {
-            int samples;
-            if (int.TryParse(SamplesTextBox.Text, out samples) && Settings != null && samples != Settings.Xmax)
+            if (int.TryParse(SamplesTextBox.Text, out int samples) && Settings != null && samples != Settings.Xmax)
                 Settings.Xmax = Math.Max(samples, 1);
         }
     }

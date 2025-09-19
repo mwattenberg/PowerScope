@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
@@ -16,8 +15,8 @@ namespace PowerScope.Model
 {
     /// <summary>
     /// Manager class for ScottPlot integration in WPF
-    /// Extended to bind directly to channel settings with automatic updates
-    /// Now manages its own update timer
+    /// Migrated to Channel-centric architecture - works directly with Channel objects
+    /// that encapsulate both data streams and settings
     /// </summary>
     public class PlotManager : INotifyPropertyChanged, IDisposable
     {
@@ -27,8 +26,7 @@ namespace PowerScope.Model
         private readonly Signal[] _signals;
         private readonly double[][] _data;
         private readonly int _maxChannels;
-        private List<IDataStream> _connectedStreams;
-        private ObservableCollection<ChannelSettings> _channelSettings;
+        private ObservableCollection<Channel> _channels;
 
         public PlotSettings Settings { get; private set; }
         
@@ -60,13 +58,11 @@ namespace PowerScope.Model
         {                
             _plot = wpfPlot;
             Settings = new PlotSettings();
-            _connectedStreams = new List<IDataStream>();
-            _channelSettings = new ObservableCollection<ChannelSettings>();
+            _channels = new ObservableCollection<Channel>();
 
-            
             // Initialize update timer with correct interval from settings
             _updateTimer = new DispatcherTimer(DispatcherPriority.Render);
-            _updateTimer.Interval = TimeSpan.FromMilliseconds(Settings.TimerInterval); // Use settings, not hardcoded!
+            _updateTimer.Interval = TimeSpan.FromMilliseconds(Settings.TimerInterval);
             _updateTimer.Tick += UpdatePlot;
 
             Settings.PropertyChanged += OnSettingsChanged;
@@ -76,7 +72,34 @@ namespace PowerScope.Model
             _data = new double[_maxChannels][];
         }
 
+        /// <summary>
+        /// Sets the channels collection for the plot manager
+        /// </summary>
+        /// <param name="channels">Collection of channels to display</param>
+        public void SetChannels(ObservableCollection<Channel> channels)
+        {
+            // Unsubscribe from old channels
+            if (_channels != null)
+            {
+                _channels.CollectionChanged -= OnChannelsCollectionChanged;
+                foreach (Channel channel in _channels)
+                {
+                    channel.PropertyChanged -= OnChannelPropertyChanged;
+                }
+            }
 
+            _channels = channels ?? new ObservableCollection<Channel>();
+
+            // Subscribe to new channels
+            _channels.CollectionChanged += OnChannelsCollectionChanged;
+            foreach (Channel channel in _channels)
+            {
+                channel.PropertyChanged += OnChannelPropertyChanged;
+            }
+
+            // Update the display
+            UpdateChannelDisplay();
+        }
 
         /// <summary>
         /// Start plot updates
@@ -136,79 +159,55 @@ namespace PowerScope.Model
                             _updateTimer.Interval = TimeSpan.FromMilliseconds(Settings.TimerInterval);
                         }
                         break;
+                        
+                    case nameof(PlotSettings.BufferSize):
+                        UpdateDataStreamBufferSizes();
+                        break;
                 }
             });
         }
 
-        public void SetChannelSettings(ObservableCollection<ChannelSettings> channelSettings)
-        {
-
-            _channelSettings.CollectionChanged -= OnChannelSettingsCollectionChanged;
-            foreach (ChannelSettings setting in _channelSettings)
-            {
-                setting.PropertyChanged -= OnChannelSettingChanged;
-            }
-
-
-            _channelSettings = channelSettings;
-
-
-            _channelSettings.CollectionChanged += OnChannelSettingsCollectionChanged;
-            foreach (ChannelSettings setting in _channelSettings)
-            {
-                setting.PropertyChanged += OnChannelSettingChanged;
-            }
-
-            
-            UpdateDataStreamChannelSettings();
-        }
-
-        private void OnChannelSettingsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+        private void OnChannelsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
         {
             if (e.NewItems != null)
             {
-                foreach (ChannelSettings setting in e.NewItems)
+                foreach (Channel channel in e.NewItems)
                 {
-                    setting.PropertyChanged += OnChannelSettingChanged;
+                    channel.PropertyChanged += OnChannelPropertyChanged;
                 }
             }
 
             if (e.OldItems != null)
             {
-                foreach (ChannelSettings setting in e.OldItems)
+                foreach (Channel channel in e.OldItems)
                 {
-                    setting.PropertyChanged -= OnChannelSettingChanged;
+                    channel.PropertyChanged -= OnChannelPropertyChanged;
                 }
             }
+
+            UpdateChannelDisplay();
         }
 
-        private void OnChannelSettingChanged(object? sender, PropertyChangedEventArgs e)
+        private void OnChannelPropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
             Application.Current.Dispatcher.BeginInvoke(() =>
             {
                 switch (e.PropertyName)
                 {
-                    case nameof(ChannelSettings.IsEnabled):
-                        UpdateChannelDisplay(NumberOfChannels);
+                    case nameof(Channel.IsEnabled):
+                    case "Settings.IsEnabled":
+                        UpdateChannelDisplay();
                         break;
                         
-                    case nameof(ChannelSettings.Color):
+                    case nameof(Channel.Color):
+                    case "Settings.Color":
                         ApplyChannelColors();
                         break;
-                            
-                    case nameof(ChannelSettings.Gain):
-                    case nameof(ChannelSettings.Offset):
-                    case nameof(ChannelSettings.Filter):
-                        UpdateDataStreamChannelSettings();
-                        break;
+                        
+                    // Other channel setting changes are handled by the Channel itself
+                    // since it applies settings directly to its owner stream
                 }
             });
-        }
-
-        public void SetDataStreams(List<IDataStream> connectedStreams)
-        {
-            _connectedStreams = connectedStreams;
-            UpdateDataStreamChannelSettings();
         }
 
         public void InitializePlot()
@@ -243,9 +242,15 @@ namespace PowerScope.Model
             _plot.Plot.Axes.Bottom.IsVisible = true;
         }
 
-        public void UpdateChannelDisplay(int channelCount)
+        private void UpdateChannelDisplay()
         {
-            NumberOfChannels = Math.Min(channelCount, _maxChannels);
+            if (_channels == null)
+            {
+                NumberOfChannels = 0;
+                return;
+            }
+
+            NumberOfChannels = Math.Min(_channels.Count, _maxChannels);
 
             // Remove existing signals
             for (int i = 0; i < _maxChannels; i++)
@@ -260,19 +265,14 @@ namespace PowerScope.Model
             // Add signals only for enabled channels
             for (int i = 0; i < NumberOfChannels; i++)
             {
-                bool isChannelEnabled = true;
-                if (_channelSettings != null && i < _channelSettings.Count && _channelSettings[i] != null)
-                    isChannelEnabled = _channelSettings[i].IsEnabled;
-
-                if (isChannelEnabled)
+                Channel channel = _channels[i];
+                
+                if (channel.IsEnabled)
                 {
                     _signals[i] = _plot.Plot.Add.Signal(_data[i]);
                     
-                    // Get color from ChannelSettings or fallback to palette
-                    Color channelColor = GetColor(i);
-                    if (_channelSettings != null && i < _channelSettings.Count && _channelSettings[i] != null)
-                        channelColor = _channelSettings[i].Color;
-                    
+                    // Use channel color
+                    Color channelColor = channel.Color;
                     _signals[i].Color = new ScottPlot.Color(channelColor.R, channelColor.G, channelColor.B);
                     _signals[i].MarkerShape = ScottPlot.MarkerShape.None;
                     _signals[i].LineWidth = (float)Settings.LineWidth;
@@ -283,15 +283,14 @@ namespace PowerScope.Model
             _plot.Refresh();
         }
 
-        // Update the UpdatePlot method signature to accept nullable sender
-        public void UpdatePlot(object? sender, EventArgs e)
+        private void UpdatePlot(object? sender, EventArgs e)
         {
             if (Application.Current == null)
                 return;
 
             _plot.Plot.RenderManager.EnableRendering = false;
 
-            CopyStreamDataToPlot();
+            CopyChannelDataToPlot();
 
             if (Settings.YAutoScale)
                 _plot.Plot.Axes.AutoScaleY();
@@ -300,26 +299,18 @@ namespace PowerScope.Model
             _plot.Refresh();
         }
 
-        private void CopyStreamDataToPlot()
+        private void CopyChannelDataToPlot()
         {
-            if (_connectedStreams == null) 
+            if (_channels == null) 
                 return;
             
-            int channelIndex = 0;
-            foreach (IDataStream stream in _connectedStreams)
+            for (int i = 0; i < _channels.Count && i < _maxChannels; i++)
             {
-                for (int streamChannel = 0; streamChannel < stream.ChannelCount; streamChannel++)
+                Channel channel = _channels[i];
+                
+                if (channel.IsEnabled)
                 {
-                    bool isChannelEnabled = true;
-                    if (channelIndex < _channelSettings.Count && _channelSettings[channelIndex] != null)
-                        isChannelEnabled = _channelSettings[channelIndex].IsEnabled;
-
-                    if (isChannelEnabled && channelIndex < _maxChannels)
-                    {
-                        stream.CopyLatestTo(streamChannel, _data[channelIndex], Settings.Xmax);
-                    }
-                    
-                    channelIndex++;
+                    channel.CopyLatestDataTo(_data[i], Settings.Xmax);
                 }
             }
         }
@@ -342,6 +333,10 @@ namespace PowerScope.Model
                     _signals[i].LineStyle.AntiAlias = Settings.AntiAliasing;
                 }
             }
+            
+            // Populate the new data arrays with current data from channels
+            // This ensures the plot shows data even when the update timer is stopped
+            CopyChannelDataToPlot();
             
             _plot.Plot.Axes.SetLimitsX(0, Settings.Xmax);
             _plot.Refresh();
@@ -366,18 +361,92 @@ namespace PowerScope.Model
 
         private void ApplyChannelColors()
         {
-            if (_channelSettings == null) 
+            if (_channels == null) 
                 return;
 
             for (int i = 0; i < NumberOfChannels && i < _maxChannels; i++)
             {
-                if (_signals[i] != null && i < _channelSettings.Count)
+                if (_signals[i] != null && i < _channels.Count)
                 {
-                    Color channelColor = _channelSettings[i].Color;
+                    Color channelColor = _channels[i].Color;
                     _signals[i].Color = new ScottPlot.Color(channelColor.R, channelColor.G, channelColor.B);
                 }
             }
             
+            _plot.Refresh();
+        }
+
+        /// <summary>
+        /// Updates buffer sizes for all data streams that support it
+        /// Called when PlotSettings.BufferSize changes
+        /// </summary>
+        private void UpdateDataStreamBufferSizes()
+        {
+            // Get unique data streams from channels
+            var uniqueStreams = new HashSet<IDataStream>();
+            foreach (Channel channel in _channels)
+            {
+                uniqueStreams.Add(channel.OwnerStream);
+            }
+
+            // Update buffer size for streams that support it
+            foreach (IDataStream stream in uniqueStreams)
+            {
+                if (stream is IBufferResizable resizableStream)
+                {
+                    try
+                    {
+                        resizableStream.SetBufferSize(Settings.BufferSize);
+                    }
+                    catch (Exception ex)
+                    {
+                        // Log error but don't crash the application
+                        System.Diagnostics.Debug.WriteLine($"Failed to update buffer size for {stream.StreamType}: {ex.Message}");
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Clears all data from connected data streams and updates the plot display
+        /// Works regardless of whether the update timer is running or stopped
+        /// </summary>
+        public void Clear()
+        {
+            if (_channels == null)
+                return;
+
+            // Get unique data streams from channels
+            var uniqueStreams = new HashSet<IDataStream>();
+            foreach (Channel channel in _channels)
+            {
+                uniqueStreams.Add(channel.OwnerStream);
+            }
+
+            // Clear data from all streams
+            foreach (IDataStream stream in uniqueStreams)
+            {
+                try
+                {
+                    stream.clearData();
+                }
+                catch (Exception ex)
+                {
+                    // Log error but don't crash the application
+                    System.Diagnostics.Debug.WriteLine($"Failed to clear data for {stream.StreamType}: {ex.Message}");
+                }
+            }
+
+            // Clear plot data arrays and update display immediately
+            for (int i = 0; i < _maxChannels; i++)
+            {
+                if (_data[i] != null)
+                {
+                    Array.Clear(_data[i], 0, _data[i].Length);
+                }
+            }
+
+            // Force plot refresh to show cleared data immediately, regardless of timer state
             _plot.Refresh();
         }
 
@@ -407,37 +476,6 @@ namespace PowerScope.Model
             _plot.UserInputProcessor.UserActionResponses.Add(wheelZoomResponse);
         }
 
-        private void UpdateDataStreamChannelSettings()
-        {
-            if (_connectedStreams == null || _channelSettings == null)
-                return;
-
-            int globalChannelIndex = 0;
-            
-            foreach (IDataStream stream in _connectedStreams)
-            {
-                IChannelConfigurable configurableStream = stream as IChannelConfigurable;
-                if (configurableStream != null)
-                {
-                    List<ChannelSettings> streamChannelSettings = new List<ChannelSettings>();
-                    
-                    for (int streamChannel = 0; streamChannel < stream.ChannelCount; streamChannel++)
-                    {
-                        if (globalChannelIndex < _channelSettings.Count)
-                            streamChannelSettings.Add(_channelSettings[globalChannelIndex]);
-                        else
-                            streamChannelSettings.Add(new ChannelSettings());
-
-                        globalChannelIndex++;
-                    }
-                    
-                    configurableStream.UpdateChannelSettings(streamChannelSettings);
-                }
-                else
-                    globalChannelIndex += stream.ChannelCount;
-            }
-        }
-
         public void Dispose()
         {
             if (!_disposed)
@@ -445,7 +483,16 @@ namespace PowerScope.Model
                 _disposed = true;
                 StopUpdates();
                 
-                // DispatcherTimer doesn't have Dispose method, just stop it
+                // Unsubscribe from channels
+                if (_channels != null)
+                {
+                    _channels.CollectionChanged -= OnChannelsCollectionChanged;
+                    foreach (Channel channel in _channels)
+                    {
+                        channel.PropertyChanged -= OnChannelPropertyChanged;
+                    }
+                }
+                
                 if (Settings != null)
                 {
                     Settings.PropertyChanged -= OnSettingsChanged;
@@ -457,10 +504,7 @@ namespace PowerScope.Model
 
         protected virtual void OnPropertyChanged(string propertyName)
         {
-            if (PropertyChanged != null)
-            {
-                PropertyChanged.Invoke(this, new PropertyChangedEventArgs(propertyName));
-            }
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
     }
 }

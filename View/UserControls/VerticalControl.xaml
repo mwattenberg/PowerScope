@@ -5,14 +5,14 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:PowerScope.View.UserControls"
              mc:Ignorable="d" 
-             Width="150" Height="180">
+             Width="150" Height="180"
+             FontFamily="{DynamicResource {x:Static SystemFonts.MessageFontFamily}}"
+             FontSize="{DynamicResource {x:Static SystemFonts.MessageFontSize}}">
     <UserControl.Resources>
-        <Style TargetType="Button">
-            <Setter Property="Background" Value="{DynamicResource PlotSettings_TextBoxBackgroundBrush}"/>
+        <!-- Button style using global styles -->
+        <Style TargetType="Button" BasedOn="{StaticResource ButtonStyle}">
             <Setter Property="Foreground" Value="White"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource PlotSettings_BorderBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="FontSize" Value="14"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
@@ -34,33 +34,46 @@
                 </Setter.Value>
             </Setter>
         </Style>
-        <Style x:Key="VerticalLabelTextBoxStyle" TargetType="TextBox">
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="TextAlignment" Value="Center"/>
-            <Setter Property="IsReadOnly" Value="True"/>
-            <Setter Property="VerticalContentAlignment" Value="Center"/>
-            <Setter Property="FontSize" Value="14"/>
+        
+        <!-- TextBox style for vertical label -->
+        <Style x:Key="VerticalLabelTextBoxStyle" TargetType="TextBox" BasedOn="{StaticResource ControlLabelTextBoxStyle}">
+            <!-- Inherits all properties from the unified ControlLabelTextBoxStyle in App.xaml -->
         </Style>
-        <Style x:Key="InputTextBoxStyle" TargetType="TextBox">
+        
+        <!-- TextBox style for input fields -->
+        <Style x:Key="InputTextBoxStyle" TargetType="TextBox" BasedOn="{StaticResource TextBoxStyle}">
             <Setter Property="Foreground" Value="White"/>
-            <Setter Property="Background" Value="{DynamicResource PlotSettings_TextBoxBackgroundBrush}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource PlotSettings_BorderBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="FontSize" Value="12"/>
             <Setter Property="TextAlignment" Value="Right"/>
             <Setter Property="Padding" Value="2"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
         </Style>
-        <Style x:Key="LabelTextStyle" TargetType="TextBlock">
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="FontSize" Value="12"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
+        
+        <!-- Label style -->
+        <Style x:Key="LabelTextStyle" TargetType="TextBlock" BasedOn="{StaticResource ControlTextStyle}">
             <Setter Property="HorizontalAlignment" Value="Left"/>
             <Setter Property="Margin" Value="5,0,5,0"/>
+        </Style>
+        
+        <!-- CheckBox style -->
+        <Style x:Key="VerticalCheckBoxStyle" TargetType="CheckBox">
+            <Setter Property="FontFamily" Value="{DynamicResource {x:Static SystemFonts.MessageFontFamily}}"/>
+            <Setter Property="FontSize" Value="{DynamicResource {x:Static SystemFonts.MessageFontSize}}"/>
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
+        
+        <!-- Style for vertical control buttons -->
+        <Style x:Key="VerticalButtonStyle" TargetType="Button" BasedOn="{StaticResource ButtonStyle}">
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+        </Style>
+        
+        <!-- Style for smaller vertical button -->
+        <Style x:Key="SmallVerticalButtonStyle" TargetType="Button" BasedOn="{StaticResource ButtonStyle}">
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="FontWeight" Value="Bold"/>
         </Style>
     </UserControl.Resources>
     <Border Height="Auto" Background="{DynamicResource PlotSettings_BackgroundBrush}" CornerRadius="5"
@@ -72,8 +85,10 @@
             </Border>
             <!-- Two buttons below the label -->
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,0,0,10">
-                <Button x:Name="ButtonGrow" Width="55" Height="25" Margin="2" Content="~" FontSize="16" FontWeight="Bold" Click="ButtonGrow_Click"/>
-                <Button x:Name="ButtonShrink" Width="55" Height="25" Margin="2" Content="~" FontSize="10" FontWeight="Bold" Click="ButtonShrink_Click"/>
+                <Button x:Name="ButtonGrow" Width="55" Height="25" Margin="2" Content="~" 
+                        Style="{StaticResource VerticalButtonStyle}" Click="ButtonGrow_Click"/>
+                <Button x:Name="ButtonShrink" Width="55" Height="25" Margin="2" Content="~" 
+                        Style="{StaticResource SmallVerticalButtonStyle}" Click="ButtonShrink_Click"/>
             </StackPanel>
             <!-- Max row -->
             <Grid Margin="0,0,0,5">
@@ -111,8 +126,7 @@
                 </Grid.ColumnDefinitions>
                 <TextBlock Grid.Column="0" Text="Auto Scale" Style="{StaticResource LabelTextStyle}" VerticalAlignment="Center"/>
                 <CheckBox Grid.Column="1" x:Name="AutoScaleCheckBox" 
-                          Foreground="White" 
-                          FontSize="12" 
+                          Style="{StaticResource VerticalCheckBoxStyle}"
                           HorizontalAlignment="Right" 
                           Margin="10,0,0,0" 
                           IsChecked="{Binding YAutoScale}"
