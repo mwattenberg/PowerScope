@@ -14,9 +14,12 @@
         Background="{DynamicResource PlotSettings_BackgroundBrush}">
     <Grid Background="{DynamicResource PlotSettings_BackgroundBrush}">
         <Grid.RowDefinitions>
-            <RowDefinition Height="22"/> <!-- Toolbar -->
-            <RowDefinition Height="*"/> <!-- Main content -->
-            <RowDefinition Height="Auto"/> <!-- Bottom controls -->
+            <RowDefinition Height="22"/>
+            <!-- Toolbar -->
+            <RowDefinition/>
+            <!-- Main content -->
+            <RowDefinition Height="Auto"/>
+            <!-- Bottom controls -->
         </Grid.RowDefinitions>
         <!-- Toolbar at the top -->
         <UserControls:MenuBar Grid.Row="0" Height="Auto"/>
@@ -42,17 +45,17 @@
             <UserControls:MeasurementBar Grid.Column="2" x:Name="MeasurementBar" Height="609" VerticalAlignment="Top"/>
         </Grid>
         <!-- Bottom controls: 4 columns for each control -->
-        <Grid Grid.Row="2" Margin="0,0,0,0" MinHeight="100">
+        <Grid Grid.Row="2" MinHeight="50">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="280"/>
-                <ColumnDefinition Width="150"/>
-                <ColumnDefinition Width="100"/>
+                <ColumnDefinition Width="auto"/>
+                <ColumnDefinition Width="auto"/>
+                <ColumnDefinition Width="auto"/>
             </Grid.ColumnDefinitions>
             <UserControls:ChannelControlBar Grid.Column="0" x:Name="ChannelControlBar" VerticalAlignment="Top"/>
             <UserControls:HorizontalControl Grid.Column="1" x:Name="HorizontalControl" VerticalAlignment="Top"/>
             <UserControls:VerticalControl Grid.Column="2" x:Name="VerticalControl" VerticalAlignment="Top"/>
-            <UserControls:RunControl Grid.Column="3" x:Name="RunControl" VerticalAlignment="Center" HorizontalAlignment="Right"/>
+            <UserControls:RunControl Grid.Column="3" x:Name="RunControl" VerticalAlignment="Top" HorizontalAlignment="Center"/>
         </Grid>
     </Grid>
 </Window>

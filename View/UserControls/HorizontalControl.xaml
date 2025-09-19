@@ -6,7 +6,7 @@
              xmlns:local="clr-namespace:PowerScope.View.UserControls"
              xmlns:svgc="http://sharpvectors.codeplex.com/svgc/"
              mc:Ignorable="d" 
-             MinWidth="150" Height="auto" BorderThickness="2" Margin="2"
+             MinWidth="150" Height="auto" Margin="2"
              FontFamily="{DynamicResource {x:Static SystemFonts.MessageFontFamily}}"
              FontSize="{DynamicResource {x:Static SystemFonts.MessageFontSize}}">
 
@@ -82,13 +82,12 @@
         </Style>
     </UserControl.Resources>
 
-    <Border Height="Auto" Background="{DynamicResource PlotSettings_BackgroundBrush}" CornerRadius="2"
-            BorderBrush="{DynamicResource PlotSettings_BorderBrush}" BorderThickness="2">
+    <Border Height="Auto" Background="{DynamicResource PlotSettings_BackgroundBrush}" CornerRadius="2">
         <Grid x:Name="RootGrid" Background="{DynamicResource PlotSettings_BackgroundBrush}">
             <Grid.RowDefinitions>
-                <RowDefinition Height="32"/>
+                <RowDefinition Height="24"/>
                 <!-- Top color bar -->
-                <RowDefinition Height="75"/>
+                <RowDefinition Height="65"/>
                 <!-- Buttons -->
                 <RowDefinition Height="*"/>
                 <!-- Samples row -->
@@ -103,12 +102,13 @@
 
             <!-- Two wider buttons with expand/shrink icons -->
             <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="2">
-                <Button x:Name="ButtonGrow" VerticalAlignment="Center" MinWidth="60" Height="60" Margin="1" 
+                <Button x:Name="ButtonGrow" VerticalAlignment="Center" MinWidth="50" Height="50" Margin="5,0,10,0" 
                         Style="{StaticResource WideButtonStyle}" Click="ButtonGrow_Click"
                         ToolTip="Expand horizontal scale">
                     <svgc:SvgViewbox Source="/Icons/xExpand.svg" Width="32" Height="32" />
                 </Button>
-                <Button x:Name="ButtonShrink" VerticalAlignment="Center" MinWidth="60" Height="60" Margin="1" 
+                
+                <Button x:Name="ButtonShrink" VerticalAlignment="Center" MinWidth="50" Height="50" Margin="10,0,5,0" 
                         Style="{StaticResource WideButtonStyle}" Click="ButtonShrink_Click"
                         ToolTip="Shrink horizontal scale">
                     <svgc:SvgViewbox Source="/Icons/xShring.svg" Width="32" Height="32" />
@@ -124,7 +124,7 @@
 
                 <TextBlock Grid.Column="0" Text="Samples:" Style="{StaticResource LabelTextStyle}"/>
                 <TextBox Grid.Column="1" x:Name="SamplesTextBox" Style="{StaticResource InputTextBoxStyle}" 
-                         Text="{Binding Xmax}" Width="120" HorizontalAlignment="Right" Margin="5,0,0,0" 
+                         Text="{Binding Xmax}" MinWidth="90" HorizontalAlignment="Right" Margin="0,0,0,0" 
                          TextChanged="SamplesTextBox_TextChanged"/>
             </Grid>
 
@@ -137,7 +137,7 @@
 
                 <TextBlock Grid.Column="0" Text="Buffer Size:" Style="{StaticResource LabelTextStyle}"/>
                 <TextBox Grid.Column="1" x:Name="BufferSizeTextBox" Style="{StaticResource InputTextBoxStyle}" 
-                         Text="{Binding BufferSize}" Width="120" HorizontalAlignment="Right" Margin="5,0,0,0" 
+                         Text="{Binding BufferSize}" MinWidth="90" HorizontalAlignment="Right" Margin="0,0,0,0" 
                          TextChanged="BufferSizeTextBox_TextChanged"/>
             </Grid>
         </Grid>
