@@ -102,6 +102,7 @@ namespace PowerScope.Model
         private int _ymax = 4000;
         private bool _yAutoScale = true;
         private int _bufferSize = 1000;
+        private bool _triggerModeEnabled = false;
 
         /// <summary>
         /// Plot refresh rate option (enum-based)
@@ -283,6 +284,22 @@ namespace PowerScope.Model
                 {
                     _bufferSize = value;
                     OnPropertyChanged(nameof(BufferSize));
+                }
+            }
+        }
+
+        /// <summary>
+        /// Enable or disable trigger mode for data acquisition
+        /// </summary>
+        public bool TriggerModeEnabled
+        {
+            get { return _triggerModeEnabled; }
+            set
+            {
+                if (_triggerModeEnabled != value)
+                {
+                    _triggerModeEnabled = value;
+                    OnPropertyChanged(nameof(TriggerModeEnabled));
                 }
             }
         }

@@ -6,7 +6,7 @@
              xmlns:local="clr-namespace:PowerScope.View.UserControls"
              xmlns:svgc="http://sharpvectors.codeplex.com/svgc/"
              mc:Ignorable="d" 
-             Width="150" Height="180"
+             Width="150" MinHeight="180"
              FontFamily="{DynamicResource {x:Static SystemFonts.MessageFontFamily}}"
              FontSize="{DynamicResource {x:Static SystemFonts.MessageFontSize}}">
     <UserControl.Resources>
@@ -52,7 +52,6 @@
         
         <!-- Label style -->
         <Style x:Key="LabelTextStyle" TargetType="TextBlock" BasedOn="{StaticResource ControlTextStyle}">
-            <Setter Property="HorizontalAlignment" Value="Left"/>
             <Setter Property="Margin" Value="5,0,5,0"/>
         </Style>
         
@@ -113,57 +112,75 @@
             </Setter>
         </Style>
     </UserControl.Resources>
-    <Border Height="Auto" Background="{DynamicResource PlotSettings_BackgroundBrush}" CornerRadius="5">
-        <StackPanel Orientation="Vertical" Margin="2">
+    
+    <Border Height="Auto" Background="{DynamicResource PlotSettings_BackgroundBrush}" CornerRadius="2">
+        <Grid x:Name="RootGrid" Background="{DynamicResource PlotSettings_BackgroundBrush}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="24"/>
+                <!-- Top color bar -->
+                <RowDefinition Height="65"/>
+                <!-- Buttons -->
+                <RowDefinition Height="*"/>
+                <!-- Max row -->
+                <RowDefinition Height="*"/>
+                <!-- Min row -->
+                <RowDefinition Height="*"/>
+                <!-- Auto Scale row -->
+            </Grid.RowDefinitions>
+            
             <!-- Top color bar with "Vertical" label -->
-            <Border Background="Gray" CornerRadius="2" Height="20" Margin="0,0,0,5">
+            <Border x:Name="TopColorBar" Grid.Row="0" Background="Gray" CornerRadius="2" Height="20" Margin="2">
                 <TextBox x:Name="VerticalLabelTextBox" Text="Vertical" Style="{StaticResource VerticalLabelTextBoxStyle}"/>
             </Border>
+            
             <!-- Two buttons below the label -->
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,0,0,5">
-                <Button x:Name="ButtonGrow" Width="50" Height="50" Margin="2,0,5,0" 
+            <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="2">
+                <Button x:Name="ButtonGrow" VerticalAlignment="Center" MinWidth="50" Height="50" Margin="2,0,5,0" 
                         Style="{StaticResource VerticalButtonStyle}" Click="ButtonGrow_Click"
                         ToolTip="Expand vertical scale">
                     <svgc:SvgViewbox Source="/Icons/yExpand.svg" Width="32" Height="32" />
                 </Button>
-                <Button x:Name="ButtonShrink" Width="50" Height="50" Margin="5,0,2,0" 
+                <Button x:Name="ButtonShrink" VerticalAlignment="Center" MinWidth="50" Height="50" Margin="5,0,2,0" 
                         Style="{StaticResource SmallVerticalButtonStyle}" Click="ButtonShrink_Click"
                         ToolTip="Shrink vertical scale">
                     <svgc:SvgViewbox Source="/Icons/yShrink.svg" Width="32" Height="32" />
                 </Button>
             </StackPanel>
+            
             <!-- Max row -->
-            <Grid Margin="0,0,0,2">
+            <Grid Grid.Row="2" Margin="5,2,5,2">
                 <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="80"/>
                 </Grid.ColumnDefinitions>
                 <TextBlock Grid.Column="0" Text="Max:" Style="{StaticResource LabelTextStyle}" VerticalAlignment="Center"/>
                 <TextBox Grid.Column="1" x:Name="MaxTextBox" 
                          Style="{StaticResource InputTextBoxStyle}" 
-                         Width="80" 
+                         MinWidth="60" 
                          HorizontalAlignment="Right" 
                          Text="{Binding Ymax, UpdateSourceTrigger=PropertyChanged}"
                          TextChanged="MaxTextBox_TextChanged"/>
             </Grid>
+            
             <!-- Min row -->
-            <Grid Margin="0,0,0,2">
+            <Grid Grid.Row="3" Margin="5,2,5,2">
                 <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="80"/>
                 </Grid.ColumnDefinitions>
                 <TextBlock Grid.Column="0" Text="Min:" Style="{StaticResource LabelTextStyle}" VerticalAlignment="Center"/>
                 <TextBox Grid.Column="1" x:Name="MinTextBox" 
                          Style="{StaticResource InputTextBoxStyle}" 
-                         Width="80" 
+                         MinWidth="60" 
                          HorizontalAlignment="Right" 
                          Text="{Binding Ymin, UpdateSourceTrigger=PropertyChanged}"
                          TextChanged="MinTextBox_TextChanged"/>
             </Grid>
+            
             <!-- Auto Scale row -->
-            <Grid Margin="0,2,0,0">
+            <Grid Grid.Row="4" Margin="5,2,5,2">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="70"/>
+                    <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
                 <TextBlock Grid.Column="0" Text="Auto Scale" Style="{StaticResource LabelTextStyle}" VerticalAlignment="Center"/>
@@ -174,6 +191,6 @@
                           IsChecked="{Binding YAutoScale}"
                           Click="AutoScaleCheckBox_CheckedChanged"/>
             </Grid>
-        </StackPanel>
+        </Grid>
     </Border>
 </UserControl>

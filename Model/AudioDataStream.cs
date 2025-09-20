@@ -8,7 +8,7 @@ using NAudio.Wave;
 
 namespace PowerScope.Model
 {
-    public class AudioDataStream : IDataStream, IChannelConfigurable, IDisposable
+    public class AudioDataStream : IDataStream, IChannelConfigurable, IBufferResizable, IDisposable
     {
         private bool _disposed = false;
         private bool _isConnected = false;
@@ -36,6 +36,7 @@ namespace PowerScope.Model
         // Audio processing parameters
         private const int DefaultSampleRate = 44100;
         private const int RingBufferDurationSeconds = 10;
+        private int _userRequestedBufferSize = 0; // Store user-requested buffer size before connection
 
         public int ChannelCount 
         { 
@@ -131,6 +132,10 @@ namespace PowerScope.Model
             StatusMessage = "Disconnected";
             TotalSamples = 0;
             TotalBits = 0;
+            
+            // Initialize with a reasonable default buffer size - can be changed later via SetBufferSize
+            int defaultBufferSize = Math.Max(500000, _sampleRate * RingBufferDurationSeconds);
+            // Note: We'll initialize ring buffers during Connect() when we know the channel count
         }
 
         #region IChannelConfigurable Implementation
@@ -217,13 +222,20 @@ namespace PowerScope.Model
                 // Get actual channel count from the audio format
                 _channelCount = _audioCapture.WaveFormat.Channels;
                 
-                // Initialize ring buffers for each channel
-                int ringBufferSize = _sampleRate * RingBufferDurationSeconds;
-                ReceivedData = new RingBuffer<double>[_channelCount];
-                for (int i = 0; i < _channelCount; i++)
+                // Initialize ring buffers - respect user's buffer size preference
+                int bufferSizeToUse;
+                if (_userRequestedBufferSize > 0)
                 {
-                    ReceivedData[i] = new RingBuffer<double>(ringBufferSize);
+                    // User explicitly set a buffer size - use it
+                    bufferSizeToUse = _userRequestedBufferSize;
                 }
+                else
+                {
+                    // No user preference - use smart default
+                    bufferSizeToUse = Math.Max(500000, _sampleRate * RingBufferDurationSeconds);
+                }
+                
+                InitializeRingBuffers(bufferSizeToUse);
                 
                 // Initialize channel processing arrays
                 _channelSettings = new ChannelSettings[_channelCount];
@@ -627,6 +639,99 @@ namespace PowerScope.Model
 
             _disposed = true;
             GC.SuppressFinalize(this);
+        }
+
+        #endregion
+
+        #region IBufferResizable Implementation
+
+        public int BufferSize 
+        { 
+            get 
+            { 
+                lock (_dataLock)
+                {
+                    // Return actual buffer size if connected, otherwise return user-requested size
+                    if (ReceivedData?[0] != null)
+                    {
+                        return ReceivedData[0].Capacity;
+                    }
+                    else if (_userRequestedBufferSize > 0)
+                    {
+                        return _userRequestedBufferSize;
+                    }
+                    else
+                    {
+                        // Return default size if nothing set yet
+                        return Math.Max(500000, _sampleRate * RingBufferDurationSeconds);
+                    }
+                }
+            }
+        }
+
+        public void SetBufferSize(int newBufferSize)
+        {
+            if (newBufferSize <= 0)
+                return;
+
+            // Store the user's requested buffer size
+            _userRequestedBufferSize = newBufferSize;
+
+            lock (_dataLock)
+            {
+                // Store streaming state
+                bool wasStreaming = _isStreaming;
+                
+                // Temporarily stop streaming if running
+                if (wasStreaming)
+                {
+                    StopStreaming();
+                }
+
+                // Clear existing data
+                if (ReceivedData != null)
+                {
+                    foreach (var buffer in ReceivedData)
+                    {
+                        buffer?.Clear();
+                    }
+                }
+
+                // Recreate ring buffers with new size if we're connected
+                if (_channelCount > 0)
+                {
+                    InitializeRingBuffers(newBufferSize);
+                }
+                // If not connected yet, the buffer will be created in Connect() with the stored size
+                
+                // Reset statistics
+                TotalSamples = 0;
+                TotalBits = 0;
+
+                // Restart streaming if it was running before and we're still connected
+                if (wasStreaming && _isConnected)
+                {
+                    StartStreaming();
+                }
+            }
+            
+            // Notify that buffer size changed
+            OnPropertyChanged(nameof(BufferSize));
+        }
+
+        private void InitializeRingBuffers(int bufferSize)
+        {
+            if (_channelCount <= 0)
+            {
+                // Channel count not known yet - defer initialization
+                return;
+            }
+            
+            ReceivedData = new RingBuffer<double>[_channelCount];
+            for (int i = 0; i < _channelCount; i++)
+            {
+                ReceivedData[i] = new RingBuffer<double>(bufferSize);
+            }
         }
 
         #endregion

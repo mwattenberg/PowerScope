@@ -24,6 +24,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Aelian.FFT" Version="1.0.4" />
     <PackageReference Include="Extended.Wpf.Toolkit" Version="4.7.25104.5739" />
     <PackageReference Include="NAudio" Version="2.2.1" />
     <PackageReference Include="RJCP.SerialPortStream" Version="3.0.3" />

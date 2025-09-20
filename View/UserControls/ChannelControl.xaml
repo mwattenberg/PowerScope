@@ -124,7 +124,7 @@
             <RowDefinition Height="28"/>
         </Grid.RowDefinitions>
         <!-- Top color bar with channel label and play/pause button -->
-        <Border x:Name="TopColorBar" Grid.Row="0" Background="{Binding DisplayColor, Converter={StaticResource ColorToBrushConverter}}" CornerRadius="2" Height="20">
+        <Border x:Name="TopColorBar" Grid.Row="0" Background="{Binding DisplayColor, Converter={StaticResource ColorToBrushConverter}}" CornerRadius="3" Height="20">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="20"/>

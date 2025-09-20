@@ -47,7 +47,7 @@ namespace PowerScope.Model
         }
     }
 
-    public class SerialDataStream : IDataStream, IChannelConfigurable
+    public class SerialDataStream : IDataStream, IChannelConfigurable, IBufferResizable
     {
         private readonly SerialPort _port;
         private byte[] _residue;
@@ -158,12 +158,7 @@ namespace PowerScope.Model
                 _port.StopBits = StopBits.One;
 
             int ringBufferSize = Math.Max(500000, source.BaudRate / 5);
-            ReceivedData = new RingBuffer<double>[dataParser.NumberOfChannels];
-
-            for (int i = 0; i < dataParser.NumberOfChannels; i++)
-            {
-                ReceivedData[i] = new RingBuffer<double>(ringBufferSize);
-            }
+            InitializeRingBuffers(ringBufferSize);
 
             // Initialize channel processing arrays
             _channelSettings = new ChannelSettings[dataParser.NumberOfChannels];
@@ -226,6 +221,73 @@ namespace PowerScope.Model
 
         #endregion
 
+        #region IBufferResizable Implementation
+
+        public int BufferSize 
+        { 
+            get 
+            { 
+                lock (_channelConfigLock)
+                {
+                    return ReceivedData?[0]?.Capacity ?? 0;
+                }
+            }
+        }
+
+        public void SetBufferSize(int newBufferSize)
+        {
+            if (newBufferSize <= 0)
+                return;
+
+            lock (_channelConfigLock)
+            {
+                // Store streaming state
+                bool wasStreaming = _isStreaming;
+                
+                // Temporarily stop streaming if running
+                if (wasStreaming)
+                {
+                    StopStreaming();
+                }
+
+                // Clear existing data
+                if (ReceivedData != null)
+                {
+                    foreach (var buffer in ReceivedData)
+                    {
+                        buffer?.Clear();
+                    }
+                }
+
+                // Recreate ring buffers with new size
+                InitializeRingBuffers(newBufferSize);
+                
+                // Reset statistics
+                TotalSamples = 0;
+                TotalBits = 0;
+
+                // Restart streaming if it was running before and we're still connected
+                if (wasStreaming && _isConnected)
+                {
+                    StartStreaming();
+                }
+            }
+            
+            // Notify that buffer size changed
+            OnPropertyChanged(nameof(BufferSize));
+        }
+
+        private void InitializeRingBuffers(int bufferSize)
+        {
+            ReceivedData = new RingBuffer<double>[ChannelCount];
+            for (int i = 0; i < ChannelCount; i++)
+            {
+                ReceivedData[i] = new RingBuffer<double>(bufferSize);
+            }
+        }
+
+        #endregion
+
         #region Data Processing
 
         private double ApplyChannelProcessing(int channel, double rawSample)
@@ -244,7 +306,7 @@ namespace PowerScope.Model
                 return rawSample;
             
             // Apply gain and offset
-            double processed = settings.Gain * (rawSample + settings.Offset);
+            double processed = rawSample * settings.Gain + settings.Offset;
             
             // Apply filter if configured
             if (filter != null)

@@ -7,13 +7,13 @@
             <ItemsControl x:Name="ChannelItemsControl" Height="auto" VerticalAlignment="Stretch">
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
-                        <StackPanel Orientation="Horizontal" VerticalAlignment="Top" Margin="4"/>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Top" Margin="0"/>
                     </ItemsPanelTemplate>
                 </ItemsControl.ItemsPanel>
                 <!-- DataTemplate: Automatically creates ChannelControl for each ChannelSettings -->
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
-                        <local:ChannelControl />
+                        <local:ChannelControl Margin="2,0,2,0"/>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>

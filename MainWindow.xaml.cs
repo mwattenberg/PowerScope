@@ -14,6 +14,7 @@ using ScottPlot.Plottables;
 using PowerScope.Model;
 using PowerScope.View.UserControls;
 using PowerScope.View.UserForms;
+using Aelian.FFT;
 
 namespace PowerScope
 {
@@ -43,6 +44,14 @@ namespace PowerScope
             
             // Initialize channel display based on current streams - simplified with Channel-centric approach
             _plotManager.SetChannels(DataStreamBar.Channels);
+
+            FastFourierTransform.Initialize();
+
+            SignalData myData = SignalData.CreateFromRealSize(4096); // Pre-create FFT data structure for 4096-point FFTs
+            
+            var temp = myData.AsReal();
+            FastFourierTransform.RealFFT(temp, true);
+
         }
 
         void InitializeControls()

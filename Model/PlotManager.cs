@@ -163,6 +163,11 @@ namespace PowerScope.Model
                     case nameof(PlotSettings.BufferSize):
                         UpdateDataStreamBufferSizes();
                         break;
+                        
+                    case nameof(PlotSettings.TriggerModeEnabled):
+                        // Handle trigger mode changes - for future trigger implementation
+                        System.Diagnostics.Debug.WriteLine($"Trigger mode changed to: {Settings.TriggerModeEnabled}");
+                        break;
                 }
             });
         }
