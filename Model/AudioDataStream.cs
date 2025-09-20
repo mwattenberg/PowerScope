@@ -36,7 +36,6 @@ namespace PowerScope.Model
         // Audio processing parameters
         private const int DefaultSampleRate = 44100;
         private const int RingBufferDurationSeconds = 10;
-        private int _userRequestedBufferSize = 0; // Store user-requested buffer size before connection
 
         public int ChannelCount 
         { 
@@ -132,10 +131,6 @@ namespace PowerScope.Model
             StatusMessage = "Disconnected";
             TotalSamples = 0;
             TotalBits = 0;
-            
-            // Initialize with a reasonable default buffer size - can be changed later via SetBufferSize
-            int defaultBufferSize = Math.Max(500000, _sampleRate * RingBufferDurationSeconds);
-            // Note: We'll initialize ring buffers during Connect() when we know the channel count
         }
 
         #region IChannelConfigurable Implementation
@@ -222,20 +217,10 @@ namespace PowerScope.Model
                 // Get actual channel count from the audio format
                 _channelCount = _audioCapture.WaveFormat.Channels;
                 
-                // Initialize ring buffers - respect user's buffer size preference
-                int bufferSizeToUse;
-                if (_userRequestedBufferSize > 0)
-                {
-                    // User explicitly set a buffer size - use it
-                    bufferSizeToUse = _userRequestedBufferSize;
-                }
-                else
-                {
-                    // No user preference - use smart default
-                    bufferSizeToUse = Math.Max(500000, _sampleRate * RingBufferDurationSeconds);
-                }
-                
-                InitializeRingBuffers(bufferSizeToUse);
+                // Initialize ring buffers with smart default size
+                // PlotManager will call SetBufferSize() later with the actual PlotSettings.BufferSize
+                int defaultBufferSize = Math.Max(500000, _sampleRate * RingBufferDurationSeconds);
+                InitializeRingBuffers(defaultBufferSize);
                 
                 // Initialize channel processing arrays
                 _channelSettings = new ChannelSettings[_channelCount];
@@ -651,20 +636,7 @@ namespace PowerScope.Model
             { 
                 lock (_dataLock)
                 {
-                    // Return actual buffer size if connected, otherwise return user-requested size
-                    if (ReceivedData?[0] != null)
-                    {
-                        return ReceivedData[0].Capacity;
-                    }
-                    else if (_userRequestedBufferSize > 0)
-                    {
-                        return _userRequestedBufferSize;
-                    }
-                    else
-                    {
-                        // Return default size if nothing set yet
-                        return Math.Max(500000, _sampleRate * RingBufferDurationSeconds);
-                    }
+                    return ReceivedData?[0]?.Capacity ?? 0;
                 }
             }
         }
@@ -674,20 +646,8 @@ namespace PowerScope.Model
             if (newBufferSize <= 0)
                 return;
 
-            // Store the user's requested buffer size
-            _userRequestedBufferSize = newBufferSize;
-
             lock (_dataLock)
             {
-                // Store streaming state
-                bool wasStreaming = _isStreaming;
-                
-                // Temporarily stop streaming if running
-                if (wasStreaming)
-                {
-                    StopStreaming();
-                }
-
                 // Clear existing data
                 if (ReceivedData != null)
                 {
@@ -697,22 +657,12 @@ namespace PowerScope.Model
                     }
                 }
 
-                // Recreate ring buffers with new size if we're connected
-                if (_channelCount > 0)
-                {
-                    InitializeRingBuffers(newBufferSize);
-                }
-                // If not connected yet, the buffer will be created in Connect() with the stored size
+                // Recreate ring buffers with new size - no need to stop/restart streaming
+                InitializeRingBuffers(newBufferSize);
                 
                 // Reset statistics
                 TotalSamples = 0;
                 TotalBits = 0;
-
-                // Restart streaming if it was running before and we're still connected
-                if (wasStreaming && _isConnected)
-                {
-                    StartStreaming();
-                }
             }
             
             // Notify that buffer size changed
@@ -723,7 +673,7 @@ namespace PowerScope.Model
         {
             if (_channelCount <= 0)
             {
-                // Channel count not known yet - defer initialization
+                // Channel count not known yet - will be called again during Connect()
                 return;
             }
             
