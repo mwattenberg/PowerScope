@@ -205,7 +205,7 @@ namespace PowerScope.Model
 
         /// <summary>
         /// FFT size (number of samples for FFT calculation)
-        /// Must be a power of 2, range 128-8192
+        /// Must be a power of 2, range 128-16384
         /// </summary>
         public int FFT_Size
         {

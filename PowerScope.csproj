@@ -14,13 +14,18 @@
 	<ApplicationIcon>Icons\logo.ico</ApplicationIcon>
 	
 	<!-- Single-file publishing settings -->
-	<PublishSingleFile>true</PublishSingleFile>
+	<PublishSingleFile>false</PublishSingleFile>
 	<SelfContained>true</SelfContained>
 	<RuntimeIdentifier>win-x64</RuntimeIdentifier>
 	<PublishTrimmed>false</PublishTrimmed>
 	<TrimMode>link</TrimMode>
 	<IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
 	<ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <PublishReadyToRun>true</PublishReadyToRun>
+    <TieredPGO>true</TieredPGO>
   </PropertyGroup>
 
   <ItemGroup>

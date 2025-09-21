@@ -164,6 +164,11 @@
                                 <sys:Int32>8192</sys:Int32>
                             </ComboBoxItem.Tag>
                         </ComboBoxItem>
+                        <ComboBoxItem Content="16384">
+                            <ComboBoxItem.Tag>
+                                <sys:Int32>16384</sys:Int32>
+                            </ComboBoxItem.Tag>
+                        </ComboBoxItem>
                     </ComboBox>
                     
                     <!-- Row 1: Interpolation -->
@@ -186,11 +191,6 @@
                         <ComboBoxItem Content="4x">
                             <ComboBoxItem.Tag>
                                 <sys:Int32>4</sys:Int32>
-                            </ComboBoxItem.Tag>
-                        </ComboBoxItem>
-                        <ComboBoxItem Content="8x">
-                            <ComboBoxItem.Tag>
-                                <sys:Int32>8</sys:Int32>
                             </ComboBoxItem.Tag>
                         </ComboBoxItem>
                     </ComboBox>

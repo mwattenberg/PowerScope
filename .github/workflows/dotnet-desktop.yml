@@ -63,7 +63,7 @@ jobs:
       run: dotnet build --configuration Release --no-restore
 
     - name: Publish Single File
-      run: dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=false -o ./publish
+      run: dotnet publish -c Release -r win-x64 --self-contained true -p:PublishTrimmed=false -p:PublishReadyToRun=true -p:ReadyToRunComposite=true -p:TieredPGO=1 -o ./publish
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v4

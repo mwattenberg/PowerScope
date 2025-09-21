@@ -59,9 +59,9 @@ namespace PowerScope.Model
         private bool _isStreaming;
         private string _statusMessage;
         
-        // Sample rate calculation
-        private long _lastSampleCount = 0;
-        private DateTime _lastSampleTime = DateTime.Now;
+        // Sample rate calculation using high-precision timing
+        private long _totalSamplesAtLastCalculation = 0;
+        private readonly Stopwatch _sampleRateStopwatch = new Stopwatch();
         private double _calculatedSampleRate = 0.0;
         private readonly object _sampleRateCalculationLock = new object();
         
@@ -554,8 +554,8 @@ namespace PowerScope.Model
             lock (_sampleRateCalculationLock)
             {
                 _calculatedSampleRate = 0.0;
-                _lastSampleTime = DateTime.Now;
-                _lastSampleCount = 0;
+                _sampleRateStopwatch.Reset();
+                _totalSamplesAtLastCalculation = 0;
             }
             
             // Reset filters when clearing data
@@ -755,19 +755,27 @@ namespace PowerScope.Model
 
         /// <summary>
         /// Updates the calculated sample rate based on incoming data
-        /// Uses an exponential low pass filter for smooth, responsive sample rate calculation
+        /// Uses high-precision Stopwatch timing and exponential low pass filter for smooth, accurate sample rate calculation
         /// </summary>
         private void UpdateSampleRateCalculation(int newSamples)
         {
             lock (_sampleRateCalculationLock)
             {
-                DateTime currentTime = DateTime.Now;
-                double timeDeltaSeconds = (currentTime - _lastSampleTime).TotalSeconds;
-                
-                // Only update if we have at least 100ms of data to avoid noise
-                if (timeDeltaSeconds >= 1)
+                // Start the stopwatch on first sample
+                if (!_sampleRateStopwatch.IsRunning)
                 {
-                    double instantaneousSampleRate = newSamples / timeDeltaSeconds;
+                    _sampleRateStopwatch.Start();
+                    _totalSamplesAtLastCalculation = TotalSamples;
+                    return; // Need at least two data points for rate calculation
+                }
+                
+                double elapsedSeconds = _sampleRateStopwatch.Elapsed.TotalSeconds;
+                
+                // Calculate sample rate every 500ms for responsive but stable updates
+                if (elapsedSeconds >= 0.5)
+                {
+                    long samplesSinceLastCalculation = TotalSamples - _totalSamplesAtLastCalculation;
+                    double instantaneousSampleRate = samplesSinceLastCalculation / elapsedSeconds;
                     
                     // Apply exponential low pass filter for smooth sample rate
                     if (_calculatedSampleRate == 0.0)
@@ -783,7 +791,9 @@ namespace PowerScope.Model
                                               (1.0 - _sampleRateFilterAlpha) * _calculatedSampleRate;
                     }
                     
-                    _lastSampleTime = currentTime;
+                    // Reset for next calculation period
+                    _totalSamplesAtLastCalculation = TotalSamples;
+                    _sampleRateStopwatch.Restart();
                     
                     // Notify property changed for real-time updates
                     OnPropertyChanged(nameof(SampleRate));

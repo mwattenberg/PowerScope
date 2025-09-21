@@ -8,6 +8,7 @@ __Key features:__
 - Real-time plotting of high-speed serial data (3MBaud and above)
 - Lightweight data protocol for efficient data transfer
 - Supports data from multiple devices simultaneously
+- Multi-threaded and GPU accelerated plotting
 - Data analytics:
   - Min/max/average calculations
   - Filtering of incoming data in real-time
