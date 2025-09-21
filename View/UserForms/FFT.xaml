@@ -1,0 +1,255 @@
+﻿<Window x:Class="PowerScope.View.UserForms.FFT"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:ScottPlot="clr-namespace:ScottPlot.WPF;assembly=ScottPlot.WPF"
+        xmlns:local="clr-namespace:PowerScope.View.UserForms"
+        xmlns:sys="clr-namespace:System;assembly=mscorlib"
+        mc:Ignorable="d"
+        Title="FFT Spectrum" Height="600" Width="800" 
+        WindowStyle="None"
+        AllowsTransparency="True"
+        ResizeMode="CanResize" 
+        WindowStartupLocation="CenterScreen"
+        Background="Transparent"
+        FontFamily="{DynamicResource {x:Static SystemFonts.MessageFontFamily}}"
+        FontSize="{DynamicResource {x:Static SystemFonts.MessageFontSize}}">
+    <Window.Resources>
+        <!-- Dark theme styles using global resources and system fonts -->
+        <Style TargetType="Label" BasedOn="{StaticResource LabelStyle}">
+            <!-- Inherits system font settings from LabelStyle in App.xaml -->
+        </Style>
+        <Style TargetType="ComboBox" BasedOn="{StaticResource SystemFontStyle}">
+            <Setter Property="Background" Value="{DynamicResource PlotSettings_TextBoxBackgroundBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource PlotSettings_LabelForegroundBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource PlotSettings_BorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="3,2"/>
+            <Setter Property="FontSize" Value="10"/>
+        </Style>
+        <!-- Custom close button style -->
+        <Style x:Key="CloseButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{DynamicResource PlotSettings_CloseButtonForegroundBrush}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Width" Value="30"/>
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" 
+                                BorderThickness="{TemplateBinding BorderThickness}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="{DynamicResource PlotSettings_CloseButtonHoverBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter Property="Background" Value="{DynamicResource PlotSettings_CloseButtonPressedBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <!-- Compact label style for FFT controls -->
+        <Style x:Key="FFTLabelStyle" TargetType="Label" BasedOn="{StaticResource LabelStyle}">
+            <Setter Property="FontSize" Value="9"/>
+            <Setter Property="Padding" Value="2"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+        </Style>
+    </Window.Resources>
+    
+    <!-- Main container with border and drop shadow -->
+    <Border Background="{DynamicResource PlotSettings_BackgroundBrush}" 
+            BorderBrush="{DynamicResource PlotSettings_BorderBrush}" 
+            BorderThickness="1"
+            CornerRadius="5">
+        <Border.Effect>
+            <DropShadowEffect Color="{DynamicResource PlotSettings_ShadowColor}" BlurRadius="10" ShadowDepth="3" Opacity="0.5"/>
+        </Border.Effect>
+        <Grid Margin="0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            
+            <!-- Custom title bar -->
+            <Grid Grid.Row="0" Background="{DynamicResource PlotSettings_TitleBarBrush}" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="FFT Spectrum" 
+                           Foreground="{DynamicResource PlotSettings_LabelForegroundBrush}" 
+                           FontWeight="SemiBold"
+                           VerticalAlignment="Center" 
+                           Margin="15,8"/>
+                <!-- Close button -->
+                <Button Grid.Column="1" 
+                        Style="{StaticResource CloseButtonStyle}"
+                        Content="✕" 
+                        Click="CloseButton_Click"
+                        ToolTip="Close"/>
+            </Grid>
+
+            <!-- Main content area with plot and controls -->
+            <Grid Grid.Row="1">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="150"/>
+                </Grid.ColumnDefinitions>
+                
+                <!-- FFT Plot Area (Left column - dynamic width) -->
+                <ScottPlot:WpfPlotGL x:Name="WpfPlotFFT" Grid.Column="0" Margin="15"/>
+                
+                <!-- Control Panel (Right column - fixed 150px width) -->
+                <Grid Grid.Column="1" Margin="5">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    
+                    <!-- Row 0: FFT Size -->
+                    <Label Grid.Column="0" Grid.Row="0" Content="FFT Size:" 
+                           Style="{StaticResource FFTLabelStyle}" Margin="2"/>
+                    <ComboBox x:Name="ComboBox_FFTSize" Grid.Column="1" Grid.Row="0" 
+                              VerticalAlignment="Center" Margin="2"
+                              SelectedValue="{Binding FFTSize}"
+                              SelectedValuePath="Tag">
+                        <ComboBoxItem Content="128">
+                            <ComboBoxItem.Tag>
+                                <sys:Int32>128</sys:Int32>
+                            </ComboBoxItem.Tag>
+                        </ComboBoxItem>
+                        <ComboBoxItem Content="256">
+                            <ComboBoxItem.Tag>
+                                <sys:Int32>256</sys:Int32>
+                            </ComboBoxItem.Tag>
+                        </ComboBoxItem>
+                        <ComboBoxItem Content="512">
+                            <ComboBoxItem.Tag>
+                                <sys:Int32>512</sys:Int32>
+                            </ComboBoxItem.Tag>
+                        </ComboBoxItem>
+                        <ComboBoxItem Content="1024">
+                            <ComboBoxItem.Tag>
+                                <sys:Int32>1024</sys:Int32>
+                            </ComboBoxItem.Tag>
+                        </ComboBoxItem>
+                        <ComboBoxItem Content="2048">
+                            <ComboBoxItem.Tag>
+                                <sys:Int32>2048</sys:Int32>
+                            </ComboBoxItem.Tag>
+                        </ComboBoxItem>
+                        <ComboBoxItem Content="4096">
+                            <ComboBoxItem.Tag>
+                                <sys:Int32>4096</sys:Int32>
+                            </ComboBoxItem.Tag>
+                        </ComboBoxItem>
+                        <ComboBoxItem Content="8192">
+                            <ComboBoxItem.Tag>
+                                <sys:Int32>8192</sys:Int32>
+                            </ComboBoxItem.Tag>
+                        </ComboBoxItem>
+                    </ComboBox>
+                    
+                    <!-- Row 1: Interpolation -->
+                    <Label Grid.Column="0" Grid.Row="1" Content="Interpolation:" 
+                           Style="{StaticResource FFTLabelStyle}" Margin="2"/>
+                    <ComboBox x:Name="ComboBox_Interpolation" Grid.Column="1" Grid.Row="1" 
+                              VerticalAlignment="Center" Margin="2"
+                              SelectedValue="{Binding Interpolation}"
+                              SelectedValuePath="Tag">
+                        <ComboBoxItem Content="1x">
+                            <ComboBoxItem.Tag>
+                                <sys:Int32>1</sys:Int32>
+                            </ComboBoxItem.Tag>
+                        </ComboBoxItem>
+                        <ComboBoxItem Content="2x">
+                            <ComboBoxItem.Tag>
+                                <sys:Int32>2</sys:Int32>
+                            </ComboBoxItem.Tag>
+                        </ComboBoxItem>
+                        <ComboBoxItem Content="4x">
+                            <ComboBoxItem.Tag>
+                                <sys:Int32>4</sys:Int32>
+                            </ComboBoxItem.Tag>
+                        </ComboBoxItem>
+                        <ComboBoxItem Content="8x">
+                            <ComboBoxItem.Tag>
+                                <sys:Int32>8</sys:Int32>
+                            </ComboBoxItem.Tag>
+                        </ComboBoxItem>
+                    </ComboBox>
+                    
+                    <!-- Row 2: Window -->
+                    <Label Grid.Column="0" Grid.Row="2" Content="Window:" 
+                           Style="{StaticResource FFTLabelStyle}" Margin="2"/>
+                    <ComboBox x:Name="ComboBox_Window" Grid.Column="1" Grid.Row="2" 
+                              VerticalAlignment="Center" Margin="2"
+                              SelectedValue="{Binding WindowFunction}"
+                              SelectedValuePath="Tag">
+                        <ComboBoxItem Content="Blackman-Harris" Tag="Blackman-Harris"/>
+                        <ComboBoxItem Content="Hann" Tag="Hann"/>
+                        <ComboBoxItem Content="Flat Top" Tag="Flat Top"/>
+                        <ComboBoxItem Content="None" Tag="None"/>
+                    </ComboBox>
+                    
+                    <!-- Row 3: Averaging -->
+                    <Label Grid.Column="0" Grid.Row="3" Content="Averaging:" 
+                           Style="{StaticResource FFTLabelStyle}" Margin="2"/>
+                    <ComboBox x:Name="ComboBox_Averaging" Grid.Column="1" Grid.Row="3" 
+                              VerticalAlignment="Center" Margin="2"
+                              SelectedValue="{Binding Averaging}"
+                              SelectedValuePath="Tag">
+                        <ComboBoxItem Content="1x">
+                            <ComboBoxItem.Tag>
+                                <sys:Int32>1</sys:Int32>
+                            </ComboBoxItem.Tag>
+                        </ComboBoxItem>
+                        <ComboBoxItem Content="2x">
+                            <ComboBoxItem.Tag>
+                                <sys:Int32>2</sys:Int32>
+                            </ComboBoxItem.Tag>
+                        </ComboBoxItem>
+                        <ComboBoxItem Content="4x">
+                            <ComboBoxItem.Tag>
+                                <sys:Int32>4</sys:Int32>
+                            </ComboBoxItem.Tag>
+                        </ComboBoxItem>
+                        <ComboBoxItem Content="8x">
+                            <ComboBoxItem.Tag>
+                                <sys:Int32>8</sys:Int32>
+                            </ComboBoxItem.Tag>
+                        </ComboBoxItem>
+                        <ComboBoxItem Content="16x">
+                            <ComboBoxItem.Tag>
+                                <sys:Int32>16</sys:Int32>
+                            </ComboBoxItem.Tag>
+                        </ComboBoxItem>
+                    </ComboBox>
+                    
+                    <!-- Row 4: Reserved for future controls -->
+                    <Border Grid.Column="0" Grid.Row="4" Grid.ColumnSpan="2" 
+                            Background="{DynamicResource PlotSettings_TitleBarBrush}" 
+                            BorderBrush="{DynamicResource PlotSettings_BorderBrush}" 
+                            BorderThickness="1" Margin="2"
+                            Opacity="0.3"/>
+                </Grid>
+            </Grid>
+        </Grid>
+    </Border>
+</Window>

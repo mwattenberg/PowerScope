@@ -74,6 +74,12 @@ namespace PowerScope.Model
         private bool _isStreaming;
         private string _statusMessage;
 
+        // Sample rate calculation for USB data stream
+        private long _lastSampleCount = 0;
+        private DateTime _lastSampleTime = DateTime.Now;
+        private double _calculatedSampleRate = 0.0;
+        private readonly object _sampleRateCalculationLock = new object();
+
         public UsbSourceSetting SourceSetting { get; init; }
         public long TotalSamples { get; private set; }
         public long TotalBits { get; private set; }
@@ -100,6 +106,21 @@ namespace PowerScope.Model
             {
                 return Parser.NumberOfChannels;
             }
+        }
+
+        /// <summary>
+        /// Sample rate of the USB data stream in samples per second (Hz)
+        /// Calculated dynamically based on received data rate
+        /// </summary>
+        public double SampleRate 
+        { 
+            get 
+            { 
+                lock (_sampleRateCalculationLock)
+                {
+                    return _calculatedSampleRate;
+                }
+            } 
         }
 
         public string StatusMessage
@@ -596,7 +617,48 @@ namespace PowerScope.Model
 
             if (channelsToProcess > 0 && parsedData[0] != null)
             {
-                TotalSamples += parsedData[0].Length;
+                int newSamples = parsedData[0].Length;
+                TotalSamples += newSamples;
+                
+                // Update sample rate calculation
+                UpdateSampleRateCalculation(newSamples);
+            }
+        }
+
+        /// <summary>
+        /// Updates the calculated sample rate based on incoming data
+        /// Uses a moving average approach similar to StreamInfoPanel
+        /// </summary>
+        private void UpdateSampleRateCalculation(int newSamples)
+        {
+            lock (_sampleRateCalculationLock)
+            {
+                DateTime currentTime = DateTime.Now;
+                double timeDeltaSeconds = (currentTime - _lastSampleTime).TotalSeconds;
+                
+                // Only update if we have at least 100ms of data to avoid noise
+                if (timeDeltaSeconds >= 0.1)
+                {
+                    double instantaneousSampleRate = newSamples / timeDeltaSeconds;
+                    
+                    // Use exponential moving average to smooth the sample rate calculation
+                    if (_calculatedSampleRate == 0.0)
+                    {
+                        // First calculation
+                        _calculatedSampleRate = instantaneousSampleRate;
+                    }
+                    else
+                    {
+                        // Exponential moving average with alpha = 0.1 for smoothing
+                        double alpha = 0.1;
+                        _calculatedSampleRate = alpha * instantaneousSampleRate + (1 - alpha) * _calculatedSampleRate;
+                    }
+                    
+                    _lastSampleTime = currentTime;
+                    
+                    // Notify propertyChanged for real-time updates
+                    OnPropertyChanged(nameof(SampleRate));
+                }
             }
         }
 

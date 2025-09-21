@@ -11,6 +11,8 @@
     <UserControl.Resources>
         <!-- Value converter for colors -->
         <local:ColorToBrushConverter x:Key="ColorToBrushConverter"/>
+        <!-- Converter to show spectrum button only for FFT measurements -->
+        <local:FFTVisibilityConverter x:Key="FFTVisibilityConverter"/>
     </UserControl.Resources>
 
     <Grid Background="{DynamicResource PlotSettings_BackgroundBrush}" Margin="2">
@@ -27,6 +29,7 @@
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="20"/>
                 </Grid.ColumnDefinitions>
@@ -50,8 +53,23 @@
                            FontWeight="Bold"
                            FontSize="10"/>
 
-                <!-- Remove button -->
+                <!-- Spectrum button (only visible for FFT measurements) -->
                 <Button Grid.Column="2"
+                        Content="📊"
+                        Click="Button_Spectrum_Click"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        Foreground="White"
+                        FontSize="10"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Width="18"
+                        Height="18"
+                        ToolTip="Show FFT Spectrum"
+                        Visibility="{Binding Type, Converter={StaticResource FFTVisibilityConverter}}"/>
+
+                <!-- Remove button -->
+                <Button Grid.Column="3"
                         Content="×"
                         Click="Button_Remove_Click"
                         Background="Transparent"

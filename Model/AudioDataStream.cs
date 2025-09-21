@@ -51,6 +51,15 @@ namespace PowerScope.Model
         }
 
         /// <summary>
+        /// Sample rate of the data stream in samples per second (Hz)
+        /// Implements IDataStream.SampleRate
+        /// </summary>
+        double IDataStream.SampleRate 
+        { 
+            get { return _sampleRate; } 
+        }
+
+        /// <summary>
         /// Gets the name of the audio device being used
         /// </summary>
         public string DeviceName 

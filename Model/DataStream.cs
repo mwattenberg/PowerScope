@@ -25,6 +25,10 @@ namespace PowerScope.Model
         long TotalBits { get;}
         //Number of channels in the data stream
         int ChannelCount { get; }
+        //Sample rate of the data stream in samples per second (Hz)
+        //For streams with known fixed rates, returns the configured rate
+        //For streams with variable rates, returns the current measured rate
+        double SampleRate { get; }
         //Connect to the data source, i.e. open serial port, USB , audio, etc.
         void Connect();
         //disconnect from the data source, i.e. close serial port, USB , audio, etc.

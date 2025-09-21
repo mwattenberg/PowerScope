@@ -23,8 +23,7 @@ namespace PowerScope.View.UserControls
         private StreamSettings _associatedStreamSettings;
 
         private readonly System.Timers.Timer _updateTimer;
-        private long _prevSampleCount = 0;
-        private long _prevBitsCount = 0;
+        private long _prevBitsCount = 0; // Removed _prevSampleCount since we now use the stream's SampleRate property
 
         public StreamInfoPanel(IDataStream dataStream, StreamSettings streamSettings)
         {
@@ -96,6 +95,21 @@ namespace PowerScope.View.UserControls
                 UpdateButtonAppearance();
             }
 
+            // Handle sample rate changes for immediate UI updates (especially useful for serial streams)
+            if (e.PropertyName == nameof(IDataStream.SampleRate))
+            {
+                // Trigger an immediate UI update for sample rate display
+                Application.Current?.Dispatcher?.BeginInvoke(() =>
+                {
+                    if (AssociatedDataStream.IsStreaming)
+                    {
+                        double streamSampleRate = AssociatedDataStream.SampleRate;
+                        long samplesPerSecond = (long)Math.Round(streamSampleRate);
+                        SamplesPerSecondTextBlock.Text = samplesPerSecond.ToString();
+                    }
+                });
+            }
+
             // Handle status message changes to provide user feedback about disconnections
             if (e.PropertyName == nameof(IDataStream.StatusMessage))
             {
@@ -152,10 +166,10 @@ namespace PowerScope.View.UserControls
             {
                 if (AssociatedDataStream.IsStreaming)
                 {
-                    // Calculate samples per second
-                    long currentSamples = AssociatedDataStream.TotalSamples;
-                    long samplesPerSecond = currentSamples - _prevSampleCount;
-                    _prevSampleCount = currentSamples;
+                    // Use the data stream's built-in sample rate calculation
+                    // This provides better accuracy and consistency across different stream types
+                    double streamSampleRate = AssociatedDataStream.SampleRate;
+                    long samplesPerSecond = (long)Math.Round(streamSampleRate);
 
                     // Calculate bits per second and port usage percentage
                     long currentBits = AssociatedDataStream.TotalBits;
@@ -176,7 +190,7 @@ namespace PowerScope.View.UserControls
                             (100.0 * bitsPerSecond / _associatedStreamSettings.Baud) : 0;
                     }
 
-                    // Update UI
+                    // Update UI with the stream's calculated sample rate
                     SamplesPerSecondTextBlock.Text = samplesPerSecond.ToString();
                     if (AssociatedDataStream.StreamType == "Demo" || AssociatedDataStream.StreamType == "Audio")
                     {
@@ -191,7 +205,6 @@ namespace PowerScope.View.UserControls
                 {
                     SamplesPerSecondTextBlock.Text = "0";
                     PortUsageTextBlock.Text = "0%";
-                    _prevSampleCount = 0;
                     _prevBitsCount = 0;
                 }
             });

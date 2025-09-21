@@ -58,6 +58,17 @@ namespace PowerScope.Model
         private bool _isConnected;
         private bool _isStreaming;
         private string _statusMessage;
+        
+        // Sample rate calculation
+        private long _lastSampleCount = 0;
+        private DateTime _lastSampleTime = DateTime.Now;
+        private double _calculatedSampleRate = 0.0;
+        private readonly object _sampleRateCalculationLock = new object();
+        
+        // Exponential low pass filter parameters for sample rate smoothing
+        private const double DefaultFilterAlpha = 0.1; // Default smoothing factor (0.1 = heavy smoothing, 0.9 = light smoothing)
+        private double _sampleRateFilterAlpha = DefaultFilterAlpha;
+
         public SourceSetting SourceSetting { get; init; }
         public long TotalSamples { get; private set; }
         public long TotalBits { get; private set; }
@@ -84,6 +95,45 @@ namespace PowerScope.Model
             { 
                 return Parser.NumberOfChannels; 
             } 
+        }
+
+        /// <summary>
+        /// Sample rate of the serial data stream in samples per second (Hz)
+        /// Calculated dynamically based on received data rate with exponential low pass filtering
+        /// </summary>
+        public double SampleRate 
+        { 
+            get 
+            { 
+                lock (_sampleRateCalculationLock)
+                {
+                    return _calculatedSampleRate;
+                }
+            } 
+        }
+
+        /// <summary>
+        /// Gets or sets the exponential low pass filter alpha value for sample rate smoothing
+        /// Range: 0.01 to 1.0 (0.01 = heavy smoothing, 1.0 = no smoothing)
+        /// Default: 0.1 (moderate smoothing)
+        /// </summary>
+        public double SampleRateFilterAlpha
+        {
+            get 
+            { 
+                lock (_sampleRateCalculationLock)
+                {
+                    return _sampleRateFilterAlpha;
+                }
+            }
+            set 
+            { 
+                lock (_sampleRateCalculationLock)
+                {
+                    // Clamp alpha to reasonable range
+                    _sampleRateFilterAlpha = Math.Max(0.01, Math.Min(1.0, value));
+                }
+            }
         }
 
         public string StatusMessage
@@ -157,8 +207,10 @@ namespace PowerScope.Model
             else
                 _port.StopBits = StopBits.One;
 
-            int ringBufferSize = Math.Max(500000, source.BaudRate / 5);
-            InitializeRingBuffers(ringBufferSize);
+            // Initialize with smart default buffer size
+            // PlotManager will call SetBufferSize() later with the actual PlotSettings.BufferSize
+            int defaultBufferSize = Math.Max(500000, source.BaudRate / 5);
+            InitializeRingBuffers(defaultBufferSize);
 
             // Initialize channel processing arrays
             _channelSettings = new ChannelSettings[dataParser.NumberOfChannels];
@@ -241,15 +293,6 @@ namespace PowerScope.Model
 
             lock (_channelConfigLock)
             {
-                // Store streaming state
-                bool wasStreaming = _isStreaming;
-                
-                // Temporarily stop streaming if running
-                if (wasStreaming)
-                {
-                    StopStreaming();
-                }
-
                 // Clear existing data
                 if (ReceivedData != null)
                 {
@@ -259,18 +302,12 @@ namespace PowerScope.Model
                     }
                 }
 
-                // Recreate ring buffers with new size
+                // Recreate ring buffers with new size - no need to stop/restart streaming
                 InitializeRingBuffers(newBufferSize);
                 
                 // Reset statistics
                 TotalSamples = 0;
                 TotalBits = 0;
-
-                // Restart streaming if it was running before and we're still connected
-                if (wasStreaming && _isConnected)
-                {
-                    StartStreaming();
-                }
             }
             
             // Notify that buffer size changed
@@ -513,6 +550,14 @@ namespace PowerScope.Model
             TotalSamples = 0;
             TotalBits = 0;
             
+            // Reset sample rate calculation when clearing data
+            lock (_sampleRateCalculationLock)
+            {
+                _calculatedSampleRate = 0.0;
+                _lastSampleTime = DateTime.Now;
+                _lastSampleCount = 0;
+            }
+            
             // Reset filters when clearing data
             ResetChannelFilters();
         }
@@ -698,9 +743,51 @@ namespace PowerScope.Model
                 }
             }
             
-            if (channelsToProcess > 0)
+            if (channelsToProcess > 0 && parsedData[0] != null)
             {
-                TotalSamples = TotalSamples + parsedData[0].Length;
+                int newSamples = parsedData[0].Length;
+                TotalSamples += newSamples;
+                
+                // Update sample rate calculation
+                UpdateSampleRateCalculation(newSamples);
+            }
+        }
+
+        /// <summary>
+        /// Updates the calculated sample rate based on incoming data
+        /// Uses an exponential low pass filter for smooth, responsive sample rate calculation
+        /// </summary>
+        private void UpdateSampleRateCalculation(int newSamples)
+        {
+            lock (_sampleRateCalculationLock)
+            {
+                DateTime currentTime = DateTime.Now;
+                double timeDeltaSeconds = (currentTime - _lastSampleTime).TotalSeconds;
+                
+                // Only update if we have at least 100ms of data to avoid noise
+                if (timeDeltaSeconds >= 0.1)
+                {
+                    double instantaneousSampleRate = newSamples / timeDeltaSeconds;
+                    
+                    // Apply exponential low pass filter for smooth sample rate
+                    if (_calculatedSampleRate == 0.0)
+                    {
+                        // First calculation - initialize filter
+                        _calculatedSampleRate = instantaneousSampleRate;
+                    }
+                    else
+                    {
+                        // Exponential low pass filter: y[n] = α * x[n] + (1 - α) * y[n-1]
+                        // Where α is the filter alpha (smoothing factor)
+                        _calculatedSampleRate = _sampleRateFilterAlpha * instantaneousSampleRate + 
+                                              (1.0 - _sampleRateFilterAlpha) * _calculatedSampleRate;
+                    }
+                    
+                    _lastSampleTime = currentTime;
+                    
+                    // Notify property changed for real-time updates
+                    OnPropertyChanged(nameof(SampleRate));
+                }
             }
         }
 

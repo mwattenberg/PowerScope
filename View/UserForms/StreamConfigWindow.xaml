@@ -448,6 +448,7 @@
                                     <ComboBoxItem Content="Random Noise"/>
                                     <ComboBoxItem Content="Mixed Signals"/>
                                     <ComboBoxItem Content="Chirp Signal"/>
+                                    <ComboBoxItem Content="Tones"/>
                                 </ComboBox>
                             </StackPanel>
                             

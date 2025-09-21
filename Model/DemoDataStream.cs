@@ -29,6 +29,14 @@ namespace PowerScope.Model
 
         public int ChannelCount { get; }
 
+        /// <summary>
+        /// Sample rate of the demo data stream in samples per second (Hz)
+        /// </summary>
+        public double SampleRate 
+        { 
+            get { return DemoSettings.SampleRate; } 
+        }
+
         public event PropertyChangedEventHandler PropertyChanged;
 
         protected virtual void OnPropertyChanged(string propertyName)
@@ -125,15 +133,6 @@ namespace PowerScope.Model
 
             lock (_dataLock)
             {
-                // Store streaming state
-                bool wasStreaming = _isStreaming;
-                
-                // Temporarily stop streaming if running
-                if (wasStreaming)
-                {
-                    StopStreaming();
-                }
-
                 // Clear existing data
                 if (ReceivedData != null)
                 {
@@ -143,19 +142,13 @@ namespace PowerScope.Model
                     }
                 }
 
-                // Recreate ring buffers with new size
+                // Recreate ring buffers with new size - no need to stop/restart streaming
                 InitializeRingBuffers(newBufferSize);
                 
                 // Reset statistics
                 TotalSamples = 0;
                 TotalBits = 0;
                 _timeAccumulator = 0;
-
-                // Restart streaming if it was running before
-                if (wasStreaming && _isConnected)
-                {
-                    StartStreaming();
-                }
             }
             
             // Notify that buffer size changed
@@ -346,6 +339,7 @@ namespace PowerScope.Model
                 "Random Noise" => amplitude * (_random.NextDouble() - 0.5) * 2,
                 "Mixed Signals" => GenerateMixedSignal(channel, time, amplitude),
                 "Chirp Signal" => GenerateChirpSignal(channel, time, amplitude),
+                "Tones" => GenerateTonesSignal(channel, time, amplitude),
                 _ => amplitude * Math.Sin(2 * Math.PI * baseFrequency * time)
             };
         }
@@ -395,6 +389,41 @@ namespace PowerScope.Model
             
             // Generate the chirp signal
             return amplitude * Math.Sin(phase);
+        }
+
+        /// <summary>
+        /// Generates a test signal with 1kHz main tone plus two side tones for FFT testing
+        /// Channel 0: 1kHz + side tones at 750Hz and 1250Hz (half amplitude)
+        /// Higher channels: Side tones get progressively closer to 1kHz main tone
+        /// </summary>
+        /// <param name="channel">Channel index (affects side tone placement)</param>
+        /// <param name="time">Current time in seconds</param>
+        /// <param name="amplitude">Main tone amplitude (1000)</param>
+        /// <returns>Composite signal with main tone plus side tones</returns>
+        private double GenerateTonesSignal(int channel, double time, double amplitude)
+        {
+            // Main tone at 1kHz with full amplitude
+            const double mainFrequency = 1000.0; // 1kHz
+            double mainTone = amplitude * Math.Sin(2 * Math.PI * mainFrequency * time);
+            
+            // Calculate side tone frequencies based on channel
+            // Channel 0: ±250Hz offset (750Hz and 1250Hz)
+            // Higher channels: Progressively smaller offsets approaching 1kHz
+            double baseOffset = 250.0; // Base offset of 250Hz for channel 0
+            double offsetReduction = Math.Min(channel * 20.0, 200.0); // Reduce offset by 20Hz per channel, max 200Hz reduction
+            double actualOffset = Math.Max(baseOffset - offsetReduction, 10.0); // Minimum 10Hz offset to keep tones distinguishable
+            
+            // Side tone frequencies
+            double lowerSideTone = mainFrequency - actualOffset;
+            double upperSideTone = mainFrequency + actualOffset;
+            
+            // Side tones with half amplitude
+            double sideToneAmplitude = amplitude * 0.5;
+            double lowerTone = sideToneAmplitude * Math.Sin(2 * Math.PI * lowerSideTone * time);
+            double upperTone = sideToneAmplitude * Math.Sin(2 * Math.PI * upperSideTone * time);
+            
+            // Combine all tones
+            return mainTone + lowerTone + upperTone;
         }
 
         public int CopyLatestTo(int channel, double[] destination, int n)
