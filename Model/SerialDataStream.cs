@@ -765,7 +765,7 @@ namespace PowerScope.Model
                 double timeDeltaSeconds = (currentTime - _lastSampleTime).TotalSeconds;
                 
                 // Only update if we have at least 100ms of data to avoid noise
-                if (timeDeltaSeconds >= 0.1)
+                if (timeDeltaSeconds >= 1)
                 {
                     double instantaneousSampleRate = newSamples / timeDeltaSeconds;
                     

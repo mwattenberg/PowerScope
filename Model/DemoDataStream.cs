@@ -410,7 +410,7 @@ namespace PowerScope.Model
             // Channel 0: ±250Hz offset (750Hz and 1250Hz)
             // Higher channels: Progressively smaller offsets approaching 1kHz
             double baseOffset = 250.0; // Base offset of 250Hz for channel 0
-            double offsetReduction = Math.Min(channel * 20.0, 200.0); // Reduce offset by 20Hz per channel, max 200Hz reduction
+            double offsetReduction = Math.Min(channel * 40.0, 250.0); // Reduce offset by 40Hz per channel, max 200Hz reduction
             double actualOffset = Math.Max(baseOffset - offsetReduction, 10.0); // Minimum 10Hz offset to keep tones distinguishable
             
             // Side tone frequencies

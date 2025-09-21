@@ -360,7 +360,12 @@ namespace PowerScope.Model
             _fftWindow.WpfPlotFFT.Plot.Axes.Bottom.Label.Text = "Frequency (Hz)";
             _fftWindow.WpfPlotFFT.Plot.Axes.Left.Label.Text = "Magnitude (dB)";
             _fftWindow.WpfPlotFFT.Plot.Title("FFT Spectrum - " + _channelSettings.Label + " (Fs = " + _dataStream.SampleRate.ToString("F1") + " Hz)");
-                
+
+            // Initialize X-axis to show frequency range from 0 to Nyquist frequency (SampleRate/2)
+            double nyquistFrequency = _dataStream.SampleRate / 2.0;
+            _fftWindow.WpfPlotFFT.Plot.Axes.SetLimitsX(0, nyquistFrequency);
+            _fftWindow.WpfPlotFFT.Plot.Axes.SetLimitsY(-60, 100);
+
             // Reset signal tracking
             _spectrumSignal = null;
             _lastSpectrumLength = -1;
@@ -584,17 +589,13 @@ namespace PowerScope.Model
 
         private double FFT_Update(ReadOnlySpan<double> data)
         {
-
-            // Use the configured FFT size with zero-padding interpolation
             int effectiveFftSize = _fftSize * _interpolation;
 
             Aelian.FFT.SignalData fftData = Aelian.FFT.SignalData.CreateFromRealSize(effectiveFftSize);
             System.Span<double> realPart = fftData.AsReal();
 
-            // Copy input data (up to FFT size, not interpolated size)
             int copyLength = Math.Min(data.Length, _fftSize);
 
-            // Apply window function if specified
             FFT_ApplyWindowFunction(data, realPart, copyLength);
 
             // Zero-pad the rest for interpolation
@@ -615,28 +616,18 @@ namespace PowerScope.Model
             int spectrumLength = effectiveFftSize / 2;
 
             bool needSpectrum = false;
-            if (_fftWindow != null)
-            {
-                if (_fftWindow.IsVisible)
+            if (_fftWindow != null && _fftWindow.IsVisible)
                     needSpectrum = true;
-            }
-
-            // If spectrum is needed, ensure arrays exist and are the right size, but DON'T replace them
-            //if (needSpectrum)
-            //{
-            //    if (_spectrumFrequencies == null || _spectrumFrequencies.Length != spectrumLength)
-            //    {
-            //        _spectrumFrequencies = new double[spectrumLength];
-            //    }
-            //    if (_spectrumMagnitudes == null || _spectrumMagnitudes.Length != spectrumLength)
-            //    {
-            //        _spectrumMagnitudes = new double[spectrumLength];
-            //    }
-            //}
 
             // Get actual sample rate from the data stream
             double sampleRate = _dataStream.SampleRate;
             double frequencyResolution = sampleRate / effectiveFftSize;
+
+            // Calculate proper scaling factors for magnitude correction
+            double fftScaling = 2.0 / _fftSize; // Factor of 2 for single-sided spectrum, divide by N for FFT scaling
+            
+            // Calculate window-specific amplitude correction factor
+            double windowAmplitudeCorrection = GetWindowAmplitudeCorrection(_windowFunction);
 
             // Calculate magnitudes and optionally build spectrum arrays
             for (int i = 0; i < spectrumLength; i++)
@@ -644,12 +635,20 @@ namespace PowerScope.Model
                 double magnitude = Math.Sqrt(complexData[i].Real * complexData[i].Real + 
                                             complexData[i].Imaginary * complexData[i].Imaginary);
 
+                // Apply proper scaling: FFT scaling and window amplitude correction
+                magnitude = magnitude * fftScaling * windowAmplitudeCorrection;
+                
+                // Special case for DC component (i=0) - no factor of 2 needed for single-sided spectrum
+                if (i == 0)
+                {
+                    magnitude = magnitude / 2.0;
+                }
+
                 if (magnitude > maxMagnitude)
                 {
                     maxMagnitude = magnitude;
                     peakBin = i;
                 }
-
 
                 if (needSpectrum)
                 {
@@ -672,6 +671,31 @@ namespace PowerScope.Model
                 
             double peakFrequency = peakBin * frequencyResolution;
             return peakFrequency;
+        }
+
+        /// <summary>
+        /// Get the amplitude correction factor for the specified window function
+        /// These factors compensate for the amplitude loss caused by windowing
+        /// </summary>
+        /// <param name="windowFunction">Name of the window function</param>
+        /// <returns>Amplitude correction factor</returns>
+        private double GetWindowAmplitudeCorrection(string windowFunction)
+        {
+            switch (windowFunction)
+            {
+                case "Hann":
+                    return 2.0; // Hann window has coherent gain of 0.5, so correction is 2.0
+                
+                case "Blackman-Harris":
+                    return 2.79; // Blackman-Harris window has coherent gain of ~0.358, so correction is ~2.79
+                
+                case "Flat Top":
+                    return 4.64; // Flat Top window has coherent gain of ~0.215, so correction is ~4.64
+                
+                case "None":
+                default:
+                    return 1.0; // Rectangular window (no windowing) needs no correction
+            }
         }
 
         /// <summary>
@@ -820,21 +844,6 @@ namespace PowerScope.Model
             }
         }
 
-        /// <summary>
-        /// Computes the next highest power of two for a given integer n
-        /// </summary>
-        private static int NextPowerOfTwo(int value)
-        {
-            if (value <= 0) return 1;
-            
-            // Find the next power of 2
-            int power = 1;
-            while (power < value)
-            {
-                power <<= 1;
-            }
-            return power;
-        }
         #endregion
     }
 }

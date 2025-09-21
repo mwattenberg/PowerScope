@@ -47,7 +47,7 @@ namespace PowerScope.View.UserControls
             
             // Initialize measurement update timer
             _measurementTimer = new DispatcherTimer(DispatcherPriority.Background);
-            _measurementTimer.Interval = TimeSpan.FromMilliseconds(200);
+            _measurementTimer.Interval = TimeSpan.FromMilliseconds(125);
             _measurementTimer.Tick += UpdateAllChannelMeasurements;
         }
 
