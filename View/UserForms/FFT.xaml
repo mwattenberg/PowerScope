@@ -127,7 +127,7 @@
                            Style="{StaticResource FFTLabelStyle}" Margin="2"/>
                     <ComboBox x:Name="ComboBox_FFTSize" Grid.Column="1" Grid.Row="0" 
                               VerticalAlignment="Center" Margin="2"
-                              SelectedValue="{Binding FFTSize}"
+                              SelectedValue="{Binding FFT_Size, Mode=TwoWay}"
                               SelectedValuePath="Tag">
                         <ComboBoxItem Content="128">
                             <ComboBoxItem.Tag>
@@ -171,7 +171,7 @@
                            Style="{StaticResource FFTLabelStyle}" Margin="2"/>
                     <ComboBox x:Name="ComboBox_Interpolation" Grid.Column="1" Grid.Row="1" 
                               VerticalAlignment="Center" Margin="2"
-                              SelectedValue="{Binding Interpolation}"
+                              SelectedValue="{Binding FFT_Interpolation, Mode=TwoWay}"
                               SelectedValuePath="Tag">
                         <ComboBoxItem Content="1x">
                             <ComboBoxItem.Tag>
@@ -200,7 +200,7 @@
                            Style="{StaticResource FFTLabelStyle}" Margin="2"/>
                     <ComboBox x:Name="ComboBox_Window" Grid.Column="1" Grid.Row="2" 
                               VerticalAlignment="Center" Margin="2"
-                              SelectedValue="{Binding WindowFunction}"
+                              SelectedValue="{Binding FFT_WindowFunction, Mode=TwoWay}"
                               SelectedValuePath="Tag">
                         <ComboBoxItem Content="Blackman-Harris" Tag="Blackman-Harris"/>
                         <ComboBoxItem Content="Hann" Tag="Hann"/>
@@ -213,7 +213,7 @@
                            Style="{StaticResource FFTLabelStyle}" Margin="2"/>
                     <ComboBox x:Name="ComboBox_Averaging" Grid.Column="1" Grid.Row="3" 
                               VerticalAlignment="Center" Margin="2"
-                              SelectedValue="{Binding Averaging}"
+                              SelectedValue="{Binding FFT_Averaging, Mode=TwoWay}"
                               SelectedValuePath="Tag">
                         <ComboBoxItem Content="1x">
                             <ComboBoxItem.Tag>

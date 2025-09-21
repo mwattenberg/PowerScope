@@ -56,7 +56,7 @@ namespace PowerScope.Model
         private int _lastSpectrumLength = -1; // Track when we need to rebuild the signal
 
         // FFT configuration properties
-        private int _fftSize = 1024;
+        private int _fftSize = 4096;
         private int _interpolation = 1;
         private string _windowFunction = "Blackman-Harris";
         private int _averaging = 1;
@@ -89,7 +89,7 @@ namespace PowerScope.Model
             // For other measurements, use a reasonable default
             int bufferSize;
             if (measurementType == MeasurementType.FFT)
-                bufferSize = 8192;
+                bufferSize = 16384; // Use maximum possible FFT size instead of current _fftSize
             else
                 bufferSize = 5000;
 
@@ -104,17 +104,6 @@ namespace PowerScope.Model
                 _calculationFunction = data => FFT_Update(data);
                 FFT_PreCalculateWindowCoefficients();
             }
-        }
-
-        /// <summary>
-        /// Legacy constructor for backward compatibility
-        /// </summary>
-        /// <param name="measurementType">Type of measurement to perform</param>
-        /// <param name="dataStream">Data stream to read from</param>
-        /// <param name="channelIndex">Zero-based channel index</param>
-        public Measurement(MeasurementType measurementType, IDataStream dataStream, int channelIndex)
-            : this(measurementType, dataStream, channelIndex, new ChannelSettings { Label = $"CH{channelIndex + 1}" })
-        {
         }
 
         /// <summary>
@@ -170,51 +159,49 @@ namespace PowerScope.Model
             {
                 return _result;
             }
-            private set 
-            { 
-                if (!EqualityComparer<double>.Default.Equals(_result, value))
-                {
+            private set
+            {
                     _result = value;
                     OnPropertyChanged(nameof(Result));
-                }
+
             }
         }
 
         /// <summary>
         /// Spectrum frequencies for FFT measurements (Hz)
         /// </summary>
-        public double[] SpectrumFrequencies
-        {
-            get
-            {
-                return _spectrumFrequencies;
-            }
-        }
+        //public double[] SpectrumFrequencies
+        //{
+        //    get
+        //    {
+        //        return _spectrumFrequencies;
+        //    }
+        //}
 
-        /// <summary>
-        /// Spectrum magnitudes for FFT measurements (dB)
-        /// </summary>
-        public double[] SpectrumMagnitudes
-        {
-            get
-            {
-                return _spectrumMagnitudes;
-            }
-        }
+        ///// <summary>
+        ///// Spectrum magnitudes for FFT measurements (dB)
+        ///// </summary>
+        //public double[] SpectrumMagnitudes
+        //{
+        //    get
+        //    {
+        //        return _spectrumMagnitudes;
+        //    }
+        //}
 
         /// <summary>
         /// Whether this measurement has spectrum data available
         /// </summary>
-        public bool HasSpectrumData
-        {
-            get
-            {
-                if (_measurementType != MeasurementType.FFT) return false;
-                if (_spectrumFrequencies == null) return false;
-                if (_spectrumMagnitudes == null) return false;
-                return true;
-            }
-        }
+        //public bool HasSpectrumData
+        //{
+        //    get
+        //    {
+        //        if (_measurementType != MeasurementType.FFT) return false;
+        //        if (_spectrumFrequencies == null) return false;
+        //        if (_spectrumMagnitudes == null) return false;
+        //        return true;
+        //    }
+        //}
 
         /// <summary>
         /// FFT size (number of samples for FFT calculation)
@@ -228,31 +215,23 @@ namespace PowerScope.Model
             }
             set
             {
-                int clampedValue = Math.Max(128, Math.Min(8192, value));
-                int powerOfTwo = NextPowerOfTwo(clampedValue);
-                
-                if (_fftSize != powerOfTwo)
-                {
-                    _fftSize = powerOfTwo;
-                    OnPropertyChanged(nameof(FFT_Size));
+
+                _fftSize = value;
+                OnPropertyChanged(nameof(FFT_Size));
                     
-                    // Invalidate window coefficients since FFT size changed
-                    _windowCoefficientsValid = false;
-                    FFT_PreCalculateWindowCoefficients();
+                // Invalidate window coefficients since FFT size changed
+                _windowCoefficientsValid = false;
+                FFT_PreCalculateWindowCoefficients();
                     
-                    // Invalidate cached spectrum signal since data length will change
-                    _lastSpectrumLength = -1;
+                // Invalidate cached spectrum signal since data length will change
+                _lastSpectrumLength = -1;
                     
-                    // Recalculate spectrum if FFT window is open
-                    if (_fftWindow != null && _fftWindow.IsVisible)
-                    {
-                        if (Application.Current != null)
-                        {
-                            if (Application.Current.Dispatcher != null)
-                                Application.Current.Dispatcher.BeginInvoke((Action)FFT_UpdateSpectrumPlot);
-                        }
-                    }
-                }
+
+                int newSpectrumLength = _fftSize * _interpolation / 2;
+                _spectrumFrequencies = new double[newSpectrumLength];
+                _spectrumMagnitudes = new double[newSpectrumLength];
+                        
+
             }
         }
 
@@ -268,30 +247,15 @@ namespace PowerScope.Model
             }
             set
             {
-                int clampedValue;
-                if (value <= 1) clampedValue = 1;
-                else if (value <= 2) clampedValue = 2;
-                else if (value <= 4) clampedValue = 4;
-                else clampedValue = 8;
-                
-                if (_interpolation != clampedValue)
-                {
-                    _interpolation = clampedValue;
-                    OnPropertyChanged(nameof(FFT_Interpolation));
+                _interpolation = value;
+                OnPropertyChanged(nameof(FFT_Interpolation));
                     
-                    // Invalidate cached spectrum signal since data length will change
-                    _lastSpectrumLength = -1;
+                // Invalidate cached spectrum signal since data length will change
+                _lastSpectrumLength = -1;
                     
-                    // Recalculate spectrum if FFT window is open
-                    if (_fftWindow != null && _fftWindow.IsVisible)
-                    {
-                        if (Application.Current != null)
-                        {
-                            if (Application.Current.Dispatcher != null)
-                                Application.Current.Dispatcher.BeginInvoke((Action)FFT_UpdateSpectrumPlot);
-                        }
-                    }
-                }
+                int newSpectrumLength = _fftSize * _interpolation / 2;
+                _spectrumFrequencies = new double[newSpectrumLength];
+                _spectrumMagnitudes = new double[newSpectrumLength];
             }
         }
 
@@ -307,31 +271,15 @@ namespace PowerScope.Model
             }
             set
             {
-                string validatedValue;
-                if (value == "Hann") validatedValue = "Hann";
-                else if (value == "Flat Top") validatedValue = "Flat Top";
-                else if (value == "None") validatedValue = "None";
-                else validatedValue = "Blackman-Harris";
-                
-                if (_windowFunction != validatedValue)
-                {
-                    _windowFunction = validatedValue;
-                    OnPropertyChanged(nameof(FFT_WindowFunction));
+                string validatedValue = value;
+
+                _windowFunction = validatedValue;
+                OnPropertyChanged(nameof(FFT_WindowFunction));
                     
-                    // Invalidate window coefficients since window function changed
-                    _windowCoefficientsValid = false;
-                    FFT_PreCalculateWindowCoefficients();
+                // Invalidate window coefficients since window function changed
+                _windowCoefficientsValid = false;
+                FFT_PreCalculateWindowCoefficients();
                     
-                    // Recalculate spectrum if FFT window is open
-                    if (_fftWindow != null && _fftWindow.IsVisible)
-                    {
-                        if (Application.Current != null)
-                        {
-                            if (Application.Current.Dispatcher != null)
-                                Application.Current.Dispatcher.BeginInvoke((Action)FFT_UpdateSpectrumPlot);
-                        }
-                    }
-                }
             }
         }
 
@@ -347,28 +295,8 @@ namespace PowerScope.Model
             }
             set
             {
-                int clampedValue;
-                if (value <= 1) clampedValue = 1;
-                else if (value <= 2) clampedValue = 2;
-                else if (value <= 4) clampedValue = 4;
-                else if (value <= 8) clampedValue = 8;
-                else clampedValue = 16;
-                
-                if (_averaging != clampedValue)
-                {
-                    _averaging = clampedValue;
-                    OnPropertyChanged(nameof(FFT_Averaging));
-                    
-                    // Recalculate spectrum if FFT window is open
-                    if (_fftWindow != null && _fftWindow.IsVisible)
-                    {
-                        if (Application.Current != null)
-                        {
-                            if (Application.Current.Dispatcher != null)
-                                Application.Current.Dispatcher.BeginInvoke((Action)FFT_UpdateSpectrumPlot);
-                        }
-                    }
-                }
+                _averaging = value;
+                OnPropertyChanged(nameof(FFT_Averaging));
             }
         }
 
@@ -386,20 +314,25 @@ namespace PowerScope.Model
         /// </summary>
         public void FFT_ShowSpectrumWindow()
         {
-            if (_measurementType != MeasurementType.FFT) return;
-
             if (_fftWindow == null || !_fftWindow.IsVisible)
             {
                 _fftWindow = new View.UserForms.FFT();
                 _fftWindow.DataContext = this; // Set the Measurement as DataContext
+
+                // (Removed redundant default re-application; defaults are set in constructor.)
+
                 _fftWindow.Title = "FFT Spectrum - " + _channelSettings.Label;
-                _fftWindow.Closed += (s, e) => {
+                _fftWindow.Closed += (s, e) => 
+                {
                     _fftWindow = null;
                     _spectrumSignal = null; // Clear cached signal when window closes
                     _lastSpectrumLength = -1;
                 };
+
+                _spectrumFrequencies = new double[FFT_Size * FFT_Interpolation / 2];
+                _spectrumMagnitudes = new double[FFT_Size * FFT_Interpolation / 2];
                 _fftWindow.Show();
-                
+
                 // Initialize the spectrum plot with constant elements (PlotManager pattern)
                 FFT_InitializeSpectrumPlot();
             }
@@ -420,26 +353,17 @@ namespace PowerScope.Model
         {
             if (_fftWindow == null) return;
 
-            try
-            {
-                // Clear the plot completely for fresh start
-                _fftWindow.WpfPlotFFT.Plot.Clear();
+            // Clear the plot completely for fresh start
+            _fftWindow.WpfPlotFFT.Plot.Clear();
                 
-                // Set constant elements that never change
-                _fftWindow.WpfPlotFFT.Plot.Axes.Bottom.Label.Text = "Frequency (Hz)";
-                _fftWindow.WpfPlotFFT.Plot.Axes.Left.Label.Text = "Magnitude (dB)";
-                _fftWindow.WpfPlotFFT.Plot.Title("FFT Spectrum - " + _channelSettings.Label + " (Fs = " + _dataStream.SampleRate.ToString("F1") + " Hz)");
+            // Set constant elements that never change
+            _fftWindow.WpfPlotFFT.Plot.Axes.Bottom.Label.Text = "Frequency (Hz)";
+            _fftWindow.WpfPlotFFT.Plot.Axes.Left.Label.Text = "Magnitude (dB)";
+            _fftWindow.WpfPlotFFT.Plot.Title("FFT Spectrum - " + _channelSettings.Label + " (Fs = " + _dataStream.SampleRate.ToString("F1") + " Hz)");
                 
-                // Reset signal tracking
-                _spectrumSignal = null;
-                _lastSpectrumLength = -1;
-                
-                Debug.WriteLine("FFT: Spectrum plot initialized with constant elements");
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine("FFT: Error initializing spectrum plot: " + ex.Message);
-            }
+            // Reset signal tracking
+            _spectrumSignal = null;
+            _lastSpectrumLength = -1;
         }
 
         /// <summary>
@@ -448,62 +372,41 @@ namespace PowerScope.Model
         /// </summary>
         private void FFT_UpdateSpectrumPlot()
         {
-            if (_fftWindow == null) return;
-            if (!HasSpectrumData) return;
+            //if (_fftWindow == null) return;
 
-            try
-            {
-                Stopwatch stopwatch = Stopwatch.StartNew();
+            int currentSpectrumLength = 0;
+            if (_spectrumFrequencies != null) currentSpectrumLength = _spectrumFrequencies.Length;
                 
-                int currentSpectrumLength = 0;
-                if (_spectrumFrequencies != null) currentSpectrumLength = _spectrumFrequencies.Length;
+            // Check if we need to rebuild the signal (data length changed)
+            bool needsRebuild = false;
+            if (_spectrumSignal == null) 
+                needsRebuild = true;
+            if (_lastSpectrumLength != currentSpectrumLength) 
+                needsRebuild = true;
                 
-                // Check if we need to rebuild the signal (data length changed)
-                bool needsRebuild = false;
-                if (_spectrumSignal == null) needsRebuild = true;
-                if (_lastSpectrumLength != currentSpectrumLength) needsRebuild = true;
-                
-                if (needsRebuild)
-                {
-                    Debug.WriteLine("FFT: Rebuilding spectrum signal - Length changed from " + _lastSpectrumLength + " to " + currentSpectrumLength);
+            if (needsRebuild)
+            {                    
+                // Remove old signal if it exists
+                if (_spectrumSignal != null)
+                    _fftWindow.WpfPlotFFT.Plot.Remove(_spectrumSignal);
+
+                // Create new signal with current data
+                ScottPlot.Plottables.SignalXY newSignal = _fftWindow.WpfPlotFFT.Plot.Add.SignalXY(_spectrumFrequencies, _spectrumMagnitudes);
+                _spectrumSignal = newSignal;
+
+
+                // Apply constant signal properties (set once)
+                ScottPlot.Color scColor = new ScottPlot.Color(_channelSettings.Color.R, _channelSettings.Color.G, _channelSettings.Color.B);
+                _spectrumSignal.Color = scColor;
+                _spectrumSignal.LineWidth = 2.0f;
+                _spectrumSignal.LineStyle.AntiAlias = true;
+                _spectrumSignal.MarkerShape = ScottPlot.MarkerShape.None;
                     
-                    // Remove old signal if it exists
-                    if (_spectrumSignal != null)
-                        _fftWindow.WpfPlotFFT.Plot.Remove(_spectrumSignal);
-
-                    // Create new signal with current data
-                    ScottPlot.Plottables.SignalXY newSignal = _fftWindow.WpfPlotFFT.Plot.Add.SignalXY(_spectrumFrequencies, _spectrumMagnitudes);
-                    _spectrumSignal = newSignal;
-
-                    //_spectrumSignal = _fftWindow.WpfPlotFFT.Plot.Add.Signal(_spectrumMagnitudes);
-
-                    // Apply constant signal properties (set once)
-                    ScottPlot.Color scColor = new ScottPlot.Color(_channelSettings.Color.R, _channelSettings.Color.G, _channelSettings.Color.B);
-                    _spectrumSignal.Color = scColor;
-                    _spectrumSignal.LineWidth = 2.0f;
-                    _spectrumSignal.LineStyle.AntiAlias = true;
-                    _spectrumSignal.MarkerShape = ScottPlot.MarkerShape.None;
-                    
-                    _lastSpectrumLength = currentSpectrumLength;
-                }
-                else
-                {
-                    // Efficient update: just update the data arrays in the existing signal
-                    // The SignalXY plot will automatically use the updated array data
-                    // No need to recreate the signal or set properties again
-                }
-                
-                stopwatch.Stop();
-                Debug.WriteLine("FFT: Spectrum plot updated - " + stopwatch.Elapsed.TotalMicroseconds.ToString("F1") + " us (Rebuild: " + needsRebuild.ToString() + ")");
-                
-                // Refresh the plot to show updated data
-                _fftWindow.WpfPlotFFT.Refresh();
-                
+                _lastSpectrumLength = currentSpectrumLength;
             }
-            catch (Exception ex)
-            {
-                Debug.WriteLine("FFT: Error updating spectrum plot: " + ex.Message);
-            }
+      
+            // Refresh the plot to show updated data
+            _fftWindow.WpfPlotFFT.Refresh();
         }
 
         /// <summary>
@@ -513,49 +416,38 @@ namespace PowerScope.Model
         {
             if (_disposed) return;
 
-            try
-            {
-                // For FFT measurements, copy exactly the amount of data needed based on FFT size
-                // For other measurements, use the full buffer for maximum accuracy
-                int samplesToCopy;
-                if (_measurementType == MeasurementType.FFT) samplesToCopy = _fftSize; else samplesToCopy = _dataBuffer.Length;
+
+            // For FFT measurements, copy exactly the amount of data needed based on FFT size
+            // For other measurements, use the full buffer for maximum accuracy
+            int samplesToCopy;
+            if (_measurementType == MeasurementType.FFT) 
+                samplesToCopy = _fftSize; 
+            else 
+                samplesToCopy = _dataBuffer.Length;
                 
-                // Ensure we don't exceed buffer capacity
-                if (samplesToCopy > _dataBuffer.Length) samplesToCopy = _dataBuffer.Length;
+            // Ensure we don't exceed buffer capacity
+            if (samplesToCopy > _dataBuffer.Length) 
+                samplesToCopy = _dataBuffer.Length;
                 
-                // Copy fresh data from the data stream - respecting FFT size for FFT measurements
-                int samplesCopied = _dataStream.CopyLatestTo(_channelIndex, _dataBuffer, samplesToCopy);
+            int samplesCopied = _dataStream.CopyLatestTo(_channelIndex, _dataBuffer, samplesToCopy);
                 
-                if (samplesCopied > 0)
-                {
-                    ReadOnlySpan<double> validData = _dataBuffer.AsSpan(0, samplesCopied);
+
+            ReadOnlySpan<double> validData = _dataBuffer.AsSpan(0, samplesCopied);
                     
-                    if (_measurementType == MeasurementType.FFT)
-                    {
-                        double newResult = FFT_Update(validData);
-                        Result = newResult;
+            if (_measurementType == MeasurementType.FFT)
+            {
+                double newResult = FFT_Update(validData);
+                Result = newResult;
                         
-                        // Update FFT plot if window is open
-                        if (_fftWindow != null && _fftWindow.IsVisible)
-                        {
-                            if (Application.Current != null)
-                            {
-                                if (Application.Current.Dispatcher != null)
-                                    Application.Current.Dispatcher.BeginInvoke((Action)FFT_UpdateSpectrumPlot);
-                            }
-                        }
-                    }
-                    else
+                // Update FFT plot if window is open
+                if (_fftWindow != null && _fftWindow.IsVisible)
+                {
+                    if (Application.Current != null)
                     {
-                        double newResult = _calculationFunction(validData);
-                        Result = newResult;
+                        if (Application.Current.Dispatcher != null)
+                            Application.Current.Dispatcher.BeginInvoke((Action)FFT_UpdateSpectrumPlot);
                     }
                 }
-            }
-            catch
-            {
-                // Ignore errors - measurement will just use stale data
-                // This can happen if the data stream is being disposed or has errors
             }
         }
 
@@ -692,138 +584,94 @@ namespace PowerScope.Model
 
         private double FFT_Update(ReadOnlySpan<double> data)
         {
-            Stopwatch totalStopwatch = Stopwatch.StartNew();
 
-            try
+            // Use the configured FFT size with zero-padding interpolation
+            int effectiveFftSize = _fftSize * _interpolation;
+
+            Aelian.FFT.SignalData fftData = Aelian.FFT.SignalData.CreateFromRealSize(effectiveFftSize);
+            System.Span<double> realPart = fftData.AsReal();
+
+            // Copy input data (up to FFT size, not interpolated size)
+            int copyLength = Math.Min(data.Length, _fftSize);
+
+            // Apply window function if specified
+            FFT_ApplyWindowFunction(data, realPart, copyLength);
+
+            // Zero-pad the rest for interpolation
+            for (int i = copyLength; i < effectiveFftSize; i++)
             {
-                if (data.Length < 4)
+                realPart[i] = 0.0;
+            }
+
+            Aelian.FFT.FastFourierTransform.RealFFT(realPart, true);
+
+            // Calculate magnitude spectrum and find peak frequency
+
+            System.Span<System.Numerics.Complex> complexData = fftData.AsComplex();
+            double maxMagnitude = 0.0;
+            int peakBin = 0;
+
+            // Prepare arrays for spectrum data (only positive frequencies)
+            int spectrumLength = effectiveFftSize / 2;
+
+            bool needSpectrum = false;
+            if (_fftWindow != null)
+            {
+                if (_fftWindow.IsVisible)
+                    needSpectrum = true;
+            }
+
+            // If spectrum is needed, ensure arrays exist and are the right size, but DON'T replace them
+            //if (needSpectrum)
+            //{
+            //    if (_spectrumFrequencies == null || _spectrumFrequencies.Length != spectrumLength)
+            //    {
+            //        _spectrumFrequencies = new double[spectrumLength];
+            //    }
+            //    if (_spectrumMagnitudes == null || _spectrumMagnitudes.Length != spectrumLength)
+            //    {
+            //        _spectrumMagnitudes = new double[spectrumLength];
+            //    }
+            //}
+
+            // Get actual sample rate from the data stream
+            double sampleRate = _dataStream.SampleRate;
+            double frequencyResolution = sampleRate / effectiveFftSize;
+
+            // Calculate magnitudes and optionally build spectrum arrays
+            for (int i = 0; i < spectrumLength; i++)
+            {
+                double magnitude = Math.Sqrt(complexData[i].Real * complexData[i].Real + 
+                                            complexData[i].Imaginary * complexData[i].Imaginary);
+
+                if (magnitude > maxMagnitude)
                 {
-                    totalStopwatch.Stop();
-                    Debug.WriteLine("FFT: Insufficient data (" + data.Length + " samples) - " + totalStopwatch.Elapsed.TotalMicroseconds.ToString("F1") + " us");
-                    return 0.0;
+                    maxMagnitude = magnitude;
+                    peakBin = i;
                 }
 
-                // Use the configured FFT size with zero-padding interpolation
-                int effectiveFftSize = _fftSize * _interpolation;
 
-                Debug.WriteLine("FFT: Starting calculation - Size: " + _fftSize + ", Interpolation: " + _interpolation + "x, Effective: " + effectiveFftSize + ", Window: " + _windowFunction);
-
-                // Copy data to FFT buffer with windowing and zero-padding
-                Stopwatch dataProcessingStopwatch = Stopwatch.StartNew();
-                Aelian.FFT.SignalData fftData = Aelian.FFT.SignalData.CreateFromRealSize(effectiveFftSize);
-                System.Span<double> realPart = fftData.AsReal();
-
-                // Copy input data (up to FFT size, not interpolated size)
-                int copyLength = Math.Min(data.Length, _fftSize);
-
-                // Apply window function if specified
-                FFT_ApplyWindowFunction(data, realPart, copyLength);
-
-                // Zero-pad the rest for interpolation
-                for (int i = copyLength; i < effectiveFftSize; i++)
-                {
-                    realPart[i] = 0.0;
-                }
-
-                dataProcessingStopwatch.Stop();
-                Debug.WriteLine("FFT: Data preparation completed - " + dataProcessingStopwatch.Elapsed.TotalMicroseconds.ToString("F1") + " us");
-
-                // Perform FFT
-                Stopwatch fftStopwatch = Stopwatch.StartNew();
-                Aelian.FFT.FastFourierTransform.RealFFT(realPart, true);
-                fftStopwatch.Stop();
-                Debug.WriteLine("FFT: Core FFT calculation completed - " + fftStopwatch.Elapsed.TotalMicroseconds.ToString("F1") + " us");
-
-                // Calculate magnitude spectrum and find peak frequency
-                Stopwatch spectrumStopwatch = Stopwatch.StartNew();
-                System.Span<System.Numerics.Complex> complexData = fftData.AsComplex();
-                double maxMagnitude = 0.0;
-                int peakBin = 0;
-
-                // Prepare arrays for spectrum data (only positive frequencies)
-                int spectrumLength = effectiveFftSize / 2;
-
-                bool needSpectrum = false;
-                if (_fftWindow != null)
-                {
-                    if (_fftWindow.IsVisible)
-                        needSpectrum = true;
-                }
-
-                // If spectrum is needed, ensure arrays exist and are the right size, but DON'T replace them
                 if (needSpectrum)
                 {
-                    if (_spectrumFrequencies == null || _spectrumFrequencies.Length != spectrumLength)
+                    _spectrumFrequencies[i] = i * frequencyResolution;
+
+                    // Apply averaging smoothing (exponential moving average simulation)
+                    if (_averaging > 1 && i < _spectrumMagnitudes.Length)
                     {
-                        _spectrumFrequencies = new double[spectrumLength];
-                        Debug.WriteLine("FFT: Created new frequency array with length " + spectrumLength);
+                        double alpha = 2.0 / (_averaging + 1.0); // EMA smoothing factor
+                        double currentMagdB = 20.0 * Math.Log10(Math.Max(magnitude, 1e-10));
+                        _spectrumMagnitudes[i] = alpha * currentMagdB + (1.0 - alpha) * _spectrumMagnitudes[i];
                     }
-                    if (_spectrumMagnitudes == null || _spectrumMagnitudes.Length != spectrumLength)
+                    else
                     {
-                        _spectrumMagnitudes = new double[spectrumLength];
-                        Debug.WriteLine("FFT: Created new magnitude array with length " + spectrumLength);
-                    }
-                }
-
-                // Get actual sample rate from the data stream
-                double sampleRate = _dataStream.SampleRate;
-                if (sampleRate <= 0)
-                    sampleRate = 10000.0; // 10 kHz default
-
-                double frequencyResolution = sampleRate / effectiveFftSize;
-
-                // Calculate magnitudes and optionally build spectrum arrays
-                for (int i = 0; i < spectrumLength; i++)
-                {
-                    double magnitude = Math.Sqrt(complexData[i].Real * complexData[i].Real + 
-                                               complexData[i].Imaginary * complexData[i].Imaginary);
-
-                    // Track peak for the result value (using linear magnitude for peak detection)
-                    if (i > 0)
-                    {
-                        if (magnitude > maxMagnitude)
-                        {
-                            maxMagnitude = magnitude;
-                            peakBin = i;
-                        }
-                    }
-
-                    if (needSpectrum)
-                    {
-                        _spectrumFrequencies[i] = i * frequencyResolution;
-
-                        // Apply averaging smoothing (exponential moving average simulation)
-                        if (_averaging > 1 && i < _spectrumMagnitudes.Length)
-                        {
-                            double alpha = 2.0 / (_averaging + 1.0); // EMA smoothing factor
-                            double currentMagdB = 20.0 * Math.Log10(Math.Max(magnitude, 1e-10));
-                            _spectrumMagnitudes[i] = alpha * currentMagdB + (1.0 - alpha) * _spectrumMagnitudes[i];
-                        }
-                        else
-                        {
-                            // Convert to dB (with small offset to avoid log(0))
-                            _spectrumMagnitudes[i] = 20.0 * Math.Log10(Math.Max(magnitude, 1e-10));
-                        }
+                        // Convert to dB (with small offset to avoid log(0))
+                        _spectrumMagnitudes[i] = 20.0 * Math.Log10(Math.Max(magnitude, 1e-10));
                     }
                 }
-
-                spectrumStopwatch.Stop();
-                Debug.WriteLine("FFT: Spectrum calculation completed - " + spectrumStopwatch.Elapsed.TotalMicroseconds.ToString("F1") + " us");
-
-                totalStopwatch.Stop();
-                double peakFrequency = peakBin * frequencyResolution;
-                Debug.WriteLine("FFT: Total execution time - " + totalStopwatch.Elapsed.TotalMicroseconds.ToString("F1") + " us, Peak at " + peakFrequency.ToString("F1") + " Hz");
-
-                // Return the dominant frequency in Hz
-                return peakFrequency;
             }
-            catch (Exception ex)
-            {
-                totalStopwatch.Stop();
-                Debug.WriteLine("FFT: Error during calculation - " + totalStopwatch.Elapsed.TotalMicroseconds.ToString("F1") + " us, Error: " + ex.Message);
-                // Return 0 on any calculation errors
-                return 0.0;
-            }
+                
+            double peakFrequency = peakBin * frequencyResolution;
+            return peakFrequency;
         }
 
         /// <summary>
@@ -831,8 +679,6 @@ namespace PowerScope.Model
         /// </summary>
         private void FFT_ApplyWindowFunction(ReadOnlySpan<double> input, Span<double> output, int length)
         {
-            Stopwatch stopwatch = Stopwatch.StartNew();
-            
             // Ensure window coefficients are valid
             if (!_windowCoefficientsValid || _windowCoefficients == null || _windowCoefficients.Length != _fftSize)
             {
@@ -846,8 +692,6 @@ namespace PowerScope.Model
                 output[i] = input[i] * _windowCoefficients[i];
             }
             
-            stopwatch.Stop();
-            Debug.WriteLine("FFT: Window function (" + _windowFunction + ") applied to " + length + " samples using pre-calculated coefficients - " + stopwatch.Elapsed.TotalMicroseconds.ToString("F1") + " us");
         }
 
         /// <summary>
@@ -855,11 +699,7 @@ namespace PowerScope.Model
         /// Called when FFT size or window function changes
         /// </summary>
         private void FFT_PreCalculateWindowCoefficients()
-        {
-            if (_measurementType != MeasurementType.FFT) return;
-
-            Stopwatch stopwatch = Stopwatch.StartNew();
-            
+        {            
             // Allocate or reallocate window coefficients array
             if (_windowCoefficients == null || _windowCoefficients.Length != _fftSize)
             {
@@ -885,8 +725,6 @@ namespace PowerScope.Model
             }
             
             _windowCoefficientsValid = true;
-            stopwatch.Stop();
-            Debug.WriteLine("FFT: Pre-calculated " + _windowFunction + " window coefficients for " + _fftSize + " samples - " + stopwatch.Elapsed.TotalMicroseconds.ToString("F1") + " us");
         }
 
         /// <summary>
