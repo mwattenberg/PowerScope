@@ -6,7 +6,7 @@ namespace PowerScope.Model
 {
     public class RingBuffer<T> : IEnumerable<T>
     {
-        private readonly T[] _buffer;
+        private T[] _buffer;
         private readonly int _capacity;
         private int _head = 0;
         private int _tail = 0;
@@ -78,8 +78,6 @@ namespace PowerScope.Model
         /// <returns>Actual number of elements copied</returns>
         public int CopyLatestTo(T[] destination, int requestedCount)
         {
-            if (destination == null || requestedCount <= 0)
-                return 0;
 
             lock (_lock)
             {

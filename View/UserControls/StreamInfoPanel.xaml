@@ -28,7 +28,7 @@
     <Grid MinWidth="140">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>   <!-- Connect and Close buttons row -->
-            <RowDefinition Height="Auto"/>   <!-- Port/Baud and Config button -->
+            <RowDefinition Height="Auto"/>   <!-- Port/Baud display -->
             <RowDefinition Height="Auto"/>   <!-- Port Usage -->
             <RowDefinition Height="Auto"/>   <!-- Samples/sec -->
             <RowDefinition Height="Auto"/>   <!-- Status -->
@@ -62,16 +62,9 @@
                     ToolTip="Remove stream" />
         </Grid>
 
-        <!-- Second row with: PortBaud | Config -->
+        <!-- Second row with Port/Baud display only -->
         <Grid Grid.Row="1" Margin="2,2,2,2">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto"/>    <!-- PortBaud -->
-                <ColumnDefinition Width="Auto"/>    <!-- Config -->
-                <ColumnDefinition Width="*"/>       <!-- Spacer -->
-            </Grid.ColumnDefinitions>
-            
-            <TextBlock Grid.Column="0"
-                       x:Name="PortBaudTextBlock"
+            <TextBlock x:Name="PortBaudTextBlock"
                        Text=""
                        VerticalAlignment="Center"
                        FontWeight="Bold"
@@ -80,17 +73,6 @@
                        TextWrapping="NoWrap"
                        Margin="2,0,4,0"
                        HorizontalAlignment="Left"/>
-            
-            <!-- Config button with wrench icon -->
-            <Button Grid.Column="1" x:Name="Button_Configure" Content="🔧" Width="22" Height="22" Margin="2,0,2,0"
-                    VerticalAlignment="Center" HorizontalAlignment="Center"
-                    Click="Button_Configure_Click"
-                    Background="Transparent" Foreground="LightGray"
-                    BorderThickness="0" FontSize="12" FontWeight="Bold"
-                    ToolTip="Configure stream" />
-            
-            <!-- Spacer -->
-            <Border Grid.Column="2"/>
         </Grid>
 
         <!-- Port Usage Information -->

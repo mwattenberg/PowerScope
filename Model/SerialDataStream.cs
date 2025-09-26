@@ -300,6 +300,7 @@ namespace PowerScope.Model
                     {
                         buffer?.Clear();
                     }
+
                 }
 
                 // Recreate ring buffers with new size - no need to stop/restart streaming

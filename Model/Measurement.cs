@@ -56,14 +56,14 @@ namespace PowerScope.Model
         private int _lastSpectrumLength = -1; // Track when we need to rebuild the signal
 
         // FFT configuration properties
-        private int _fftSize = 4096;
-        private int _interpolation = 1;
-        private string _windowFunction = "Blackman-Harris";
-        private int _averaging = 1;
+        private int _FFT_Size = 4096;
+        private int _FFT_interpolation = 1; // Zero-padding factor
+        private string _FFT_windowFunction = "Blackman-Harris";
+        private int _FFT_averaging = 1;
 
         // Pre-calculated window function coefficients for performance optimization
-        private double[] _windowCoefficients;
-        private bool _windowCoefficientsValid = false;
+        private double[] _FFT_windowCoefficients;
+        private bool _FFT_windowCoefficientsValid = false;
 
         // Events
         public event EventHandler RemoveRequested;
@@ -79,10 +79,8 @@ namespace PowerScope.Model
         public Measurement(MeasurementType measurementType, IDataStream dataStream, int channelIndex, ChannelSettings channelSettings)
         {
             _measurementType = measurementType;
-            if (dataStream == null) throw new ArgumentNullException(nameof(dataStream));
             _dataStream = dataStream;
             _channelIndex = channelIndex;
-            if (channelSettings == null) throw new ArgumentNullException(nameof(channelSettings));
             _channelSettings = channelSettings;
             
             // For FFT measurements, ensure buffer is large enough for maximum FFT size
@@ -101,7 +99,8 @@ namespace PowerScope.Model
             if (measurementType == MeasurementType.FFT)
             {
                 // For FFT measurements we need an instance-bound calculation function
-                _calculationFunction = data => FFT_Update(data);
+                // Traditional C-style: assign function pointer directly
+                _calculationFunction = CalculateFFT;
                 FFT_PreCalculateWindowCoefficients();
             }
         }
@@ -167,41 +166,7 @@ namespace PowerScope.Model
             }
         }
 
-        /// <summary>
-        /// Spectrum frequencies for FFT measurements (Hz)
-        /// </summary>
-        //public double[] SpectrumFrequencies
-        //{
-        //    get
-        //    {
-        //        return _spectrumFrequencies;
-        //    }
-        //}
 
-        ///// <summary>
-        ///// Spectrum magnitudes for FFT measurements (dB)
-        ///// </summary>
-        //public double[] SpectrumMagnitudes
-        //{
-        //    get
-        //    {
-        //        return _spectrumMagnitudes;
-        //    }
-        //}
-
-        /// <summary>
-        /// Whether this measurement has spectrum data available
-        /// </summary>
-        //public bool HasSpectrumData
-        //{
-        //    get
-        //    {
-        //        if (_measurementType != MeasurementType.FFT) return false;
-        //        if (_spectrumFrequencies == null) return false;
-        //        if (_spectrumMagnitudes == null) return false;
-        //        return true;
-        //    }
-        //}
 
         /// <summary>
         /// FFT size (number of samples for FFT calculation)
@@ -211,23 +176,23 @@ namespace PowerScope.Model
         {
             get
             {
-                return _fftSize;
+                return _FFT_Size;
             }
             set
             {
 
-                _fftSize = value;
+                _FFT_Size = value;
                 OnPropertyChanged(nameof(FFT_Size));
                     
                 // Invalidate window coefficients since FFT size changed
-                _windowCoefficientsValid = false;
+                _FFT_windowCoefficientsValid = false;
                 FFT_PreCalculateWindowCoefficients();
                     
                 // Invalidate cached spectrum signal since data length will change
                 _lastSpectrumLength = -1;
                     
 
-                int newSpectrumLength = _fftSize * _interpolation / 2;
+                int newSpectrumLength = _FFT_Size * _FFT_interpolation / 2;
                 _spectrumFrequencies = new double[newSpectrumLength];
                 _spectrumMagnitudes = new double[newSpectrumLength];
                         
@@ -243,17 +208,17 @@ namespace PowerScope.Model
         {
             get
             {
-                return _interpolation;
+                return _FFT_interpolation;
             }
             set
             {
-                _interpolation = value;
+                _FFT_interpolation = value;
                 OnPropertyChanged(nameof(FFT_Interpolation));
                     
                 // Invalidate cached spectrum signal since data length will change
                 _lastSpectrumLength = -1;
                     
-                int newSpectrumLength = _fftSize * _interpolation / 2;
+                int newSpectrumLength = _FFT_Size * _FFT_interpolation / 2;
                 _spectrumFrequencies = new double[newSpectrumLength];
                 _spectrumMagnitudes = new double[newSpectrumLength];
             }
@@ -267,17 +232,17 @@ namespace PowerScope.Model
         {
             get
             {
-                return _windowFunction;
+                return _FFT_windowFunction;
             }
             set
             {
                 string validatedValue = value;
 
-                _windowFunction = validatedValue;
+                _FFT_windowFunction = validatedValue;
                 OnPropertyChanged(nameof(FFT_WindowFunction));
                     
                 // Invalidate window coefficients since window function changed
-                _windowCoefficientsValid = false;
+                _FFT_windowCoefficientsValid = false;
                 FFT_PreCalculateWindowCoefficients();
                     
             }
@@ -291,11 +256,11 @@ namespace PowerScope.Model
         {
             get
             {
-                return _averaging;
+                return _FFT_averaging;
             }
             set
             {
-                _averaging = value;
+                _FFT_averaging = value;
                 OnPropertyChanged(nameof(FFT_Averaging));
             }
         }
@@ -318,8 +283,6 @@ namespace PowerScope.Model
             {
                 _fftWindow = new View.UserForms.FFT();
                 _fftWindow.DataContext = this; // Set the Measurement as DataContext
-
-                // (Removed redundant default re-application; defaults are set in constructor.)
 
                 _fftWindow.Title = "FFT Spectrum - " + _channelSettings.Label;
                 _fftWindow.Closed += (s, e) => 
@@ -377,10 +340,10 @@ namespace PowerScope.Model
         /// </summary>
         private void FFT_UpdateSpectrumPlot()
         {
-            //if (_fftWindow == null) return;
 
             int currentSpectrumLength = 0;
-            if (_spectrumFrequencies != null) currentSpectrumLength = _spectrumFrequencies.Length;
+            if (_spectrumFrequencies != null) 
+                currentSpectrumLength = _spectrumFrequencies.Length;
                 
             // Check if we need to rebuild the signal (data length changed)
             bool needsRebuild = false;
@@ -421,21 +384,23 @@ namespace PowerScope.Model
         {
             if (_disposed) return;
 
-
             // For FFT measurements, copy exactly the amount of data needed based on FFT size
-            // For other measurements, use the full buffer for maximum accuracy
+            // For other measurements, use 5000 samples as requested (hardcoded for now)
             int samplesToCopy;
             if (_measurementType == MeasurementType.FFT) 
-                samplesToCopy = _fftSize; 
+                samplesToCopy = _FFT_Size; 
             else 
-                samplesToCopy = _dataBuffer.Length;
+                samplesToCopy = 5000; // Use hardcoded 5000 samples for non-FFT measurements
                 
-            // Ensure we don't exceed buffer capacity
-            if (samplesToCopy > _dataBuffer.Length) 
-                samplesToCopy = _dataBuffer.Length;
+            //// Ensure we don't exceed buffer capacity
+            //if (samplesToCopy > _dataBuffer.Length) 
+            //    samplesToCopy = _dataBuffer.Length;
                 
             int samplesCopied = _dataStream.CopyLatestTo(_channelIndex, _dataBuffer, samplesToCopy);
-                
+            
+            // Skip calculation if no data was copied
+            if (samplesCopied <= 0)
+                return;
 
             ReadOnlySpan<double> validData = _dataBuffer.AsSpan(0, samplesCopied);
                     
@@ -453,6 +418,12 @@ namespace PowerScope.Model
                             Application.Current.Dispatcher.BeginInvoke((Action)FFT_UpdateSpectrumPlot);
                     }
                 }
+            }
+            else
+            {
+                // Calculate using the assigned function pointer for non-FFT measurements
+                double newResult = _calculationFunction(validData);
+                Result = newResult;
             }
         }
 
@@ -501,10 +472,14 @@ namespace PowerScope.Model
             double min = double.MaxValue;
             foreach (double value in data)
             {
-                if (double.IsNaN(value) || double.IsInfinity(value)) continue;
-                if (value < min) min = value;
+                if (double.IsNaN(value) || double.IsInfinity(value)) 
+                    continue;
+                if (value < min) 
+                    min = value;
             }
-            if (min == double.MaxValue) return 0.0; else return min;
+            if (min == double.MaxValue) 
+                return 0.0; 
+            else return min;
         }
 
         private static double CalculateMaximum(ReadOnlySpan<double> data)
@@ -512,10 +487,14 @@ namespace PowerScope.Model
             double max = double.MinValue;
             foreach (double value in data)
             {
-                if (double.IsNaN(value) || double.IsInfinity(value)) continue;
-                if (value > max) max = value;
+                if (double.IsNaN(value) || double.IsInfinity(value)) 
+                    continue;
+                if (value > max) 
+                    max = value;
             }
-            if (max == double.MinValue) return 0.0; else return max;
+            if (max == double.MinValue)
+                return 0.0; 
+            else return max;
         }
 
         private static double CalculateMean(ReadOnlySpan<double> data)
@@ -524,11 +503,16 @@ namespace PowerScope.Model
             int count = 0;
             foreach (double value in data)
             {
-                if (double.IsNaN(value) || double.IsInfinity(value)) continue;
+                if (double.IsNaN(value) || double.IsInfinity(value)) 
+                    continue;
+
                 sum += value;
                 count++;
             }
-            if (count > 0) return sum / count; else return 0.0;
+            if (count > 0) 
+                return sum / count; 
+            else 
+                return 0.0;
         }
 
         private static double CalculateRms(ReadOnlySpan<double> data)
@@ -537,11 +521,15 @@ namespace PowerScope.Model
             int count = 0;
             foreach (double value in data)
             {
-                if (double.IsNaN(value) || double.IsInfinity(value)) continue;
+                if (double.IsNaN(value) || double.IsInfinity(value)) 
+                    continue;
+
                 sumOfSquares += value * value;
                 count++;
             }
-            if (count > 0) return Math.Sqrt(sumOfSquares / count); else return 0.0;
+            if (count > 0) 
+                return Math.Sqrt(sumOfSquares / count); 
+            else return 0.0;
         }
 
         private static double CalculateStandardDeviation(ReadOnlySpan<double> data)
@@ -549,14 +537,20 @@ namespace PowerScope.Model
             double mean = CalculateMean(data);
             double sumOfSquaredDifferences = 0.0;
             int count = 0;
+
             foreach (double value in data)
             {
-                if (double.IsNaN(value) || double.IsInfinity(value)) continue;
+                if (double.IsNaN(value) || double.IsInfinity(value)) 
+                    continue;
+
                 double diff = value - mean;
                 sumOfSquaredDifferences += diff * diff;
                 count++;
             }
-            if (count > 0) return Math.Sqrt(sumOfSquaredDifferences / count); else return 0.0;
+            if (count > 0) 
+                return Math.Sqrt(sumOfSquaredDifferences / count);
+            else 
+                return 0.0;
         }
 
         private static double CalculateVariance(ReadOnlySpan<double> data)
@@ -566,12 +560,17 @@ namespace PowerScope.Model
             int count = 0;
             foreach (double value in data)
             {
-                if (double.IsNaN(value) || double.IsInfinity(value)) continue;
+                if (double.IsNaN(value) || double.IsInfinity(value)) 
+                    continue;
+
                 double diff = value - mean;
                 sumOfSquaredDifferences += diff * diff;
                 count++;
             }
-            if (count > 0) return sumOfSquaredDifferences / count; else return 0.0;
+            if (count > 0) 
+                return sumOfSquaredDifferences / count; 
+            else 
+                return 0.0;
         }
 
         private static double CalculatePeakToPeak(ReadOnlySpan<double> data)
@@ -580,21 +579,35 @@ namespace PowerScope.Model
             double max = double.MinValue;
             foreach (double value in data)
             {
-                if (double.IsNaN(value) || double.IsInfinity(value)) continue;
+                if (double.IsNaN(value) || double.IsInfinity(value)) 
+                    continue;
+
                 if (value < min) min = value;
                 if (value > max) max = value;
             }
-            if (min == double.MaxValue || max == double.MinValue) return 0.0; else return max - min;
+            if (min == double.MaxValue || max == double.MinValue) 
+                return 0.0; 
+            else 
+                return max - min;
+        }
+
+        /// <summary>
+        /// FFT calculation function (matching traditional C-style function pointer pattern)
+        /// Note: This is an instance method that gets bound to the specific Measurement instance
+        /// </summary>
+        private double CalculateFFT(ReadOnlySpan<double> data)
+        {
+            return FFT_Update(data);
         }
 
         private double FFT_Update(ReadOnlySpan<double> data)
         {
-            int effectiveFftSize = _fftSize * _interpolation;
+            int effectiveFftSize = _FFT_Size * _FFT_interpolation;
 
             Aelian.FFT.SignalData fftData = Aelian.FFT.SignalData.CreateFromRealSize(effectiveFftSize);
             System.Span<double> realPart = fftData.AsReal();
 
-            int copyLength = Math.Min(data.Length, _fftSize);
+            int copyLength = Math.Min(data.Length, _FFT_Size);
 
             FFT_ApplyWindowFunction(data, realPart, copyLength);
 
@@ -624,10 +637,10 @@ namespace PowerScope.Model
             double frequencyResolution = sampleRate / effectiveFftSize;
 
             // Calculate proper scaling factors for magnitude correction
-            double fftScaling = 2.0 / _fftSize; // Factor of 2 for single-sided spectrum, divide by N for FFT scaling
+            double fftScaling = 2.0 / _FFT_Size; // Factor of 2 for single-sided spectrum, divide by N for FFT scaling
             
             // Calculate window-specific amplitude correction factor
-            double windowAmplitudeCorrection = GetWindowAmplitudeCorrection(_windowFunction);
+            double windowAmplitudeCorrection = GetWindowAmplitudeCorrection(_FFT_windowFunction);
 
             // Calculate magnitudes and optionally build spectrum arrays
             for (int i = 0; i < spectrumLength; i++)
@@ -655,9 +668,9 @@ namespace PowerScope.Model
                     _spectrumFrequencies[i] = i * frequencyResolution;
 
                     // Apply averaging smoothing (exponential moving average simulation)
-                    if (_averaging > 1 && i < _spectrumMagnitudes.Length)
+                    if (_FFT_averaging > 1 && i < _spectrumMagnitudes.Length)
                     {
-                        double alpha = 2.0 / (_averaging + 1.0); // EMA smoothing factor
+                        double alpha = 2.0 / (_FFT_averaging + 1.0); // EMA smoothing factor
                         double currentMagdB = 20.0 * Math.Log10(Math.Max(magnitude, 1e-10));
                         _spectrumMagnitudes[i] = alpha * currentMagdB + (1.0 - alpha) * _spectrumMagnitudes[i];
                     }
@@ -704,16 +717,16 @@ namespace PowerScope.Model
         private void FFT_ApplyWindowFunction(ReadOnlySpan<double> input, Span<double> output, int length)
         {
             // Ensure window coefficients are valid
-            if (!_windowCoefficientsValid || _windowCoefficients == null || _windowCoefficients.Length != _fftSize)
+            if (!_FFT_windowCoefficientsValid || _FFT_windowCoefficients == null || _FFT_windowCoefficients.Length != _FFT_Size)
             {
                 FFT_PreCalculateWindowCoefficients();
             }
             
             // Apply pre-calculated window coefficients (element-wise multiplication)
-            int applyLength = Math.Min(length, _windowCoefficients.Length);
+            int applyLength = Math.Min(length, _FFT_windowCoefficients.Length);
             for (int i = 0; i < applyLength; i++)
             {
-                output[i] = input[i] * _windowCoefficients[i];
+                output[i] = input[i] * _FFT_windowCoefficients[i];
             }
             
         }
@@ -725,13 +738,13 @@ namespace PowerScope.Model
         private void FFT_PreCalculateWindowCoefficients()
         {            
             // Allocate or reallocate window coefficients array
-            if (_windowCoefficients == null || _windowCoefficients.Length != _fftSize)
+            if (_FFT_windowCoefficients == null || _FFT_windowCoefficients.Length != _FFT_Size)
             {
-                _windowCoefficients = new double[_fftSize];
+                _FFT_windowCoefficients = new double[_FFT_Size];
             }
             
             // Calculate coefficients based on window function type
-            switch (_windowFunction)
+            switch (_FFT_windowFunction)
             {
                 case "Hann":
                     FFT_PreCalculateHannWindow();
@@ -748,7 +761,7 @@ namespace PowerScope.Model
                     break;
             }
             
-            _windowCoefficientsValid = true;
+            _FFT_windowCoefficientsValid = true;
         }
 
         /// <summary>
@@ -761,10 +774,10 @@ namespace PowerScope.Model
             const double a2 = 0.14128;
             const double a3 = 0.01168;
             
-            for (int i = 0; i < _fftSize; i++)
+            for (int i = 0; i < _FFT_Size; i++)
             {
-                double n = i / (double)(_fftSize - 1);
-                _windowCoefficients[i] = a0 - a1 * Math.Cos(2.0 * Math.PI * n) + 
+                double n = i / (double)(_FFT_Size - 1);
+                _FFT_windowCoefficients[i] = a0 - a1 * Math.Cos(2.0 * Math.PI * n) + 
                                         a2 * Math.Cos(4.0 * Math.PI * n) - 
                                         a3 * Math.Cos(6.0 * Math.PI * n);
             }
@@ -775,9 +788,9 @@ namespace PowerScope.Model
         /// </summary>
         private void FFT_PreCalculateHannWindow()
         {
-            for (int i = 0; i < _fftSize; i++)
+            for (int i = 0; i < _FFT_Size; i++)
             {
-                _windowCoefficients[i] = 0.5 * (1.0 - Math.Cos(2.0 * Math.PI * i / (_fftSize - 1)));
+                _FFT_windowCoefficients[i] = 0.5 * (1.0 - Math.Cos(2.0 * Math.PI * i / (_FFT_Size - 1)));
             }
         }
 
@@ -792,10 +805,10 @@ namespace PowerScope.Model
             const double a3 = 0.083578947;
             const double a4 = 0.006947368;
             
-            for (int i = 0; i < _fftSize; i++)
+            for (int i = 0; i < _FFT_Size; i++)
             {
-                double n = i / (double)(_fftSize - 1);
-                _windowCoefficients[i] = a0 - a1 * Math.Cos(2.0 * Math.PI * n) + 
+                double n = i / (double)(_FFT_Size - 1);
+                _FFT_windowCoefficients[i] = a0 - a1 * Math.Cos(2.0 * Math.PI * n) + 
                                         a2 * Math.Cos(4.0 * Math.PI * n) - 
                                         a3 * Math.Cos(6.0 * Math.PI * n) + 
                                         a4 * Math.Cos(8.0 * Math.PI * n);
@@ -807,9 +820,9 @@ namespace PowerScope.Model
         /// </summary>
         private void FFT_PreCalculateRectangularWindow()
         {
-            for (int i = 0; i < _fftSize; i++)
+            for (int i = 0; i < _FFT_Size; i++)
             {
-                _windowCoefficients[i] = 1.0;
+                _FFT_windowCoefficients[i] = 1.0;
             }
         }
 

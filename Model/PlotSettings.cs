@@ -101,7 +101,7 @@ namespace PowerScope.Model
         private int _ymin = -200;
         private int _ymax = 4000;
         private bool _yAutoScale = true;
-        private int _bufferSize = 1000;
+        private int _bufferSize = 50000;
         private bool _triggerModeEnabled = false;
 
         /// <summary>

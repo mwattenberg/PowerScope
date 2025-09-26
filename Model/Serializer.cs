@@ -40,6 +40,7 @@ namespace PowerScope.Model
             parent.Add(new XElement("AntiAliasing", plotManager.Settings.AntiAliasing));
             parent.Add(new XElement("ShowRenderTime", plotManager.Settings.ShowRenderTime));
             parent.Add(new XElement("YAutoScale", plotManager.Settings.YAutoScale));
+            parent.Add(new XElement("BufferSize", plotManager.Settings.BufferSize));
             parent.Add(new XElement("Xmin", plotManager.Settings.Xmin));
             parent.Add(new XElement("Xmax", plotManager.Settings.Xmax));
             parent.Add(new XElement("Ymin", plotManager.Settings.Ymin));
@@ -231,6 +232,14 @@ namespace PowerScope.Model
                 yAutoScaleValue = "true";
             bool yAutoScale = bool.Parse(yAutoScaleValue);
 
+            XElement bufferSizeElement = settingsXml.Element("BufferSize");
+            string bufferSizeValue;
+            if (bufferSizeElement != null)
+                bufferSizeValue = bufferSizeElement.Value;
+            else
+                bufferSizeValue = "500000"; // Default buffer size
+            int bufferSize = int.Parse(bufferSizeValue);
+
             XElement xMinElement = settingsXml.Element("Xmin");
             string xMinValue;
             if (xMinElement != null)
@@ -269,6 +278,7 @@ namespace PowerScope.Model
             plotManager.Settings.AntiAliasing = antiAliasing;
             plotManager.Settings.ShowRenderTime = showRenderTime;
             plotManager.Settings.YAutoScale = yAutoScale;
+            plotManager.Settings.BufferSize = bufferSize;
             plotManager.Settings.Xmin = xMin;
             plotManager.Settings.Xmax = xMax;
             plotManager.Settings.Ymin = yMin;

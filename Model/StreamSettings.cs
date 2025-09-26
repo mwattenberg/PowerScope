@@ -321,21 +321,27 @@ namespace PowerScope.Model
 
         public void UpdateFromWindow(View.UserForms.SerialConfigWindow window)
         {
-            this.Port = window.SelectedPort;
-            this.Baud = window.SelectedBaud;
-            this.DataBits = window.SelectedDataBits;
-            this.StopBits = window.SelectedStopBits;
-            this.Parity = window.SelectedParity;
-            this.AudioDevice = window.SelectedAudioDevice;
-            this.AudioDeviceIndex = window.SelectedAudioDeviceIndex;
-            this.AudioSampleRate = window.SelectedSampleRate;
-            // Get NumberType from the ComboBox
+            // Only handle properties that require special logic or don't have reliable binding
+            
+            // Get NumberType from ComboBox (requires special Tag-based logic)
             if (window.ComboBox_NumberType?.SelectedItem is ComboBoxItem selectedItem && 
                 Enum.TryParse<NumberTypeEnum>(selectedItem.Tag?.ToString(), out var numberType))
             {
                 this.NumberType = numberType;
             }
-            // Demo properties are handled by data binding automatically
+
+            // Get DataFormat from ComboBox (requires special Tag-based logic)
+            if (window.ComboBox_DataFormat?.SelectedItem is ComboBoxItem dataFormatItem &&
+                Enum.TryParse<DataFormatType>(dataFormatItem.Tag?.ToString(), out var dataFormat))
+            {
+                this.DataFormat = dataFormat;
+            }
+            
+            // All other properties are handled by two-way data binding automatically:
+            // - Demo properties (NumberOfChannels, DemoSampleRate, DemoSignalType)
+            // - Serial properties (Port, Baud, DataBits, StopBits, Parity)
+            // - Audio properties (AudioDevice, AudioDeviceIndex, AudioSampleRate)
+            // - Other properties (Endianness, Delimiter, FrameStart, EnableChecksum)
         }
     }
 }

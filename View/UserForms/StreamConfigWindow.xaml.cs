@@ -19,8 +19,8 @@ namespace PowerScope.View.UserForms
     public partial class SerialConfigWindow : Window
     {
         // Common fallback sample rates if device-specific rates can't be determined
-        private static readonly int[] FallbackSampleRates = new int[] { 8000, 16000, 22050, 44100, 48000, 96000 };
-        
+        private static readonly int[] FallbackAudioSampleRates = new int[] { 8000, 16000, 22050, 44100, 48000, 96000 };
+
         readonly List<PortInfo> ports = new List<PortInfo>();
         private List<AudioDeviceInfo> audioDevices = new List<AudioDeviceInfo>();
         
@@ -41,9 +41,38 @@ namespace PowerScope.View.UserForms
             ComboBox_AudioDevices.SelectionChanged += ComboBox_AudioDevices_SelectionChanged;
             SetRawBinaryPanelVisibility();
             SetASCIIPanelVisibility();
+            
+            // Automatically select the appropriate tab based on the configured StreamSource
+            SelectTabBasedOnStreamSource();
         }
 
         public SerialConfigWindow() : this(new StreamSettings()) { }
+
+        /// <summary>
+        /// Automatically selects the appropriate tab based on the StreamSource in the ViewModel
+        /// This allows users to directly edit their previously configured stream type
+        /// </summary>
+        private void SelectTabBasedOnStreamSource()
+        {
+            if (TabControl_StreamTypes == null || ViewModel == null)
+                return;
+
+            // Map StreamSource enum to the corresponding tab
+            TabItem targetTab = ViewModel.StreamSource switch
+            {
+                StreamSource.SerialPort => TabItem_Serial,
+                StreamSource.AudioInput => TabItem_Audio,
+                StreamSource.Demo => TabItem_Demo,
+                StreamSource.USB => null, // USB tab exists but is not implemented yet
+                _ => TabItem_Serial // Default fallback to Serial tab
+            };
+
+            // Select the target tab if it exists
+            if (targetTab != null)
+            {
+                TabControl_StreamTypes.SelectedItem = targetTab;
+            }
+        }
 
         // Custom window event handlers
         private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -87,8 +116,6 @@ namespace PowerScope.View.UserForms
             ComboBox_Port.ItemsSource = ports;
             ComboBox_Port.DisplayMemberPath = "Description";
             ComboBox_Port.SelectedValuePath = "Port";
-
-            // Pre-populate baud rates, allow user to edit
         }
 
         private void SerialConfigWindow_Loaded_AudioDevices(object sender, RoutedEventArgs e)
@@ -204,7 +231,7 @@ namespace PowerScope.View.UserForms
 
         private void PopulateFallbackSampleRates()
         {
-            foreach (var rate in FallbackSampleRates)
+            foreach (var rate in FallbackAudioSampleRates)
             {
                 ComboBox_SampleRates.Items.Add(rate.ToString());
             }
@@ -271,14 +298,14 @@ namespace PowerScope.View.UserForms
                 // If still no rates found, assume device supports common rates
                 if (!supportedRates.Any())
                 {
-                    supportedRates.UnionWith(FallbackSampleRates);
+                    supportedRates.UnionWith(FallbackAudioSampleRates);
                 }
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Error getting supported sample rates: {ex.Message}");
                 // Return common rates as fallback
-                supportedRates.UnionWith(FallbackSampleRates);
+                supportedRates.UnionWith(FallbackAudioSampleRates);
             }
             
             return supportedRates;

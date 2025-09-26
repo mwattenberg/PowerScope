@@ -157,13 +157,44 @@ namespace PowerScope.View.UserControls
             }
         }
 
-        // Input validation methods
-        private void DecimalOnly_PreviewTextInput(object sender, TextCompositionEventArgs e)
+        private void GainOffset_KeyDown(object sender, KeyEventArgs e)
         {
             var textBox = sender as TextBox;
-            var newText = textBox.Text.Insert(textBox.SelectionStart, e.Text);
-            e.Handled = !IsDecimal(newText);
+            if (textBox == null || Settings == null) return;
+
+            if (e.Key == Key.Enter)
+            {
+                // Force the binding to update by updating the source immediately
+                var bindingExpression = textBox.GetBindingExpression(TextBox.TextProperty);
+                bindingExpression?.UpdateSource();
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Add || e.Key == Key.Subtract)
+            {
+                // Increment/decrement the first decimal place (0.1 increments)
+                double currentValue = 0.0;
+                bool isGainTextBox = textBox.Name == "GainTextBox";
+
+                // Get current value from the bound property (more reliable than parsing text)
+                if (isGainTextBox)
+                {
+                    if (e.Key == Key.Add)
+                        Settings.Gain = Settings.Gain * 1.01;
+                    else
+                        Settings.Gain = Settings.Gain * 0.99;
+                }
+                else // OffsetTextBox
+                {
+                    if (e.Key == Key.Add)
+                        Settings.Offset = Settings.Offset * 1.01;
+                    else
+                        Settings.Offset = Settings.Offset * 0.99;
+                }
+
+                e.Handled = true;
+            }
         }
+
 
         private void SignedDecimalOnly_PreviewTextInput(object sender, TextCompositionEventArgs e)
         {
@@ -172,14 +203,10 @@ namespace PowerScope.View.UserControls
             e.Handled = !IsSignedDecimal(newText);
         }
 
-        private static bool IsDecimal(string text)
-        {
-            return Regex.IsMatch(text, @"^[0-9]*\.?[0-9]*$") && text != "." && !text.EndsWith("..");
-        }
-
         private static bool IsSignedDecimal(string text)
         {
-            return Regex.IsMatch(text, @"^-?[0-9]*\.?[0-9]*$") && text != "-" && text != "." && !text.EndsWith("..");
+            // Updated regex to support exponential notation
+            return Regex.IsMatch(text, @"^-?[0-9]*(\.[0-9]*)?([eE][-+]?[0-9]+)?$") && text != "." && !text.EndsWith("..");
         }
     }
 }

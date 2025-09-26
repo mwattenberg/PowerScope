@@ -2,12 +2,14 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="clr-namespace:PowerScope.View.UserControls"
+             xmlns:converters="clr-namespace:PowerScope.Converters"
              MinWidth="110" MinHeight="140"
              FontFamily="{DynamicResource {x:Static SystemFonts.MessageFontFamily}}"
              FontSize="{DynamicResource {x:Static SystemFonts.MessageFontSize}}">
     <UserControl.Resources>
         <!-- Value converter -->
         <local:ColorToBrushConverter x:Key="ColorToBrushConverter"/>
+        <converters:ExponentialNotationConverter x:Key="ExponentialNotationConverter"/>
         
         <!-- Use global button style -->
         <Style TargetType="Button" BasedOn="{StaticResource ButtonStyle}">
@@ -65,9 +67,17 @@
                 </Setter.Value>
             </Setter>
         </Style>
-        <!-- TextBox style for channel label -->
+        <!-- Editable TextBox style for channel label -->
         <Style x:Key="ChannelLabelTextBoxStyle" TargetType="TextBox" BasedOn="{StaticResource ControlLabelTextBoxStyle}">
-            <!-- Inherits all properties from the unified ControlLabelTextBoxStyle in App.xaml -->
+            <!-- Override IsReadOnly to make it editable -->
+            <Setter Property="IsReadOnly" Value="False"/>
+            <!-- Add subtle border when focused for better UX -->
+            <Style.Triggers>
+                <Trigger Property="IsFocused" Value="True">
+                    <Setter Property="BorderThickness" Value="1"/>
+                    <Setter Property="BorderBrush" Value="#FF0078D4"/>
+                </Trigger>
+            </Style.Triggers>
         </Style>
         <!-- TextBox style for gain/offset inputs -->
         <Style x:Key="GainOffsetInputStyle" TargetType="TextBox" BasedOn="{StaticResource TextBoxStyle}">
@@ -138,9 +148,9 @@
                         ToolTip="Enable/Disable channel">
                     <TextBlock x:Name="PlayPauseIcon" Text="▶" FontSize="8" Margin="0"/>
                 </Button>
-                <!-- Channel label -->
+                <!-- Editable channel label -->
                 <TextBox x:Name="ChannelLabelTextBox" Grid.Column="1" 
-                         Text="{Binding Label}" 
+                         Text="{Binding Label, UpdateSourceTrigger=LostFocus}" 
                          Style="{StaticResource ChannelLabelTextBoxStyle}" 
                          Margin="2,0,2,0" 
                          RenderTransformOrigin="0.5,0.5">
@@ -178,15 +188,17 @@
                 <Label Grid.Column="1" Grid.Row="0" Content="Gain" Style="{StaticResource GainOffsetLabelStyle}"/>
                 <!-- Input boxes -->
                 <TextBox x:Name="OffsetTextBox" Grid.Column="0" Grid.Row="1" 
-                         Text="{Binding Offset, StringFormat=F3, UpdateSourceTrigger=LostFocus}" 
+                         Text="{Binding Offset, Converter={StaticResource ExponentialNotationConverter}, UpdateSourceTrigger=LostFocus}" 
                          Style="{StaticResource GainOffsetInputStyle}" 
                          Margin="2,0,1,2"
-                         PreviewTextInput="SignedDecimalOnly_PreviewTextInput"/>
+                         PreviewTextInput="SignedDecimalOnly_PreviewTextInput"
+                         KeyDown="GainOffset_KeyDown"/> 
                 <TextBox x:Name="GainTextBox" Grid.Column="1" Grid.Row="1" 
-                         Text="{Binding Gain, StringFormat=F3, UpdateSourceTrigger=LostFocus}" 
+                         Text="{Binding Gain, Converter={StaticResource ExponentialNotationConverter}, UpdateSourceTrigger=LostFocus}" 
                          Style="{StaticResource GainOffsetInputStyle}" 
                          Margin="1,0,2,2"
-                         PreviewTextInput="DecimalOnly_PreviewTextInput"/>
+                         PreviewTextInput="SignedDecimalOnly_PreviewTextInput"
+                         KeyDown="GainOffset_KeyDown"/>
             </Grid>
         </Border>
         <!-- Filters button -->

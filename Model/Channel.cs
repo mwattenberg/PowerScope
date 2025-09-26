@@ -31,10 +31,6 @@ namespace PowerScope.Model
         /// <param name="settings">Channel settings for display and processing</param>
         public Channel(IDataStream ownerStream, int localChannelIndex, ChannelSettings settings)
         {
-            if (ownerStream == null)
-                throw new ArgumentNullException(nameof(ownerStream));
-            if (settings == null)
-                throw new ArgumentNullException(nameof(settings));
             if (localChannelIndex < 0 || localChannelIndex >= ownerStream.ChannelCount)
                 throw new ArgumentOutOfRangeException(nameof(localChannelIndex));
 
@@ -79,9 +75,6 @@ namespace PowerScope.Model
             get { return _settings; }
             set
             {
-                if (value == null)
-                    throw new ArgumentNullException(nameof(value));
-
                 if (_settings != value)
                 {
                     // Unsubscribe from old settings

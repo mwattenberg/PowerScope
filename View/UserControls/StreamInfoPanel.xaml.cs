@@ -6,7 +6,6 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using ScottPlot.Plottables;
 using PowerScope.Model;
-using PowerScope.View.UserForms;
 
 namespace PowerScope.View.UserControls
 {
@@ -110,20 +109,6 @@ namespace PowerScope.View.UserControls
                 });
             }
 
-            // Handle status message changes to provide user feedback about disconnections
-            if (e.PropertyName == nameof(IDataStream.StatusMessage))
-            {
-                // If the status message indicates an error or disconnection, we could show it
-                // For now, we'll let the existing timer-based UI handle most status updates
-                // but this provides a hook for future status message display
-
-                // Example: If we wanted to show error messages immediately:
-                // if (AssociatedDataStream.StatusMessage?.Contains("Disconnected:") == true ||
-                //     AssociatedDataStream.StatusMessage?.Contains("Error") == true)
-                // {
-                //     // Could show a tooltip or update a status indicator here
-                // }
-            }
         }
 
         private void UpdateButtonAppearance()
@@ -208,15 +193,6 @@ namespace PowerScope.View.UserControls
                     _prevBitsCount = 0;
                 }
             });
-        }
-
-        private void Button_Configure_Click(object sender, RoutedEventArgs e)
-        {
-            if (_associatedStreamSettings != null)
-            {
-                SerialConfigWindow configWindow = new SerialConfigWindow(_associatedStreamSettings);
-                configWindow.ShowDialog();
-            }
         }
 
         private void Button_Connect_Click(object sender, RoutedEventArgs e)

@@ -47,11 +47,6 @@ namespace PowerScope
 
             FastFourierTransform.Initialize();
 
-            SignalData myData = SignalData.CreateFromRealSize(4096); // Pre-create FFT data structure for 4096-point FFTs
-            
-            var temp = myData.AsReal();
-            FastFourierTransform.RealFFT(temp, true);
-
         }
 
         void InitializeControls()

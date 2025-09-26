@@ -13,12 +13,37 @@
             <Setter Property="Foreground" Value="{DynamicResource PlotSettings_LabelForegroundBrush}"/>
             <Setter Property="FontSize" Value="14"/>
         </Style>
+
         <Style TargetType="MenuItem">
             <Setter Property="Background" Value="{DynamicResource PlotSettings_TitleBarBrush}"/>
             <Setter Property="Foreground" Value="{DynamicResource PlotSettings_LabelForegroundBrush}"/>
             <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Padding" Value="10,5"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="MenuItem">
+                        <Border Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter ContentSource="Header" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="{DynamicResource PlotSettings_ButtonHoverBrush}"/>
+                                <Setter Property="Foreground" Value="White"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter Property="Background" Value="{DynamicResource PlotSettings_ButtonPressedBrush}"/>
+                                <Setter Property="Foreground" Value="White"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Foreground" Value="#FF888888"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
     </UserControl.Resources>
+
     <Border Background="{DynamicResource PlotSettings_BackgroundBrush}"
             BorderBrush="{DynamicResource PlotSettings_BorderBrush}"
             BorderThickness="1"
@@ -27,23 +52,16 @@
             <MenuItem Header="File">
                 <MenuItem Header="Save Settings"/>
                 <MenuItem Header="Open Settings"/>
-                <MenuItem Header="Export as">
-                    <MenuItem Header="PNG"/>
-                    <MenuItem Header="SVG"/>
-                    <MenuItem Header="CSV"/>
-                </MenuItem>
+
                 <MenuItem Header="Exit"/>
             </MenuItem>
             <MenuItem Header="Edit">
                 <MenuItem Header="Preferences"/>
             </MenuItem>
-            <MenuItem Header="View">
-                <MenuItem Header="Grid"/>
-                <MenuItem Header="Minor Grid"/>
-            </MenuItem>
+
             <MenuItem Header="Help">
                 <MenuItem Header="About"/>
-                <MenuItem Header="Software releases"/>
+
             </MenuItem>
         </Menu>
     </Border>

@@ -399,15 +399,8 @@ namespace PowerScope.Model
             {
                 if (stream is IBufferResizable resizableStream)
                 {
-                    try
-                    {
-                        resizableStream.SetBufferSize(Settings.BufferSize);
-                    }
-                    catch (Exception ex)
-                    {
-                        // Log error but don't crash the application
-                        System.Diagnostics.Debug.WriteLine($"Failed to update buffer size for {stream.StreamType}: {ex.Message}");
-                    }
+
+                    resizableStream.SetBufferSize(Settings.BufferSize);
                 }
             }
         }
