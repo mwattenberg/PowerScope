@@ -1,7 +1,7 @@
 ﻿<Window x:Class="PowerScope.View.UserForms.AboutWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="About" Height="200" Width="300"
+        Title="About" Height="320" Width="380"
         WindowStyle="None"
         ResizeMode="NoResize"
         WindowStartupLocation="CenterOwner"
@@ -33,18 +33,43 @@
             <!-- Centered version textbox -->
             <TextBox Grid.Row="1" Text="PowerScope 1.0 Alpha 3" 
                      HorizontalAlignment="Center"
-                     Margin="0,12,0,24" 
+                     Margin="0,6,0,4" 
                      BorderThickness="0" Background="Transparent" 
                      Foreground="{DynamicResource PlotSettings_LabelForegroundBrush}"
-                     FontSize="14" FontWeight="Bold" IsReadOnly="True" Grid.RowSpan="2"/>
+                     FontSize="14" FontWeight="Bold" IsReadOnly="True"/>
             <!-- GitHub link below the version textbox -->
-            <TextBlock Grid.Row="3" HorizontalAlignment="Center" Margin="0,12,0,68">
+            <TextBlock Grid.Row="2" HorizontalAlignment="Center" Margin="0,1,0,4">
                 <Hyperlink NavigateUri="https://github.com/mwattenberg/PowerScope" RequestNavigate="Hyperlink_RequestNavigate">
                     https://github.com/mwattenberg/PowerScope
                 </Hyperlink>
             </TextBlock>
-            <!-- Empty content area -->
-            <Grid Grid.Row="3"/>
+            <!-- Acknowledgements and license area -->
+            <Grid Grid.Row="3" Margin="12">
+                <Border Background="Transparent" BorderThickness="0">
+                    <StackPanel>
+                        <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource PlotSettings_LabelForegroundBrush}" Margin="0,0,0,8">
+                            This software is released under the MIT license and was built on the efforts of many people.
+                        </TextBlock>
+
+                        <TextBlock Foreground="{DynamicResource PlotSettings_LabelForegroundBrush}" Margin="0,0,0,4">Acknowledgements:</TextBlock>
+
+                        <TextBlock TextWrapping="Wrap" Margin="8,0,0,2">
+                            <Hyperlink NavigateUri="https://scottplot.net/" RequestNavigate="Hyperlink_RequestNavigate">ScottPlot</Hyperlink>
+                        </TextBlock>
+
+                        <TextBlock TextWrapping="Wrap" Margin="8,0,0,2">
+                            <Hyperlink NavigateUri="https://github.com/Aelian-Software/Aelian.FFT" RequestNavigate="Hyperlink_RequestNavigate">Aelian FFT</Hyperlink>
+                        </TextBlock>
+
+                        <TextBlock TextWrapping="Wrap" Margin="8,0,0,2">
+                            <Hyperlink NavigateUri="https://github.com/naudio/NAudio" RequestNavigate="Hyperlink_RequestNavigate">NAudio</Hyperlink>
+                        </TextBlock>
+
+                        <!-- Optional spacing -->
+                        <TextBlock Text="" Height="8"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
         </Grid>
     </Border>
 </Window>
