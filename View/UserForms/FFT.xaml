@@ -119,7 +119,7 @@
                         <RowDefinition Height="*"/>
                         <RowDefinition Height="*"/>
                         <RowDefinition Height="*"/>
-                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="5*"/>
                     </Grid.RowDefinitions>
                     
                     <!-- Row 0: FFT Size -->

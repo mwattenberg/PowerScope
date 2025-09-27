@@ -346,15 +346,15 @@ namespace PowerScope.Model
             if (!IsStreaming || e.Buffer == null || e.BytesRecorded == 0)
                 return;
 
-            try
-            {
+            //try
+            //{
                 ProcessAudioData(e.Buffer, e.BytesRecorded);
-            }
-            catch (Exception ex)
-            {
-                // Log error but don't stop streaming
-                StatusMessage = $"Audio processing error: {ex.Message}";
-            }
+            //}
+            //catch (Exception ex)
+            //{
+            //    // Log error but don't stop streaming
+            //    StatusMessage = $"Audio processing error: {ex.Message}";
+            //}
         }
 
         private void OnRecordingStopped(object sender, StoppedEventArgs e)

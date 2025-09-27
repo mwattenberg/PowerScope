@@ -121,7 +121,11 @@ namespace PowerScope.Model
             { 
                 lock (_dataLock)
                 {
-                    return ReceivedData?[0]?.Capacity ?? 0;
+                    if (ReceivedData == null)
+                        return 0;
+                    if (ReceivedData[0] == null)
+                        return 0;
+                    return ReceivedData[0].Capacity;
                 }
             }
         }
@@ -330,7 +334,7 @@ namespace PowerScope.Model
         {
             double baseFrequency = 1.0 + channel * 0.5; // Different frequency for each channel
             double amplitude = 1000; // Amplitude to make signals visible
-            
+
             return DemoSettings.SignalType switch
             {
                 "Sine Wave" => amplitude * Math.Sin(2 * Math.PI * baseFrequency * time),

@@ -1,0 +1,63 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<ClassDiagram MajorVersion="1" MinorVersion="1">
+  <Class Name="PowerScope.MainWindow">
+    <Position X="3.25" Y="0.5" Width="2.75" />
+    <TypeIdentifier>
+      <HashCode>AAAAIIAAAAAAgIAgAUhCAEgCIAAgAAAAAAQBgEAAAAE=</HashCode>
+      <FileName>MainWindow.xaml.cs</FileName>
+    </TypeIdentifier>
+    <Lollipop Position="0.2" />
+  </Class>
+  <Class Name="PowerScope.Model.Channel">
+    <Position X="6" Y="0.5" Width="2.25" />
+    <TypeIdentifier>
+      <HashCode>QACAAAAAEiCEAAAUoANAAAAAgAAAACQAgAAQwAAAIgA=</HashCode>
+      <FileName>Model\Channel.cs</FileName>
+    </TypeIdentifier>
+    <Lollipop Position="0.2" />
+  </Class>
+  <Class Name="PowerScope.Model.Measurement">
+    <Position X="0.5" Y="0.5" Width="2.75" />
+    <TypeIdentifier>
+      <HashCode>cLHACxBAADF0AKAaMERCEBQgnUGAFCCGEQTBAgQAQgM=</HashCode>
+      <FileName>Model\Measurement.cs</FileName>
+    </TypeIdentifier>
+    <Lollipop Position="0.2" />
+  </Class>
+  <Class Name="PowerScope.Model.ChannelSettings">
+    <Position X="12.75" Y="0.5" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAACAAAAEIAIAAAAIBEAAAAAgBIBAIEAAAAAgAAAgAA=</HashCode>
+      <FileName>Model\ChannelSettings.cs</FileName>
+    </TypeIdentifier>
+    <Lollipop Position="0.2" />
+  </Class>
+  <Class Name="PowerScope.Model.DataParser">
+    <Position X="10.75" Y="0.75" Width="1.5" />
+    <NestedTypes>
+      <Enum Name="PowerScope.Model.DataParser.ParserMode" Collapsed="true">
+        <TypeIdentifier>
+          <NewMemberFileName>Model\DataParser.cs</NewMemberFileName>
+        </TypeIdentifier>
+      </Enum>
+      <Enum Name="PowerScope.Model.DataParser.BinaryFormat" Collapsed="true">
+        <TypeIdentifier>
+          <NewMemberFileName>Model\DataParser.cs</NewMemberFileName>
+        </TypeIdentifier>
+      </Enum>
+    </NestedTypes>
+    <TypeIdentifier>
+      <HashCode>ACAAAAgAAIAAAAEAAAEACAAAAAAAABAAQEAgAAACBAE=</HashCode>
+      <FileName>Model\DataParser.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="PowerScope.Model.DemoDataStream">
+    <Position X="9" Y="0.75" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>BBSBgQAAACAMAABgOuAAAYCggCAAASAAAAGAAJCCF4E=</HashCode>
+      <FileName>Model\DemoDataStream.cs</FileName>
+    </TypeIdentifier>
+    <Lollipop Position="0.2" />
+  </Class>
+  <Font Name="Segoe UI" Size="9" />
+</ClassDiagram>

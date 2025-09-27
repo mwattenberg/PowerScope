@@ -72,6 +72,7 @@ namespace PowerScope.View.UserForms
                 "Notch" => "Notch",
                 "Absolute" => "Absolute",
                 "Squared" => "Squared",
+                "Downsampling" => "Downsampling",
                 _ => "None"
             };
         }
@@ -110,7 +111,7 @@ namespace PowerScope.View.UserForms
             var buttonNames = new[] 
             { 
                 "Button_None", "Button_LowPass", "Button_HighPass", "Button_MovingAverage", 
-                "Button_Median", "Button_Notch", "Button_Absolute", "Button_Squared" 
+                "Button_Median", "Button_Notch", "Button_Downsampling", "Button_Absolute", "Button_Squared" 
             };
             
             foreach (var buttonName in buttonNames)
@@ -149,6 +150,9 @@ namespace PowerScope.View.UserForms
                     break;
                 case "Notch":
                     CreateNotchControls(ParametersStackPanel);
+                    break;
+                case "Downsampling":
+                    CreateDownsamplingControls(ParametersStackPanel);
                     break;
             }
         }
@@ -241,6 +245,64 @@ namespace PowerScope.View.UserForms
             }
         }
 
+        // New downsampling controls
+        private void CreateDownsamplingControls(StackPanel parametersStackPanel)
+        {
+            var ratePanel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 10) };
+
+            var rateLabel = new Label { Content = "Rate:", Width = 100, VerticalAlignment = VerticalAlignment.Center };
+            var rateTextBox = new TextBox
+            {
+                Name = "DownsamplingRateTextBox",
+                Width = 80,
+                Text = GetCurrentDownsamplingRate().ToString(),
+                VerticalContentAlignment = VerticalAlignment.Center
+            };
+
+            var buttonPanel = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(5, 0, 0, 0) };
+            var upButton = new Button { Content = "▲", Width = 25, Height = 15, Margin = new Thickness(0, 0, 0, 2), ToolTip = "Increase" };
+            var downButton = new Button { Content = "▼", Width = 25, Height = 15, ToolTip = "Decrease" };
+
+            upButton.Click += (s, e) =>
+            {
+                if (int.TryParse(rateTextBox.Text, out int current))
+                {
+                    int newValue = Math.Min(current + 1, 1000);
+                    rateTextBox.Text = newValue.ToString();
+                }
+            };
+
+            downButton.Click += (s, e) =>
+            {
+                if (int.TryParse(rateTextBox.Text, out int current))
+                {
+                    int newValue = Math.Max(current - 1, 1);
+                    rateTextBox.Text = newValue.ToString();
+                }
+            };
+
+            rateTextBox.TextChanged += (s, e) =>
+            {
+                if (int.TryParse(rateTextBox.Text, out int value) && value >= 1 && value <= 1000)
+                {
+                    ApplyFilter("Downsampling", value);
+                }
+            };
+
+            buttonPanel.Children.Add(upButton);
+            buttonPanel.Children.Add(downButton);
+
+            ratePanel.Children.Add(rateLabel);
+            ratePanel.Children.Add(rateTextBox);
+            ratePanel.Children.Add(buttonPanel);
+            parametersStackPanel.Children.Add(ratePanel);
+
+            if (int.TryParse(rateTextBox.Text, out int rate))
+            {
+                ApplyFilter("Downsampling", rate);
+            }
+        }
+
         private void CreateNotchControls(StackPanel parametersStackPanel)
         {
             var freqPanel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 10) };
@@ -284,6 +346,7 @@ namespace PowerScope.View.UserForms
                     "Median" => new MedianFilter((int)parameter.Value),
                     "Absolute" => new AbsoluteFilter(),
                     "Squared" => new SquaredFilter(),
+                    "Downsampling" => new DownsamplingFilter((int)parameter.Value),
                     _ => null
                 };
             }
@@ -329,6 +392,16 @@ namespace PowerScope.View.UserForms
                 if (parameters.ContainsKey("WindowSize")) return (int)parameters["WindowSize"];
             }
             return 5;
+        }
+
+        private int GetCurrentDownsamplingRate()
+        {
+            if (_channelSettings?.Filter != null)
+            {
+                var parameters = _channelSettings.Filter.GetFilterParameters();
+                if (parameters.ContainsKey("Rate")) return (int)parameters["Rate"];
+            }
+            return 3;
         }
 
         private double GetCurrentNotchFreq()

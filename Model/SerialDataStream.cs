@@ -418,7 +418,7 @@ namespace PowerScope.Model
             {
                 if (_port != null)
                     _port.Dispose();
-                StatusMessage = "Port already in use";
+                StatusMessage = "Could not find port";
                 IsConnected = false;
                 //throw new PortAlreadyInUseException(SourceSetting.PortName, ex);
             }
@@ -501,21 +501,7 @@ namespace PowerScope.Model
             }
         }
 
-        /// <summary>
-        /// Checks if the serial port is still physically connected and functional
-        /// </summary>
-        /// <returns>True if port appears to be connected and functional</returns>
-        public bool IsPortHealthy()
-        {
-            try
-            {
-                return _port != null && _port.IsOpen;
-            }
-            catch
-            {
-                return false;
-            }
-        }
+
         public int CopyLatestTo(int channel, double[] destination, int n)
         {
             if (channel < 0)

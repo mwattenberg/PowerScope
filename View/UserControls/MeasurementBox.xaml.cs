@@ -17,7 +17,14 @@ namespace PowerScope.View.UserControls
         {
             if (value is MeasurementType measurementType)
             {
-                return measurementType == MeasurementType.FFT ? Visibility.Visible : Visibility.Collapsed;
+                if (measurementType == MeasurementType.FFT)
+                {
+                    return Visibility.Visible;
+                }
+                else
+                {
+                    return Visibility.Collapsed;
+                }
             }
             return Visibility.Collapsed;
         }

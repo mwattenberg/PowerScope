@@ -12,25 +12,6 @@ using PowerScope.View.UserForms;
 
 namespace PowerScope.View.UserControls
 {
-    public class ColorToBrushConverter : IValueConverter
-    {
-        public static readonly ColorToBrushConverter Instance = new ColorToBrushConverter();
-
-        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
-        {
-            if (value is Color color)
-                return new SolidColorBrush(color);
-            return new SolidColorBrush(Colors.Gray);
-        }
-
-        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
-        {
-            if (value is SolidColorBrush brush)
-                return brush.Color;
-            return Colors.Gray;
-        }
-    }
-
     public partial class ChannelControl : UserControl
     {
         private static readonly Color DisabledColor = Colors.Gray;
@@ -169,8 +150,10 @@ namespace PowerScope.View.UserControls
                 bindingExpression?.UpdateSource();
                 e.Handled = true;
             }
-            else if (e.Key == Key.Add || e.Key == Key.Subtract)
-            {
+
+            if (e.Key != Key.Add || e.Key != Key.Subtract)
+                return;
+
                 // Increment/decrement the first decimal place (0.1 increments)
                 double currentValue = 0.0;
                 bool isGainTextBox = textBox.Name == "GainTextBox";
@@ -212,7 +195,7 @@ namespace PowerScope.View.UserControls
                 }
 
                 e.Handled = true;
-            }
+           
         }
 
 

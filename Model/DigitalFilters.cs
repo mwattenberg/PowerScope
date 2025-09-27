@@ -435,4 +435,141 @@ namespace PowerScope.Model
             return new Dictionary<string, double>();
         }
     }
+
+    /// <summary>
+    /// Downsampling filter - updates output only every Nth sample, with linear interpolation between the two most recent anchors.
+    /// This implementation uses the two most recent captured anchors and interpolates between them over the downsampling interval.
+    /// It intentionally introduces a short delay (one anchor interval) to ensure smooth transitions between anchors.
+    /// </summary>
+    public class DownsamplingFilter : IDigitalFilter
+    {
+        private int _rate;
+        private int _counter; // samples since last capture
+        private double _anchorPrev; // older anchor sample
+        private double _anchorCurr; // newer anchor sample
+        private int _anchorsCount; // how many anchors we have (0,1,2)
+        private bool _initialized;
+
+        /// <summary>
+        /// Create a new downsampling filter
+        /// </summary>
+        /// <param name="rate">Downsampling rate (>= 1). For rate=3 anchors are taken every 3rd sample.</param>
+        public DownsamplingFilter(int rate)
+        {
+            if (rate < 1)
+                throw new ArgumentOutOfRangeException(nameof(rate), "Rate must be >= 1.");
+            _rate = rate;
+            _counter = 0;
+            _initialized = false;
+            _anchorPrev = 0.0;
+            _anchorCurr = 0.0;
+            _anchorsCount = 0;
+        }
+
+        /// <summary>
+        /// Filter a new input value. The output is an interpolated value between the two most recent anchors.
+        /// An anchor is captured every Nth sample; interpolation uses the two most recent anchors to produce a smooth transition.
+        /// </summary>
+        /// <param name="input">Input value</param>
+        /// <returns>Interpolated/downsampled output value</returns>
+        public double Filter(double input)
+        {
+            if (!_initialized)
+            {
+                // First sample: establish the first anchor
+                _anchorCurr = input;
+                _anchorsCount = 1;
+                _counter = 0;
+                _initialized = true;
+                return _anchorCurr;
+            }
+
+            // Advance sample counter
+            _counter++;
+
+            // When counter reaches rate, capture a new anchor (shift older anchor)
+            if (_counter >= _rate)
+            {
+                if (_anchorsCount == 0)
+                {
+                    _anchorCurr = input;
+                    _anchorsCount = 1;
+                }
+                else if (_anchorsCount == 1)
+                {
+                    _anchorPrev = _anchorCurr;
+                    _anchorCurr = input;
+                    _anchorsCount = 2;
+                }
+                else // anchorsCount >= 2
+                {
+                    _anchorPrev = _anchorCurr;
+                    _anchorCurr = input;
+                }
+
+                // reset counter so interpolation restarts from the older anchor
+                _counter = 0;
+
+                // If rate == 1, no interpolation interval, return the current anchor immediately
+                if (_rate == 1)
+                {
+                    return _anchorCurr;
+                }
+            }
+
+            // If we have two anchors, interpolate between them based on position within the interval
+            if (_anchorsCount >= 2)
+            {
+                // Use (rate - 1) as denominator so that when counter == rate - 1 we reach t == 1.0
+                if (_rate == 1)
+                {
+                    return _anchorCurr;
+                }
+
+                double denom = Math.Max(1, _rate);
+                double t = (double)_counter / denom; // fractional progress between anchors (0 .. 1)
+                if (t < 0) t = 0;
+                if (t > 1) t = 1;
+                return _anchorPrev + (_anchorCurr - _anchorPrev) * t;
+            }
+
+            // If only one anchor available, return that anchor (no interpolation possible)
+            return _anchorCurr;
+        }
+
+        public void Reset()
+        {
+            _initialized = false;
+            _counter = 0;
+            _anchorPrev = 0.0;
+            _anchorCurr = 0.0;
+            _anchorsCount = 0;
+        }
+
+        public string GetFilterType()
+        {
+            return "Downsampling";
+        }
+
+        public Dictionary<string, double> GetFilterParameters()
+        {
+            var parameters = new Dictionary<string, double>();
+            parameters.Add("Rate", _rate);
+            return parameters;
+        }
+
+        /// <summary>
+        /// Public property to get/set the downsampling rate. Setting validates the value.
+        /// </summary>
+        public int Rate
+        {
+            get => _rate;
+            set
+            {
+                if (value < 1)
+                    throw new ArgumentOutOfRangeException(nameof(value), "Rate must be >= 1.");
+                _rate = value;
+            }
+        }
+    }
 }

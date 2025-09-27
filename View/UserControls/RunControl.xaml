@@ -5,10 +5,10 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:PowerScope.View.UserControls"
              mc:Ignorable="d" 
-             d:DesignHeight="160" d:DesignWidth="100">
+             d:DesignHeight="180" d:DesignWidth="100">
     <Grid>
         <StackPanel Orientation="Vertical" VerticalAlignment="Center" HorizontalAlignment="Center">
-            <Button x:Name="RunButton" Content="Run 🏃‍♂️‍➡️" Height="40" Width="90" Foreground="White" FontWeight="Bold" Click="RunButton_Click" Margin="0,2,0,2">
+            <Button x:Name="RunButton" Content="Run 🏃‍♂️‍➡️" Height="42" Width="90" Foreground="White" FontWeight="Bold" Click="RunButton_Click" Margin="0,2,0,2">
                 <Button.Background>
                     <SolidColorBrush Color="LimeGreen"/>
                 </Button.Background>
@@ -20,7 +20,7 @@
                     </ControlTemplate>
                 </Button.Template>
             </Button>
-            <Button x:Name="ClearButton" Content="Clear 🧹" Height="40" Width="90" Foreground="Black" FontWeight="Bold" Click="ClearButton_Click" Margin="0,0,0,2">
+            <Button x:Name="ClearButton" Content="Clear 🧹" Height="42" Width="90" Foreground="Black" FontWeight="Bold" Click="ClearButton_Click" Margin="0,0,0,2">
                 <Button.Background>
                     <SolidColorBrush Color="#FFD700"/>
                 </Button.Background>
@@ -32,7 +32,7 @@
                     </ControlTemplate>
                 </Button.Template>
             </Button>
-            <Button x:Name="RecordButton" Height="40" Width="90" Background="Red" Foreground="White" FontWeight="Bold" Click="RecordButton_Click" Margin="0,0,0,2">
+            <Button x:Name="RecordButton" Height="41" Width="90" Background="Red" Foreground="White" FontWeight="Bold" Click="RecordButton_Click" Margin="0,0,0,2">
                 <Button.Content>
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
                         <TextBlock Text="⬤ Record" Foreground="White" VerticalAlignment="Center"/>
@@ -46,7 +46,7 @@
                     </ControlTemplate>
                 </Button.Template>
             </Button>
-            <Button x:Name="LoadButton" Content="Load 📁" Height="40" Width="90" Foreground="White" FontWeight="Bold" Click="LoadButton_Click" Margin="0" Background="#FF008CF9">
+            <Button x:Name="LoadButton" Content="Load 📁" Height="42" Width="90" Foreground="White" FontWeight="Bold" Click="LoadButton_Click" Margin="0" Background="#FF008CF9">
                 <Button.Template>
                     <ControlTemplate TargetType="Button">
                         <Border Background="{TemplateBinding Background}" CornerRadius="6" BorderThickness="0">

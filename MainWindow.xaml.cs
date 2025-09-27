@@ -84,7 +84,7 @@ namespace PowerScope
                 if (saveFileDialog.ShowDialog() == true)
                 {
                     Serializer.WriteSettingsToXML(saveFileDialog.FileName, _plotManager, DataStreamBar);
-                    MessageBox.Show("Settings saved successfully!", "Save Settings", MessageBoxButton.OK, MessageBoxImage.Information);
+                    
                 }
             }
             catch (Exception ex)
@@ -106,7 +106,7 @@ namespace PowerScope
                 if (openFileDialog.ShowDialog() == true)
                 {
                     Serializer.ReadSettingsFromXML(openFileDialog.FileName, _plotManager, DataStreamBar);
-                    MessageBox.Show("Settings loaded successfully!", "Load Settings", MessageBoxButton.OK, MessageBoxImage.Information);
+                    
                 }
             }
             catch (Exception ex)
@@ -150,7 +150,7 @@ namespace PowerScope
                         WpfPlot1.Plot.SavePng(saveFileDialog.FileName, 1920, 1080);
                     }
                     
-                    MessageBox.Show("Plot exported successfully!", "Export Plot", MessageBoxButton.OK, MessageBoxImage.Information);
+
                 }
             }
             catch (Exception ex)
@@ -274,12 +274,6 @@ namespace PowerScope
             base.OnClosed(e);
         }
 
-        private void Button_ConfigPlot_Click(object sender, RoutedEventArgs e)
-        {
-            // Pass current settings to the window - changes are applied immediately via data binding
-            View.UserForms.PlotSettingsWindow settingsWindow = new View.UserForms.PlotSettingsWindow(_plotManager.Settings);
-            settingsWindow.Show();
-        }
     }
 
     // Simple RelayCommand implementation

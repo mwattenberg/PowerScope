@@ -4,13 +4,14 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:PowerScope.View.UserControls"
+             xmlns:converters="clr-namespace:PowerScope.Converters"
              mc:Ignorable="d" 
              d:DesignHeight="60" d:DesignWidth="120"
              MinWidth="120" MinHeight="60">
 
     <UserControl.Resources>
         <!-- Value converter for colors -->
-        <local:ColorToBrushConverter x:Key="ColorToBrushConverter"/>
+        <converters:ColorToBrushConverter x:Key="ColorToBrushConverter"/>
         <!-- Converter to show spectrum button only for FFT measurements -->
         <local:FFTVisibilityConverter x:Key="FFTVisibilityConverter"/>
     </UserControl.Resources>
