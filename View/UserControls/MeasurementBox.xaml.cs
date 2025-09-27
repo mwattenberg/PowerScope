@@ -58,7 +58,6 @@ namespace PowerScope.View.UserControls
             if (e.NewValue is Measurement newMeasurement)
             {
                 newMeasurement.CalculateStatistics = _isExpanded;
-                UpdateDetailLabels();
             }
         }
 
@@ -102,8 +101,6 @@ namespace PowerScope.View.UserControls
                 ExpandButton.ToolTip = "Hide details";
                 DetailsPanel.Visibility = Visibility.Visible;
                 
-                UpdateDetailLabels();
-                
                 // Simple animation using DoubleAnimation on Height
                 var heightAnimation = new DoubleAnimation(0, 80, TimeSpan.FromMilliseconds(200));
                 heightAnimation.Completed += (s, e) =>
@@ -130,28 +127,6 @@ namespace PowerScope.View.UserControls
                 };
                 
                 DetailsPanel.BeginAnimation(FrameworkElement.HeightProperty, heightAnimation);
-            }
-        }
-
-        private void UpdateDetailLabels()
-        {
-            if (Measurement == null) return;
-
-            switch (Measurement.Type)
-            {
-                case MeasurementType.FFT:
-                    Detail1Label.Text = "Peak 1:";
-                    Detail2Label.Text = "Peak 2:";
-                    Detail3Label.Text = "Peak 3:";
-                    Detail4Label.Text = "Peak 4:";
-                    break;
-                    
-                default: // RMS and other measurements
-                    Detail1Label.Text = "Min:";
-                    Detail2Label.Text = "Max:";
-                    Detail3Label.Text = "Mean:";
-                    Detail4Label.Text = "Count:";
-                    break;
             }
         }
     }

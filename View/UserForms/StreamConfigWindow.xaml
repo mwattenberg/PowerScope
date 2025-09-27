@@ -432,10 +432,11 @@
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                                 <Label Content="Sample Rate:" VerticalAlignment="Center" Width="80"/>
                                 <ComboBox x:Name="ComboBox_DemoSampleRate" Width="200" IsEditable="True" Text="{Binding DemoSampleRate, Mode=TwoWay}" SelectedValuePath="Content">
-                                    <ComboBoxItem Content="100"/>
-                                    <ComboBoxItem Content="1000" IsSelected="True"/>
-                                    <ComboBoxItem Content="10000"/>
-                                    <ComboBoxItem Content="44100"/>
+                                    <ComboBoxItem Content="1000"/>
+                                    <ComboBoxItem Content="10000" IsSelected="True"/>
+                                    <ComboBoxItem Content="20000"/>
+                                    <ComboBoxItem Content="50000"/>
+                                    
                                 </ComboBox>
                             </StackPanel>
                             

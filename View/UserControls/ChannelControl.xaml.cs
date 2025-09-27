@@ -179,16 +179,36 @@ namespace PowerScope.View.UserControls
                 if (isGainTextBox)
                 {
                     if (e.Key == Key.Add)
-                        Settings.Gain = Settings.Gain * 1.01;
+                    {
+                        if(Settings.Gain == 0.0)
+                            Settings.Gain = 0.01; // Avoid zero gain
+                        else
+                            Settings.Gain = Settings.Gain * 1.01;
+                    }
                     else
-                        Settings.Gain = Settings.Gain * 0.99;
+                    {
+                        if (Settings.Gain == 0.0)
+                            Settings.Gain = 0.01; // Avoid zero gain
+                        else
+                            Settings.Gain = Settings.Gain * 0.99;
+                    }
                 }
                 else // OffsetTextBox
                 {
                     if (e.Key == Key.Add)
-                        Settings.Offset = Settings.Offset * 1.01;
+                    {
+                        if (Settings.Offset == 0.0)
+                            Settings.Offset = 0.01; // Avoid zero gain
+                        else
+                            Settings.Offset = Settings.Offset * 1.01;
+                    }
                     else
-                        Settings.Offset = Settings.Offset * 0.99;
+                    {
+                        if (Settings.Offset == 0.0)
+                            Settings.Offset = 0.01; // Avoid zero gain
+                        else
+                            Settings.Offset = Settings.Offset * 0.99;
+                    }
                 }
 
                 e.Handled = true;
@@ -205,8 +225,8 @@ namespace PowerScope.View.UserControls
 
         private static bool IsSignedDecimal(string text)
         {
-            // Updated regex to support exponential notation
-            return Regex.IsMatch(text, @"^-?[0-9]*(\.[0-9]*)?([eE][-+]?[0-9]+)?$") && text != "." && !text.EndsWith("..");
+            // Updated regex to support exponential notation, including partial input
+            return Regex.IsMatch(text, @"^-?[0-9]*(\.[0-9]*)?([eE][-+]?[0-9]*)?$") && text != "." && !text.EndsWith("..");
         }
     }
 }

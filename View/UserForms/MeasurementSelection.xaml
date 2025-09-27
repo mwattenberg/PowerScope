@@ -6,7 +6,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:PowerScope.View.UserForms"
         mc:Ignorable="d"
-        Title="Measurement Selection" Height="350" Width="500" 
+        Title="Measurement Selection" Height="400" Width="400" 
         WindowStyle="None"
         AllowsTransparency="True"
         ResizeMode="NoResize" 
@@ -21,7 +21,7 @@
         </Style>
         <Style TargetType="Button" BasedOn="{StaticResource ButtonStyle}">
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Padding" Value="10,5"/>
+            <Setter Property="Padding" Value="5,5"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
@@ -44,9 +44,9 @@
         </Style>
         <!-- Custom measurement button style with larger size -->
         <Style x:Key="MeasurementButtonStyle" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
-            <Setter Property="Width" Value="120"/>
+            <Setter Property="Width" Value="80"/>
             <Setter Property="Height" Value="80"/>
-            <Setter Property="Margin" Value="10"/>
+            <Setter Property="Margin" Value="5"/>
             <Setter Property="Padding" Value="5"/>
             <Setter Property="BorderThickness" Value="2"/>
         </Style>
@@ -132,7 +132,7 @@
                             Tag="Minimum"
                             ToolTip="Minimum value in the data set">
                         <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
-                            <svgc:SvgViewbox Source="/Icons/min.svg" Width="32" Height="32" Margin="5"/>
+                            <svgc:SvgViewbox Source="/Icons/min.svg" Width="48" Height="48" Margin="5"/>
                             <TextBlock Text="Minimum" Style="{StaticResource SmallLabelStyle}"/>
                         </StackPanel>
                     </Button>
@@ -144,7 +144,7 @@
                             Tag="Maximum"
                             ToolTip="Maximum value in the data set">
                         <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
-                            <svgc:SvgViewbox Source="/Icons/max.svg" Width="32" Height="32" Margin="5"/>
+                            <svgc:SvgViewbox Source="/Icons/max.svg" Width="48" Height="48" Margin="5"/>
                             <TextBlock Text="Maximum" Style="{StaticResource SmallLabelStyle}"/>
                         </StackPanel>
                     </Button>
@@ -156,7 +156,7 @@
                             Tag="Mean"
                             ToolTip="Average (mean) value of the data set">
                         <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
-                            <svgc:SvgViewbox Source="/Icons/AVG.svg" Width="32" Height="32" Margin="5"/>
+                            <svgc:SvgViewbox Source="/Icons/AVG.svg" Width="48" Height="48" Margin="5"/>
                             <TextBlock Text="Mean" Style="{StaticResource SmallLabelStyle}"/>
                         </StackPanel>
                     </Button>
@@ -168,7 +168,7 @@
                             Tag="Rms"
                             ToolTip="Root Mean Square (RMS) value">
                         <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
-                            <svgc:SvgViewbox Source="/Icons/RMS.svg" Width="32" Height="32" Margin="5"/>
+                            <svgc:SvgViewbox Source="/Icons/RMS.svg" Width="48" Height="48" Margin="5"/>
                             <TextBlock Text="RMS" Style="{StaticResource SmallLabelStyle}"/>
                         </StackPanel>
                     </Button>
@@ -180,7 +180,7 @@
                             Tag="StandardDeviation"
                             ToolTip="Standard deviation of the data set">
                         <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
-                            <svgc:SvgViewbox Source="/Icons/StdDev.svg" Width="32" Height="32" Margin="5"/>
+                            <svgc:SvgViewbox Source="/Icons/StdDev.svg" Width="48" Height="48" Margin="5"/>
                             <TextBlock Text="Std Dev" Style="{StaticResource SmallLabelStyle}"/>
                         </StackPanel>
                     </Button>
@@ -192,7 +192,7 @@
                             Tag="Variance"
                             ToolTip="Variance of the data set">
                         <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
-                            <svgc:SvgViewbox Source="/Icons/Var.svg" Width="32" Height="32" Margin="5"/>
+                            <svgc:SvgViewbox Source="/Icons/Var.svg" Width="48" Height="48" Margin="5"/>
                             <TextBlock Text="Variance" Style="{StaticResource SmallLabelStyle}"/>
                         </StackPanel>
                     </Button>
@@ -204,7 +204,7 @@
                             Tag="PeakToPeak"
                             ToolTip="Peak-to-Peak value (Maximum - Minimum)">
                         <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
-                            <svgc:SvgViewbox Source="/Icons/PkPk.svg" Width="32" Height="32" Margin="5"/>
+                            <svgc:SvgViewbox Source="/Icons/PkPk.svg" Width="48" Height="48" Margin="5"/>
                             <TextBlock Text="Peak-Peak" Style="{StaticResource SmallLabelStyle}"/>
                         </StackPanel>
                     </Button>
@@ -216,7 +216,7 @@
                             Tag="FFT"
                             ToolTip="Fast Fourier Transform - dominant frequency analysis">
                         <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
-                            <svgc:SvgViewbox Source="/Icons/FFT.svg" Width="32" Height="32" Margin="5"/>
+                            <svgc:SvgViewbox Source="/Icons/FFT.svg" Width="48" Height="48" Margin="5"/>
                             <TextBlock Text="FFT" Style="{StaticResource SmallLabelStyle}"/>
                         </StackPanel>
                     </Button>

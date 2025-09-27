@@ -77,7 +77,7 @@ namespace PowerScope.Model
             }
             set
             {
-                if (Math.Abs(_gain - value) > 0.001)
+                if (Math.Abs(_gain - value) > 1e-9)
                 {
                     _gain = value;
                     OnPropertyChanged(nameof(Gain));
@@ -93,7 +93,7 @@ namespace PowerScope.Model
             }
             set
             {
-                if (Math.Abs(_offset - value) > 0.001)
+                if (Math.Abs(_offset - value) > 1e-9)
                 {
                     _offset = value;
                     OnPropertyChanged(nameof(Offset));

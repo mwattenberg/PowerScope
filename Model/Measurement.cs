@@ -481,12 +481,12 @@ namespace PowerScope.Model
                 // Calculate using the assigned function pointer for non-FFT measurements
                 double newResult = _calculationFunction(validData);
                 Result = newResult;
-                
-                // Update measurement history for detail tracking
-                if (CalculateStatistics)
-                {
-                    UpdateStatistics(newResult);
-                }
+            }
+
+            // Update measurement history for detail tracking
+            if (CalculateStatistics)
+            {
+                UpdateStatistics(Result);
             }
         }
 

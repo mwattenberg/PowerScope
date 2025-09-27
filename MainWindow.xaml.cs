@@ -193,6 +193,14 @@ namespace PowerScope
             MainMenuBar.SaveSettingsClicked += (s, e) => SaveSettings();
             MainMenuBar.LoadSettingsClicked += (s, e) => LoadSettings();
             MainMenuBar.ExportPlotClicked += (s, e) => ExportPlot();
+            MainMenuBar.AboutClicked += (s, e) => ShowAboutWindow();
+        }
+
+        private void ShowAboutWindow()
+        {
+            var aboutWindow = new View.UserForms.AboutWindow();
+            aboutWindow.Owner = this;
+            aboutWindow.ShowDialog();
         }
 
         private void MenuBar_PreferencesClicked(object sender, EventArgs e)

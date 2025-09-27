@@ -4,8 +4,9 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:PowerScope.View.UserForms"
+        xmlns:svgc="http://sharpvectors.codeplex.com/svgc/"
         mc:Ignorable="d"
-        Title="Filter Configuration" Height="400" Width="450"
+        Title="Filter Configuration" Height="610" Width="400"
         WindowStyle="None"
         AllowsTransparency="True"
         ResizeMode="NoResize" 
@@ -15,9 +16,7 @@
         FontSize="{DynamicResource {x:Static SystemFonts.MessageFontSize}}">
     <Window.Resources>
         <!-- Dark theme styles using global resources and system fonts -->
-        <Style TargetType="Label" BasedOn="{StaticResource LabelStyle}">
-            <!-- Inherits system font settings from LabelStyle in App.xaml -->
-        </Style>
+        <Style TargetType="Label" BasedOn="{StaticResource LabelStyle}"/>
         <Style TargetType="ComboBox" BasedOn="{StaticResource SystemFontStyle}">
             <Setter Property="Background" Value="{DynamicResource PlotSettings_TextBoxBackgroundBrush}"/>
             <Setter Property="Foreground" Value="{DynamicResource PlotSettings_LabelForegroundBrush}"/>
@@ -33,6 +32,37 @@
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Padding" Value="10,5"/>
         </Style>
+        <!-- Custom filter button style -->
+        <Style x:Key="FilterButtonStyle" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Width" Value="80"/>
+            <Setter Property="Height" Value="80"/>
+            <Setter Property="Margin" Value="5"/>
+            <Setter Property="Padding" Value="5"/>
+            <Setter Property="BorderThickness" Value="2"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" 
+                                BorderBrush="{TemplateBinding BorderBrush}" 
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="3">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="{DynamicResource PlotSettings_ButtonHoverBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter Property="Background" Value="{DynamicResource PlotSettings_ButtonPressedBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsFocused" Value="True">
+                                <Setter Property="BorderBrush" Value="{DynamicResource PlotSettings_AccentBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
         <!-- Custom close button style -->
         <Style x:Key="CloseButtonStyle" TargetType="Button">
             <Setter Property="Background" Value="Transparent"/>
@@ -42,6 +72,13 @@
             <Setter Property="FontWeight" Value="Bold"/>
             <Setter Property="Width" Value="30"/>
             <Setter Property="Height" Value="30"/>
+        </Style>
+        <!-- Style for small text labels under icons -->
+        <Style x:Key="SmallLabelStyle" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="{DynamicResource {x:Static SystemFonts.MessageFontFamily}}"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="Foreground" Value="{DynamicResource PlotSettings_LabelForegroundBrush}"/>
         </Style>
     </Window.Resources>
     
@@ -57,6 +94,7 @@
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
             
             <!-- Custom title bar -->
@@ -79,42 +117,93 @@
             </Grid>
 
             <!-- Content Area -->
-            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="20,10,20,20">
+            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="10">
                 <StackPanel>
-                    <!-- Filter Type Selection -->
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,15">
-                        <Label Content="Filter Type:" Width="120" VerticalAlignment="Center"/>
-                        <ComboBox x:Name="ComboBox_FilterType" Width="250">
-                            SelectionChanged="ComboBox_FilterType_SelectionChanged">
-                            <ComboBoxItem Content="None" Tag="None" IsSelected="True"/>
-                            <ComboBoxItem Content="Low Pass" Tag="LowPass"/>
-                            <ComboBoxItem Content="High Pass" Tag="HighPass"/>
-                            <ComboBoxItem Content="Moving Average" Tag="MovingAverage"/>
-                            <ComboBoxItem Content="Median" Tag="Median"/>
-                            <ComboBoxItem Content="Notch" Tag="Notch"/>
-                            <ComboBoxItem Content="Absolute" Tag="Absolute"/>
-                            <ComboBoxItem Content="Squared" Tag="Squared"/>
-                        </ComboBox>
-                    </StackPanel>
+                    <!-- Filter Type Selection Grid -->
+                    <Grid HorizontalAlignment="Center" Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <Button Grid.Row="0" Grid.Column="0" x:Name="Button_None" Style="{StaticResource FilterButtonStyle}" Click="FilterButton_Click" Tag="None" ToolTip="No filter applied">
+                            <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
+                                <TextBlock Text="∅" FontSize="40" HorizontalAlignment="Center" VerticalAlignment="Center" Width="48" Height="48" Margin="10,0,0,0" Foreground="{DynamicResource PlotSettings_LabelForegroundBrush}"/>
+                                <TextBlock Text="None" Style="{StaticResource SmallLabelStyle}"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Grid.Row="1" Grid.Column="0" x:Name="Button_LowPass" Style="{StaticResource FilterButtonStyle}" Click="FilterButton_Click" Tag="LowPass" ToolTip="Low Pass Filter">
+                            <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
+                                <svgc:SvgViewbox Source="/Icons/lowpass.svg" Width="48" Height="48" Margin="5"/>
+                                <TextBlock Text="Low Pass" Style="{StaticResource SmallLabelStyle}"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Grid.Row="1" Grid.Column="1" x:Name="Button_Notch" Style="{StaticResource FilterButtonStyle}" Click="FilterButton_Click" Tag="Notch" ToolTip="Notch Filter">
+                            <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
+                                <svgc:SvgViewbox Source="/Icons/notch.svg" Width="48" Height="48" Margin="5"/>
+                                <TextBlock Text="Notch" Style="{StaticResource SmallLabelStyle}"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Grid.Row="1" Grid.Column="2" x:Name="Button_HighPass" Style="{StaticResource FilterButtonStyle}" Click="FilterButton_Click" Tag="HighPass" ToolTip="High Pass Filter">
+                            <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
+                                <svgc:SvgViewbox Source="/Icons/highpass.svg" Width="48" Height="48" Margin="5"/>
+                                <TextBlock Text="High Pass" Style="{StaticResource SmallLabelStyle}"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Grid.Row="2" Grid.Column="0" x:Name="Button_MovingAverage" Style="{StaticResource FilterButtonStyle}" Click="FilterButton_Click" Tag="MovingAverage" ToolTip="Moving Average Filter">
+                            <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
+                                <svgc:SvgViewbox Source="/Icons/movingAverage.svg" Width="48" Height="48" Margin="5"/>
+                                <TextBlock Text="Moving Avg" Style="{StaticResource SmallLabelStyle}"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Grid.Row="2" Grid.Column="1" x:Name="Button_Median" Style="{StaticResource FilterButtonStyle}" Click="FilterButton_Click" Tag="Median" ToolTip="Median Filter">
+                            <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
+                                <svgc:SvgViewbox Source="/Icons/median.svg" Width="48" Height="48" Margin="5"/>
+                                <TextBlock Text="Median" Style="{StaticResource SmallLabelStyle}"/>
+                            </StackPanel>
+                        </Button>
+
+                        <Button Grid.Row="3" Grid.Column="0" x:Name="Button_Absolute" Style="{StaticResource FilterButtonStyle}" Click="FilterButton_Click" Tag="Absolute" ToolTip="Absolute Value">
+                            <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
+                                <svgc:SvgViewbox Source="/Icons/abs.svg" Width="48" Height="48" Margin="5"/>
+                                <TextBlock Text="Absolute" Style="{StaticResource SmallLabelStyle}"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Grid.Row="3" Grid.Column="1" x:Name="Button_Squared" Style="{StaticResource FilterButtonStyle}" Click="FilterButton_Click" Tag="Squared" ToolTip="Squared Value">
+                            <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
+                                <svgc:SvgViewbox Source="/Icons/squared.svg" Width="48" Height="48" Margin="5"/>
+                                <TextBlock Text="Squared" Style="{StaticResource SmallLabelStyle}"/>
+                            </StackPanel>
+                        </Button>
+                    </Grid>
 
                     <!-- Filter Parameters Panel -->
                     <Border x:Name="ParametersPanel" BorderBrush="{DynamicResource PlotSettings_BorderBrush}" 
-                            BorderThickness="1" CornerRadius="5" Padding="15" 
-                            Visibility="Collapsed">
+                            BorderThickness="1" CornerRadius="5" Padding="15" Margin="10,0"
+                            MinHeight="150">
                         <StackPanel x:Name="ParametersStackPanel">
                             <!-- Content will be dynamically populated based on filter type -->
                         </StackPanel>
                     </Border>
                     
-                    <!-- Information text about immediate application -->
-                    <TextBlock Text="Changes are applied immediately" 
-                              FontStyle="Italic" 
-                              Foreground="{DynamicResource PlotSettings_LabelForegroundBrush}" 
-                              Opacity="0.7" 
-                              HorizontalAlignment="Center" 
-                              Margin="0,15,0,0"/>
                 </StackPanel>
             </ScrollViewer>
+
+            <!-- Bottom area for info text -->
+            <TextBlock Grid.Row="2" Text="Changes are applied immediately" 
+                       FontStyle="Italic" 
+                       Foreground="{DynamicResource PlotSettings_LabelForegroundBrush}" 
+                       Opacity="0.7" 
+                       HorizontalAlignment="Center" 
+                       Margin="0,10"/>
         </Grid>
     </Border>
 </Window>

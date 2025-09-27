@@ -41,6 +41,7 @@ namespace PowerScope.View.UserForms
             {
                 // Default to None if no channel settings
                 HighlightSelectedButton("None");
+                UpdateParametersPanel("None");
             }
         }
 
@@ -90,36 +91,31 @@ namespace PowerScope.View.UserForms
             // Reset all button styles
             ResetButtonStyles();
             
-            // Highlight the selected button
-            string buttonName = filterType switch
-            {
-                "None" => "Button_None",
-                "LowPass" => "Button_LowPass",  
-                "HighPass" => "Button_HighPass",
-                "MovingAverage" => "Button_MovingAverage",
-                "Median" => "Button_Median",
-                "Notch" => "Button_Notch",
-                "Absolute" => "Button_Absolute",
-                "Squared" => "Button_Squared",
-                _ => "Button_None"
-            };
+            // Highlight the selected button by its name
+            Button selectedButton = FindName($"Button_{filterType}") as Button;
 
-            Button selectedButton = this.FindName(buttonName) as Button;
             if (selectedButton != null)
             {
-                selectedButton.BorderBrush = new SolidColorBrush(Colors.Orange);
-                selectedButton.BorderThickness = new Thickness(3);
+                object accentColor = Application.Current.Resources["AccentColor"];
+                if (accentColor != null)
+                {
+                    selectedButton.BorderBrush = new SolidColorBrush((Color)accentColor);
+                    selectedButton.BorderThickness = new Thickness(3);
+                }
             }
         }
 
         private void ResetButtonStyles()
         {
-            var buttonNames = new[] { "Button_None", "Button_LowPass", "Button_HighPass", "Button_MovingAverage", 
-                                     "Button_Median", "Button_Notch", "Button_Absolute", "Button_Squared" };
+            var buttonNames = new[] 
+            { 
+                "Button_None", "Button_LowPass", "Button_HighPass", "Button_MovingAverage", 
+                "Button_Median", "Button_Notch", "Button_Absolute", "Button_Squared" 
+            };
             
             foreach (var buttonName in buttonNames)
             {
-                Button button = this.FindName(buttonName) as Button;
+                Button button = FindName(buttonName) as Button;
                 if (button != null)
                 {
                     button.ClearValue(Button.BorderBrushProperty);
@@ -130,52 +126,38 @@ namespace PowerScope.View.UserForms
 
         private void UpdateParametersPanel(string filterType)
         {
-            var parametersStackPanel = this.FindName("ParametersStackPanel") as StackPanel;
-            var parametersPanel = this.FindName("ParametersPanel") as Border;
+            ParametersStackPanel.Children.Clear();
             
-            if (parametersStackPanel == null || parametersPanel == null) return;
-            
-            parametersStackPanel.Children.Clear();
-            
-            if (filterType == "None")
+            if (filterType == "None" || filterType == "Absolute" || filterType == "Squared")
             {
-                parametersPanel.Visibility = Visibility.Collapsed;
-                ApplyFilter(null);
+                ApplyFilter(filterType, null);
+                ParametersPanel.Visibility = Visibility.Collapsed;
                 return;
             }
 
-            // For Absolute and Squared filters, no parameters are needed
-            if (filterType == "Absolute" || filterType == "Squared")
-            {
-                parametersPanel.Visibility = Visibility.Collapsed;
-                ApplyFilterWithoutParameters(filterType);
-                return;
-            }
-
-            parametersPanel.Visibility = Visibility.Visible;
+            ParametersPanel.Visibility = Visibility.Visible;
 
             switch (filterType)
             {
                 case "LowPass":
                 case "HighPass":
-                    CreateAlphaSliderControls(filterType, parametersStackPanel);
+                    CreateAlphaSliderControls(filterType, ParametersStackPanel);
                     break;
                 case "MovingAverage":
                 case "Median":
-                    CreateWindowSizeControls(filterType, parametersStackPanel);
+                    CreateWindowSizeControls(filterType, ParametersStackPanel);
                     break;
                 case "Notch":
-                    CreateNotchControls(parametersStackPanel);
+                    CreateNotchControls(ParametersStackPanel);
                     break;
             }
         }
 
         private void CreateAlphaSliderControls(string filterType, StackPanel parametersStackPanel)
         {
-            // Alpha parameter (0.01 to 1.0)
             var alphaPanel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 10) };
             
-            var alphaLabel = new Label { Content = "Alpha:", Width = 80 };
+            var alphaLabel = new Label { Content = "Alpha:", Width = 80, VerticalAlignment = VerticalAlignment.Center };
             var alphaSlider = new Slider 
             { 
                 Name = "AlphaSlider",
@@ -183,15 +165,15 @@ namespace PowerScope.View.UserForms
                 Minimum = 0.01, 
                 Maximum = 1.0, 
                 Value = GetCurrentAlpha(filterType),
-                TickFrequency = 0.1,
+                TickFrequency = 0.01,
                 IsSnapToTickEnabled = false,
             };
-            var alphaValueLabel = new Label { Name = "AlphaValueLabel", Width = 60, Content = alphaSlider.Value.ToString("F2") };
+            var alphaValueLabel = new Label { Name = "AlphaValueLabel", Width = 60, Content = alphaSlider.Value.ToString("F2"), VerticalAlignment = VerticalAlignment.Center };
             
             alphaSlider.ValueChanged += (s, e) => 
             {
                 alphaValueLabel.Content = e.NewValue.ToString("F2");
-                ApplyFilterWithParameter(filterType, e.NewValue);
+                ApplyFilter(filterType, e.NewValue);
             };
             
             alphaPanel.Children.Add(alphaLabel);
@@ -199,15 +181,14 @@ namespace PowerScope.View.UserForms
             alphaPanel.Children.Add(alphaValueLabel);
             parametersStackPanel.Children.Add(alphaPanel);
             
-            // Apply initial filter
-            ApplyFilterWithParameter(filterType, alphaSlider.Value);
+            ApplyFilter(filterType, alphaSlider.Value);
         }
 
         private void CreateWindowSizeControls(string filterType, StackPanel parametersStackPanel)
         {
             var windowPanel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 10) };
             
-            var windowLabel = new Label { Content = "Window Size:", Width = 100 };
+            var windowLabel = new Label { Content = "Window Size:", Width = 100, VerticalAlignment = VerticalAlignment.Center };
             var windowTextBox = new TextBox 
             { 
                 Name = "WindowSizeTextBox",
@@ -219,14 +200,13 @@ namespace PowerScope.View.UserForms
             var buttonPanel = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(5, 0, 0, 0) };
             var upButton = new Button { Content = "▲", Width = 25, Height = 15, Margin = new Thickness(0, 0, 0, 2), ToolTip = "Increase" };
             var downButton = new Button { Content = "▼", Width = 25, Height = 15, ToolTip = "Decrease" };
-            //▲
+            
             upButton.Click += (s, e) => 
             {
                 if (int.TryParse(windowTextBox.Text, out int current))
                 {
                     int newValue = Math.Min(current + 1, 100);
                     windowTextBox.Text = newValue.ToString();
-                    ApplyFilterWithParameter(filterType, newValue);
                 }
             };
             
@@ -236,7 +216,6 @@ namespace PowerScope.View.UserForms
                 {
                     int newValue = Math.Max(current - 1, 1);
                     windowTextBox.Text = newValue.ToString();
-                    ApplyFilterWithParameter(filterType, newValue);
                 }
             };
             
@@ -244,7 +223,7 @@ namespace PowerScope.View.UserForms
             {
                 if (int.TryParse(windowTextBox.Text, out int value) && value >= 1 && value <= 100)
                 {
-                    ApplyFilterWithParameter(filterType, value);
+                    ApplyFilter(filterType, value);
                 }
             };
             
@@ -256,128 +235,79 @@ namespace PowerScope.View.UserForms
             windowPanel.Children.Add(buttonPanel);
             parametersStackPanel.Children.Add(windowPanel);
             
-            // Apply initial filter
             if (int.TryParse(windowTextBox.Text, out int windowSize))
             {
-                ApplyFilterWithParameter(filterType, windowSize);
+                ApplyFilter(filterType, windowSize);
             }
         }
 
         private void CreateNotchControls(StackPanel parametersStackPanel)
         {
-            // Notch Frequency
             var freqPanel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 10) };
-            freqPanel.Children.Add(new Label { Content = "Notch Freq (Hz):", Width = 120 });
-            var freqTextBox = new TextBox { Name = "NotchFreqTextBox", Width = 100, Text = GetCurrentNotchFreq().ToString("F1") };
+            freqPanel.Children.Add(new Label { Content = "Notch Freq (Hz):", Width = 120, VerticalAlignment = VerticalAlignment.Center });
+            var freqTextBox = new TextBox { Name = "NotchFreqTextBox", Width = 100, Text = GetCurrentNotchFreq().ToString("F1"), VerticalContentAlignment = VerticalAlignment.Center };
             freqPanel.Children.Add(freqTextBox);
             parametersStackPanel.Children.Add(freqPanel);
             
-            // Sample Rate
             var samplePanel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 10) };
-            samplePanel.Children.Add(new Label { Content = "Sample Rate (Hz):", Width = 120 });
-            var sampleTextBox = new TextBox { Name = "SampleRateTextBox", Width = 100, Text = GetCurrentSampleRate().ToString("F1") };
+            samplePanel.Children.Add(new Label { Content = "Sample Rate (Hz):", Width = 120, VerticalAlignment = VerticalAlignment.Center });
+            var sampleTextBox = new TextBox { Name = "SampleRateTextBox", Width = 100, Text = GetCurrentSampleRate().ToString("F1"), VerticalContentAlignment = VerticalAlignment.Center };
             samplePanel.Children.Add(sampleTextBox);
             parametersStackPanel.Children.Add(samplePanel);
             
-            // Bandwidth
             var bandwidthPanel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 10) };
-            bandwidthPanel.Children.Add(new Label { Content = "Bandwidth (Hz):", Width = 120 });
-            var bandwidthTextBox = new TextBox { Name = "BandwidthTextBox", Width = 100, Text = GetCurrentBandwidth().ToString("F1") };
+            bandwidthPanel.Children.Add(new Label { Content = "Bandwidth (Hz):", Width = 120, VerticalAlignment = VerticalAlignment.Center });
+            var bandwidthTextBox = new TextBox { Name = "BandwidthTextBox", Width = 100, Text = GetCurrentBandwidth().ToString("F1"), VerticalContentAlignment = VerticalAlignment.Center };
             bandwidthPanel.Children.Add(bandwidthTextBox);
             parametersStackPanel.Children.Add(bandwidthPanel);
             
-            // Update filter when any parameter changes
             TextChangedEventHandler updateNotchFilter = (s, e) => ApplyNotchFilter(freqTextBox, sampleTextBox, bandwidthTextBox);
             freqTextBox.TextChanged += updateNotchFilter;
             sampleTextBox.TextChanged += updateNotchFilter;
             bandwidthTextBox.TextChanged += updateNotchFilter;
             
-            // Apply initial filter
             ApplyNotchFilter(freqTextBox, sampleTextBox, bandwidthTextBox);
         }
 
-        /// <summary>
-        /// Apply filter with no parameters (for Absolute and Squared filters)
-        /// </summary>
-        private void ApplyFilterWithoutParameters(string filterType)
+        private void ApplyFilter(string filterType, double? parameter)
         {
+            if (_channelSettings == null) return;
+
+            IDigitalFilter newFilter = null;
             try
             {
-                IDigitalFilter newFilter = filterType switch
+                newFilter = filterType switch
                 {
+                    "LowPass" => new ExponentialLowPassFilter(parameter.Value),
+                    "HighPass" => new ExponentialHighPassFilter(parameter.Value),
+                    "MovingAverage" => new MovingAverageFilter((int)parameter.Value),
+                    "Median" => new MedianFilter((int)parameter.Value),
                     "Absolute" => new AbsoluteFilter(),
                     "Squared" => new SquaredFilter(),
                     _ => null
                 };
-                
-                ApplyFilter(newFilter);
             }
             catch
             {
-                // If filter creation fails, apply null filter (no filtering)
-                ApplyFilter(null);
+                newFilter = null;
             }
+            _channelSettings.Filter = newFilter;
         }
 
-        /// <summary>
-        /// Apply filter with a single parameter (for Alpha and WindowSize filters)
-        /// </summary>
-        private void ApplyFilterWithParameter(string filterType, double parameter)
-        {
-            try
-            {
-                IDigitalFilter newFilter = filterType switch
-                {
-                    "LowPass" => new ExponentialLowPassFilter(parameter),
-                    "HighPass" => new ExponentialHighPassFilter(parameter),
-                    "MovingAverage" => new MovingAverageFilter((int)parameter),
-                    "Median" => new MedianFilter((int)parameter),
-                    _ => null
-                };
-                
-                ApplyFilter(newFilter);
-            }
-            catch
-            {
-                // If filter creation fails, apply null filter (no filtering)
-                ApplyFilter(null);
-            }
-        }
-
-        /// <summary>
-        /// Apply notch filter with multiple parameters
-        /// </summary>
         private void ApplyNotchFilter(TextBox freqBox, TextBox sampleBox, TextBox bandwidthBox)
         {
-            try
-            {
-                if (double.TryParse(freqBox.Text, out double freq) &&
-                    double.TryParse(sampleBox.Text, out double sample) &&
-                    double.TryParse(bandwidthBox.Text, out double bandwidth) &&
-                    freq > 0 && sample > 0 && bandwidth > 0)
-                {
-                    var notchFilter = new NotchFilter(freq, sample, bandwidth);
-                    ApplyFilter(notchFilter);
-                }
-                else
-                {
-                    ApplyFilter(null);
-                }
-            }
-            catch
-            {
-                ApplyFilter(null);
-            }
-        }
+            if (_channelSettings == null) return;
 
-        /// <summary>
-        /// Apply the filter directly to the channel settings (immediate application)
-        /// </summary>
-        private void ApplyFilter(IDigitalFilter filter)
-        {
-            if (_channelSettings != null)
+            if (double.TryParse(freqBox.Text, out double freq) &&
+                double.TryParse(sampleBox.Text, out double sample) &&
+                double.TryParse(bandwidthBox.Text, out double bandwidth) &&
+                freq > 0 && sample > 0 && bandwidth > 0)
             {
-                _channelSettings.Filter = filter;
+                _channelSettings.Filter = new NotchFilter(freq, sample, bandwidth);
+            }
+            else
+            {
+                _channelSettings.Filter = null;
             }
         }
 
@@ -386,12 +316,9 @@ namespace PowerScope.View.UserForms
             if (_channelSettings?.Filter != null)
             {
                 var parameters = _channelSettings.Filter.GetFilterParameters();
-                if (parameters.ContainsKey("Alpha"))
-                {
-                    return parameters["Alpha"];
-                }
+                if (parameters.ContainsKey("Alpha")) return parameters["Alpha"];
             }
-            return 0.1; // Default value
+            return 0.1;
         }
 
         private int GetCurrentWindowSize(string filterType)
@@ -399,12 +326,9 @@ namespace PowerScope.View.UserForms
             if (_channelSettings?.Filter != null)
             {
                 var parameters = _channelSettings.Filter.GetFilterParameters();
-                if (parameters.ContainsKey("WindowSize"))
-                {
-                    return (int)parameters["WindowSize"];
-                }
+                if (parameters.ContainsKey("WindowSize")) return (int)parameters["WindowSize"];
             }
-            return 5; // Default value
+            return 5;
         }
 
         private double GetCurrentNotchFreq()
@@ -412,12 +336,9 @@ namespace PowerScope.View.UserForms
             if (_channelSettings?.Filter != null)
             {
                 var parameters = _channelSettings.Filter.GetFilterParameters();
-                if (parameters.ContainsKey("NotchFreq"))
-                {
-                    return parameters["NotchFreq"];
-                }
+                if (parameters.ContainsKey("NotchFreq")) return parameters["NotchFreq"];
             }
-            return 50.0; // Default 50Hz
+            return 50.0;
         }
 
         private double GetCurrentSampleRate()
@@ -425,12 +346,9 @@ namespace PowerScope.View.UserForms
             if (_channelSettings?.Filter != null)
             {
                 var parameters = _channelSettings.Filter.GetFilterParameters();
-                if (parameters.ContainsKey("SampleRate"))
-                {
-                    return parameters["SampleRate"];
-                }
+                if (parameters.ContainsKey("SampleRate")) return parameters["SampleRate"];
             }
-            return 1000.0; // Default 1kHz
+            return 1000.0;
         }
 
         private double GetCurrentBandwidth()
@@ -438,21 +356,14 @@ namespace PowerScope.View.UserForms
             if (_channelSettings?.Filter != null)
             {
                 var parameters = _channelSettings.Filter.GetFilterParameters();
-                if (parameters.ContainsKey("Bandwidth"))
-                {
-                    return parameters["Bandwidth"];
-                }
+                if (parameters.ContainsKey("Bandwidth")) return parameters["Bandwidth"];
             }
-            return 2.0; // Default 2Hz
+            return 2.0;
         }
 
-        // Event handlers
         private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            if (e.ButtonState == MouseButtonState.Pressed)
-            {
-                this.DragMove();
-            }
+            if (e.ButtonState == MouseButtonState.Pressed) this.DragMove();
         }
 
         private void CloseButton_Click(object sender, RoutedEventArgs e)
