@@ -84,8 +84,8 @@
                     <!-- Filter Type Selection -->
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,15">
                         <Label Content="Filter Type:" Width="120" VerticalAlignment="Center"/>
-                        <ComboBox x:Name="ComboBox_FilterType" Width="250" 
-                                  SelectionChanged="ComboBox_FilterType_SelectionChanged">
+                        <ComboBox x:Name="ComboBox_FilterType" Width="250">
+                            SelectionChanged="ComboBox_FilterType_SelectionChanged">
                             <ComboBoxItem Content="None" Tag="None" IsSelected="True"/>
                             <ComboBoxItem Content="Low Pass" Tag="LowPass"/>
                             <ComboBoxItem Content="High Pass" Tag="HighPass"/>

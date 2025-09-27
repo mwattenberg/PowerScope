@@ -216,9 +216,7 @@
                             Tag="FFT"
                             ToolTip="Fast Fourier Transform - dominant frequency analysis">
                         <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
-                            <TextBlock Text="FFT" FontSize="20" FontWeight="Bold" 
-                                      Foreground="{DynamicResource PlotSettings_LabelForegroundBrush}" 
-                                      HorizontalAlignment="Center" VerticalAlignment="Center" Margin="5"/>
+                            <svgc:SvgViewbox Source="/Icons/FFT.svg" Width="32" Height="32" Margin="5"/>
                             <TextBlock Text="FFT" Style="{StaticResource SmallLabelStyle}"/>
                         </StackPanel>
                     </Button>

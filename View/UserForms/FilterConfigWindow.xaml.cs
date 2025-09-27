@@ -21,6 +21,7 @@ namespace PowerScope.View.UserForms
     public partial class FilterConfigWindow : Window
     {
         private ChannelSettings _channelSettings;
+        private string _selectedFilterType = "None";
 
         public FilterConfigWindow()
         {
@@ -33,32 +34,30 @@ namespace PowerScope.View.UserForms
             _channelSettings = DataContext as ChannelSettings;
             if (_channelSettings != null)
             {
-                // Set the current filter type in the ComboBox
+                // Set the current filter type based on existing filter
                 SetCurrentFilterType();
+            }
+            else
+            {
+                // Default to None if no channel settings
+                HighlightSelectedButton("None");
             }
         }
 
         private void SetCurrentFilterType()
         {
-            var comboBox = this.FindName("ComboBox_FilterType") as ComboBox;
-            if (comboBox == null) return;
-            
             if (_channelSettings.Filter == null)
             {
-                comboBox.SelectedIndex = 0; // None
+                _selectedFilterType = "None";
             }
             else
             {
                 string filterType = _channelSettings.Filter.GetFilterType();
-                foreach (ComboBoxItem item in comboBox.Items)
-                {
-                    if (item.Tag.ToString() == GetFilterTag(filterType))
-                    {
-                        comboBox.SelectedItem = item;
-                        break;
-                    }
-                }
+                _selectedFilterType = GetFilterTag(filterType);
             }
+            
+            HighlightSelectedButton(_selectedFilterType);
+            UpdateParametersPanel(_selectedFilterType);
         }
 
         private string GetFilterTag(string filterType)
@@ -76,12 +75,56 @@ namespace PowerScope.View.UserForms
             };
         }
 
-        private void ComboBox_FilterType_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        private void FilterButton_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is ComboBox comboBox && comboBox.SelectedItem is ComboBoxItem selectedItem)
+            if (sender is Button button && button.Tag is string filterType)
             {
-                string filterType = selectedItem.Tag.ToString();
+                _selectedFilterType = filterType;
+                HighlightSelectedButton(filterType);
                 UpdateParametersPanel(filterType);
+            }
+        }
+
+        private void HighlightSelectedButton(string filterType)
+        {
+            // Reset all button styles
+            ResetButtonStyles();
+            
+            // Highlight the selected button
+            string buttonName = filterType switch
+            {
+                "None" => "Button_None",
+                "LowPass" => "Button_LowPass",  
+                "HighPass" => "Button_HighPass",
+                "MovingAverage" => "Button_MovingAverage",
+                "Median" => "Button_Median",
+                "Notch" => "Button_Notch",
+                "Absolute" => "Button_Absolute",
+                "Squared" => "Button_Squared",
+                _ => "Button_None"
+            };
+
+            Button selectedButton = this.FindName(buttonName) as Button;
+            if (selectedButton != null)
+            {
+                selectedButton.BorderBrush = new SolidColorBrush(Colors.Orange);
+                selectedButton.BorderThickness = new Thickness(3);
+            }
+        }
+
+        private void ResetButtonStyles()
+        {
+            var buttonNames = new[] { "Button_None", "Button_LowPass", "Button_HighPass", "Button_MovingAverage", 
+                                     "Button_Median", "Button_Notch", "Button_Absolute", "Button_Squared" };
+            
+            foreach (var buttonName in buttonNames)
+            {
+                Button button = this.FindName(buttonName) as Button;
+                if (button != null)
+                {
+                    button.ClearValue(Button.BorderBrushProperty);
+                    button.BorderThickness = new Thickness(2);
+                }
             }
         }
 
@@ -174,9 +217,9 @@ namespace PowerScope.View.UserForms
             };
             
             var buttonPanel = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(5, 0, 0, 0) };
-            var upButton = new Button { Content = "▲", Width = 25, Height = 15, Margin = new Thickness(0, 0, 0, 2) };
-            var downButton = new Button { Content = "▼", Width = 25, Height = 15 };
-            
+            var upButton = new Button { Content = "▲", Width = 25, Height = 15, Margin = new Thickness(0, 0, 0, 2), ToolTip = "Increase" };
+            var downButton = new Button { Content = "▼", Width = 25, Height = 15, ToolTip = "Decrease" };
+            //▲
             upButton.Click += (s, e) => 
             {
                 if (int.TryParse(windowTextBox.Text, out int current))

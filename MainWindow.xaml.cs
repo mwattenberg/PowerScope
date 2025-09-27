@@ -15,12 +15,14 @@ using PowerScope.Model;
 using PowerScope.View.UserControls;
 using PowerScope.View.UserForms;
 using Aelian.FFT;
+using System.Windows.Media.Effects; // Add for VisualTreeHelper
+using Microsoft.Win32;
 
 namespace PowerScope
 {
     /// <summary>
     /// Interaction logic for MainWindow.xaml
-    /// </summary> 　
+    /// </summary> 
     public partial class MainWindow : Window
     {
         private PlotManager _plotManager;
@@ -28,9 +30,18 @@ namespace PowerScope
         // Configurable display settings - use DataStream's ring buffer capacity
         public int DisplayElements { get; set; } = 3000; // Number of elements to display
 
+        // Commands for keyboard shortcuts
+        public ICommand SaveSettingsCommand { get; private set; }
+        public ICommand LoadSettingsCommand { get; private set; }
+        public ICommand PreferencesCommand { get; private set; }
+        public ICommand ExportPlotCommand { get; private set; }
+
         public MainWindow()
         {
             InitializeComponent();
+            
+            // Initialize commands
+            InitializeCommands();
 
             _plotManager = new PlotManager(WpfPlot1);
             
@@ -47,6 +58,105 @@ namespace PowerScope
 
             FastFourierTransform.Initialize();
 
+            // Set DataContext for command bindings
+            DataContext = this;
+        }
+
+        private void InitializeCommands()
+        {
+            SaveSettingsCommand = new RelayCommand(SaveSettings);
+            LoadSettingsCommand = new RelayCommand(LoadSettings);
+            PreferencesCommand = new RelayCommand(OpenPreferences);
+            ExportPlotCommand = new RelayCommand(ExportPlot);
+        }
+
+        private void SaveSettings()
+        {
+            try
+            {
+                SaveFileDialog saveFileDialog = new SaveFileDialog
+                {
+                    Filter = "XML files (*.xml)|*.xml|All files (*.*)|*.*",
+                    DefaultExt = "xml",
+                    FileName = "Settings.xml"
+                };
+
+                if (saveFileDialog.ShowDialog() == true)
+                {
+                    Serializer.WriteSettingsToXML(saveFileDialog.FileName, _plotManager, DataStreamBar);
+                    MessageBox.Show("Settings saved successfully!", "Save Settings", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error saving settings: {ex.Message}", "Save Settings Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void LoadSettings()
+        {
+            try
+            {
+                OpenFileDialog openFileDialog = new OpenFileDialog
+                {
+                    Filter = "XML files (*.xml)|*.xml|All files (*.*)|*.*",
+                    DefaultExt = "xml"
+                };
+
+                if (openFileDialog.ShowDialog() == true)
+                {
+                    Serializer.ReadSettingsFromXML(openFileDialog.FileName, _plotManager, DataStreamBar);
+                    MessageBox.Show("Settings loaded successfully!", "Load Settings", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error loading settings: {ex.Message}", "Load Settings Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void OpenPreferences()
+        {
+            View.UserForms.PlotSettingsWindow settingsWindow = new View.UserForms.PlotSettingsWindow(_plotManager.Settings);
+            settingsWindow.Show();
+        }
+
+        private void ExportPlot()
+        {
+            try
+            {
+                SaveFileDialog saveFileDialog = new SaveFileDialog
+                {
+                    Filter = "PNG files (*.png)|*.png|SVG files (*.svg)|*.svg|All files (*.*)|*.*",
+                    DefaultExt = "png",
+                    FileName = "plot_export"
+                };
+
+                if (saveFileDialog.ShowDialog() == true)
+                {
+                    string extension = Path.GetExtension(saveFileDialog.FileName).ToLower();
+                    
+                    if (extension == ".png")
+                    {
+                        WpfPlot1.Plot.SavePng(saveFileDialog.FileName, 1920, 1080);
+                    }
+                    else if (extension == ".svg")
+                    {
+                        WpfPlot1.Plot.SaveSvg(saveFileDialog.FileName, 1920, 1080);
+                    }
+                    else
+                    {
+                        // Default to PNG
+                        WpfPlot1.Plot.SavePng(saveFileDialog.FileName, 1920, 1080);
+                    }
+                    
+                    MessageBox.Show("Plot exported successfully!", "Export Plot", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error exporting plot: {ex.Message}", "Export Plot Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         void InitializeControls()
@@ -77,6 +187,17 @@ namespace PowerScope
 
             // Subscribe directly to ObservableCollection.CollectionChanged for automatic notifications
             DataStreamBar.Channels.CollectionChanged += OnChannelsCollectionChanged;
+            
+            // Subscribe to MenuBar events
+            MainMenuBar.PreferencesClicked += MenuBar_PreferencesClicked;
+            MainMenuBar.SaveSettingsClicked += (s, e) => SaveSettings();
+            MainMenuBar.LoadSettingsClicked += (s, e) => LoadSettings();
+            MainMenuBar.ExportPlotClicked += (s, e) => ExportPlot();
+        }
+
+        private void MenuBar_PreferencesClicked(object sender, EventArgs e)
+        {
+            OpenPreferences();
         }
 
         private void OnChannelsCollectionChanged(object sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
@@ -145,13 +266,40 @@ namespace PowerScope
             base.OnClosed(e);
         }
 
-
         private void Button_ConfigPlot_Click(object sender, RoutedEventArgs e)
         {
             // Pass current settings to the window - changes are applied immediately via data binding
             View.UserForms.PlotSettingsWindow settingsWindow = new View.UserForms.PlotSettingsWindow(_plotManager.Settings);
             settingsWindow.Show();
         }
+    }
 
+    // Simple RelayCommand implementation
+    public class RelayCommand : ICommand
+    {
+        private readonly Action _execute;
+        private readonly Func<bool> _canExecute;
+
+        public RelayCommand(Action execute, Func<bool> canExecute = null)
+        {
+            _execute = execute ?? throw new ArgumentNullException(nameof(execute));
+            _canExecute = canExecute;
+        }
+
+        public event EventHandler CanExecuteChanged
+        {
+            add { CommandManager.RequerySuggested += value; }
+            remove { CommandManager.RequerySuggested -= value; }
+        }
+
+        public bool CanExecute(object parameter)
+        {
+            return _canExecute == null || _canExecute();
+        }
+
+        public void Execute(object parameter)
+        {
+            _execute();
+        }
     }
 }

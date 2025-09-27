@@ -12,40 +12,47 @@
         FontFamily="{DynamicResource {x:Static SystemFonts.MessageFontFamily}}"
         FontSize="{DynamicResource {x:Static SystemFonts.MessageFontSize}}"
         Background="{DynamicResource PlotSettings_BackgroundBrush}">
+    
+    <Window.InputBindings>
+        <KeyBinding Command="{Binding SaveSettingsCommand}" Key="S" Modifiers="Ctrl"/>
+        <KeyBinding Command="{Binding LoadSettingsCommand}" Key="O" Modifiers="Ctrl"/>
+        <KeyBinding Command="{Binding PreferencesCommand}" Key="P" Modifiers="Ctrl"/>
+        <KeyBinding Command="{Binding ExportPlotCommand}" Key="E" Modifiers="Ctrl"/>
+    </Window.InputBindings>
+
     <Grid Background="{DynamicResource PlotSettings_BackgroundBrush}">
         <Grid.RowDefinitions>
-            <RowDefinition Height="22"/>
+            <RowDefinition Height="25"/>
             <!-- Toolbar -->
-            <RowDefinition/>
+            <RowDefinition Height="*"/>
             <!-- Main content -->
             <RowDefinition Height="Auto"/>
             <!-- Bottom controls -->
         </Grid.RowDefinitions>
         <!-- Toolbar at the top -->
-        <UserControls:MenuBar Grid.Row="0" Height="Auto"/>
+        <UserControls:MenuBar Grid.Row="0" x:Name="MainMenuBar" Height="Auto"/>
         <!-- Main content area: 3 columns -->
-        <Grid Grid.Row="1">
+        <Grid Grid.Row="1" VerticalAlignment="Stretch">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="150" MinWidth="150"/>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="140" MinWidth="140"/>
             </Grid.ColumnDefinitions>
             <!-- DataStreamBar (left) -->
-            <UserControls:DataStreamBar Grid.Column="0" x:Name="DataStreamBar"/>
+            <UserControls:DataStreamBar Grid.Column="0" x:Name="DataStreamBar" VerticalAlignment="Stretch"/>
             <!-- Plot area (center) -->
-            <Grid Grid.Column="1" Background="{DynamicResource PlotSettings_BackgroundBrush}">
+            <Grid Grid.Column="1" Background="{DynamicResource PlotSettings_BackgroundBrush}" VerticalAlignment="Stretch">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="*"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
-                <ScottPlot:WpfPlotGL x:Name="WpfPlot1" Grid.Row="0" Margin="15"/>
-                <Button x:Name="Button_ConfigPlot" Panel.ZIndex="1" Height="20" Width="20" HorizontalAlignment="Right" VerticalAlignment="Top" Content="🔨" Margin="5,5,5,5" Click="Button_ConfigPlot_Click" Grid.Row="0"/>
+                <ScottPlot:WpfPlotGL x:Name="WpfPlot1" Grid.Row="0" Margin="0" VerticalAlignment="Stretch"/>
             </Grid>
             <!-- MeasurementBar (right) -->
-            <UserControls:MeasurementBar Grid.Column="2" x:Name="MeasurementBar" Height="609" VerticalAlignment="Top"/>
+            <UserControls:MeasurementBar Grid.Column="2" x:Name="MeasurementBar" VerticalAlignment="Stretch"/>
         </Grid>
         <!-- Bottom controls: 4 columns for each control -->
-        <Grid Grid.Row="2">
+        <Grid Grid.Row="2" Margin="0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="auto"/>

@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Linq;
 using System.Windows;
 using Aelian.FFT;
 
@@ -32,6 +33,7 @@ namespace PowerScope.Model
     /// Takes a DataStream and channel index, handles all data management internally
     /// Updates are now managed externally by SystemManager
     /// Extended to work directly with WPF data binding and templates
+    /// Enhanced with detail tracking for expandable UI
     /// </summary>
     public class Measurement : INotifyPropertyChanged, IDisposable
     {
@@ -45,6 +47,12 @@ namespace PowerScope.Model
         // Single measurement result
         private double _result = 0.0;
         private bool _disposed = false;
+
+        // Statistics properties
+        private double _min = double.MaxValue;
+        private double _max = double.MinValue;
+        private double _mean = 0.0;
+        private long _samplesCount = 0;
 
         // FFT-specific data for spectrum display
         private double[] _spectrumFrequencies;
@@ -64,6 +72,10 @@ namespace PowerScope.Model
         // Pre-calculated window function coefficients for performance optimization
         private double[] _FFT_windowCoefficients;
         private bool _FFT_windowCoefficientsValid = false;
+
+        // Detail tracking for expandable UI
+        private readonly List<(double frequency, double magnitude)> _fftPeaks = new List<(double, double)>();
+        private const int MaxPeaksToTrack = 10;
 
         // Events
         public event EventHandler RemoveRequested;
@@ -160,13 +172,67 @@ namespace PowerScope.Model
             }
             private set
             {
-                    _result = value;
-                    OnPropertyChanged(nameof(Result));
-
+                _result = value;
+                OnPropertyChanged(nameof(Result));
             }
         }
 
+        /// <summary>
+        /// Controls whether statistics (Min, Max, Mean, Count) are calculated for each measurement.
+        /// </summary>
+        public bool CalculateStatistics { get; set; } = false;
 
+        /// <summary>
+        /// The minimum value recorded since statistics were last reset.
+        /// </summary>
+        public double Min
+        {
+            get => _min;
+            private set
+            {
+                _min = value;
+                OnPropertyChanged(nameof(Min));
+            }
+        }
+
+        /// <summary>
+        /// The maximum value recorded since statistics were last reset.
+        /// </summary>
+        public double Max
+        {
+            get => _max;
+            private set
+            {
+                _max = value;
+                OnPropertyChanged(nameof(Max));
+            }
+        }
+
+        /// <summary>
+        /// The running mean (average) of values since statistics were last reset.
+        /// </summary>
+        public double Mean
+        {
+            get => _mean;
+            private set
+            {
+                _mean = value;
+                OnPropertyChanged(nameof(Mean));
+            }
+        }
+
+        /// <summary>
+        /// The total number of samples included in the statistics calculation.
+        /// </summary>
+        public long SamplesCount
+        {
+            get => _samplesCount;
+            private set
+            {
+                _samplesCount = value;
+                OnPropertyChanged(nameof(SamplesCount));
+            }
+        }
 
         /// <summary>
         /// FFT size (number of samples for FFT calculation)
@@ -180,7 +246,6 @@ namespace PowerScope.Model
             }
             set
             {
-
                 _FFT_Size = value;
                 OnPropertyChanged(nameof(FFT_Size));
                     
@@ -191,12 +256,9 @@ namespace PowerScope.Model
                 // Invalidate cached spectrum signal since data length will change
                 _lastSpectrumLength = -1;
                     
-
                 int newSpectrumLength = _FFT_Size * _FFT_interpolation / 2;
                 _spectrumFrequencies = new double[newSpectrumLength];
                 _spectrumMagnitudes = new double[newSpectrumLength];
-                        
-
             }
         }
 
@@ -244,7 +306,6 @@ namespace PowerScope.Model
                 // Invalidate window coefficients since window function changed
                 _FFT_windowCoefficientsValid = false;
                 FFT_PreCalculateWindowCoefficients();
-                    
             }
         }
 
@@ -272,6 +333,18 @@ namespace PowerScope.Model
         {
             if (RemoveRequested != null)
                 RemoveRequested(this, EventArgs.Empty);
+        }
+
+        /// <summary>
+        /// Resets the calculated statistics (Min, Max, Mean, Count) to their initial values.
+        /// </summary>
+        public void ClearStatistics()
+        {
+            Min = double.MaxValue;
+            Max = double.MinValue;
+            Mean = 0.0;
+            SamplesCount = 0;
+            _fftPeaks.Clear();
         }
 
         /// <summary>
@@ -340,17 +413,10 @@ namespace PowerScope.Model
         /// </summary>
         private void FFT_UpdateSpectrumPlot()
         {
-
-            int currentSpectrumLength = 0;
-            if (_spectrumFrequencies != null) 
-                currentSpectrumLength = _spectrumFrequencies.Length;
+            int currentSpectrumLength = _spectrumFrequencies.Length;
                 
             // Check if we need to rebuild the signal (data length changed)
-            bool needsRebuild = false;
-            if (_spectrumSignal == null) 
-                needsRebuild = true;
-            if (_lastSpectrumLength != currentSpectrumLength) 
-                needsRebuild = true;
+            bool needsRebuild = _spectrumSignal == null || _lastSpectrumLength != currentSpectrumLength;
                 
             if (needsRebuild)
             {                    
@@ -361,7 +427,6 @@ namespace PowerScope.Model
                 // Create new signal with current data
                 ScottPlot.Plottables.SignalXY newSignal = _fftWindow.WpfPlotFFT.Plot.Add.SignalXY(_spectrumFrequencies, _spectrumMagnitudes);
                 _spectrumSignal = newSignal;
-
 
                 // Apply constant signal properties (set once)
                 ScottPlot.Color scColor = new ScottPlot.Color(_channelSettings.Color.R, _channelSettings.Color.G, _channelSettings.Color.B);
@@ -392,10 +457,6 @@ namespace PowerScope.Model
             else 
                 samplesToCopy = 5000; // Use hardcoded 5000 samples for non-FFT measurements
                 
-            //// Ensure we don't exceed buffer capacity
-            //if (samplesToCopy > _dataBuffer.Length) 
-            //    samplesToCopy = _dataBuffer.Length;
-                
             int samplesCopied = _dataStream.CopyLatestTo(_channelIndex, _dataBuffer, samplesToCopy);
             
             // Skip calculation if no data was copied
@@ -412,11 +473,7 @@ namespace PowerScope.Model
                 // Update FFT plot if window is open
                 if (_fftWindow != null && _fftWindow.IsVisible)
                 {
-                    if (Application.Current != null)
-                    {
-                        if (Application.Current.Dispatcher != null)
-                            Application.Current.Dispatcher.BeginInvoke((Action)FFT_UpdateSpectrumPlot);
-                    }
+                    Application.Current.Dispatcher.BeginInvoke((Action)FFT_UpdateSpectrumPlot);
                 }
             }
             else
@@ -424,6 +481,29 @@ namespace PowerScope.Model
                 // Calculate using the assigned function pointer for non-FFT measurements
                 double newResult = _calculationFunction(validData);
                 Result = newResult;
+                
+                // Update measurement history for detail tracking
+                if (CalculateStatistics)
+                {
+                    UpdateStatistics(newResult);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Updates the running statistics with a new measurement value.
+        /// </summary>
+        private void UpdateStatistics(double value)
+        {
+            if (!double.IsNaN(value) && !double.IsInfinity(value))
+            {
+                // Update Min/Max
+                if (value < Min) Min = value;
+                if (value > Max) Max = value;
+
+                // Update running mean and count
+                SamplesCount++;
+                Mean += (value - Mean) / SamplesCount;
             }
         }
 
@@ -472,8 +552,6 @@ namespace PowerScope.Model
             double min = double.MaxValue;
             foreach (double value in data)
             {
-                if (double.IsNaN(value) || double.IsInfinity(value)) 
-                    continue;
                 if (value < min) 
                     min = value;
             }
@@ -487,8 +565,6 @@ namespace PowerScope.Model
             double max = double.MinValue;
             foreach (double value in data)
             {
-                if (double.IsNaN(value) || double.IsInfinity(value)) 
-                    continue;
                 if (value > max) 
                     max = value;
             }
@@ -503,9 +579,6 @@ namespace PowerScope.Model
             int count = 0;
             foreach (double value in data)
             {
-                if (double.IsNaN(value) || double.IsInfinity(value)) 
-                    continue;
-
                 sum += value;
                 count++;
             }
@@ -521,9 +594,6 @@ namespace PowerScope.Model
             int count = 0;
             foreach (double value in data)
             {
-                if (double.IsNaN(value) || double.IsInfinity(value)) 
-                    continue;
-
                 sumOfSquares += value * value;
                 count++;
             }
@@ -540,9 +610,6 @@ namespace PowerScope.Model
 
             foreach (double value in data)
             {
-                if (double.IsNaN(value) || double.IsInfinity(value)) 
-                    continue;
-
                 double diff = value - mean;
                 sumOfSquaredDifferences += diff * diff;
                 count++;
@@ -560,9 +627,6 @@ namespace PowerScope.Model
             int count = 0;
             foreach (double value in data)
             {
-                if (double.IsNaN(value) || double.IsInfinity(value)) 
-                    continue;
-
                 double diff = value - mean;
                 sumOfSquaredDifferences += diff * diff;
                 count++;
@@ -579,9 +643,6 @@ namespace PowerScope.Model
             double max = double.MinValue;
             foreach (double value in data)
             {
-                if (double.IsNaN(value) || double.IsInfinity(value)) 
-                    continue;
-
                 if (value < min) min = value;
                 if (value > max) max = value;
             }
@@ -642,6 +703,9 @@ namespace PowerScope.Model
             // Calculate window-specific amplitude correction factor
             double windowAmplitudeCorrection = GetWindowAmplitudeCorrection(_FFT_windowFunction);
 
+            // Clear peaks list for new calculation
+            _fftPeaks.Clear();
+
             // Calculate magnitudes and optionally build spectrum arrays
             for (int i = 0; i < spectrumLength; i++)
             {
@@ -657,6 +721,14 @@ namespace PowerScope.Model
                     magnitude = magnitude / 2.0;
                 }
 
+                double frequency = i * frequencyResolution;
+
+                // Track peaks for detail display (skip DC component)
+                if (i > 0 && magnitude > 0.001) // Threshold to avoid noise
+                {
+                    _fftPeaks.Add((frequency, magnitude));
+                }
+
                 if (magnitude > maxMagnitude)
                 {
                     maxMagnitude = magnitude;
@@ -665,7 +737,7 @@ namespace PowerScope.Model
 
                 if (needSpectrum)
                 {
-                    _spectrumFrequencies[i] = i * frequencyResolution;
+                    _spectrumFrequencies[i] = frequency;
 
                     // Apply averaging smoothing (exponential moving average simulation)
                     if (_FFT_averaging > 1 && i < _spectrumMagnitudes.Length)
@@ -680,6 +752,13 @@ namespace PowerScope.Model
                         _spectrumMagnitudes[i] = 20.0 * Math.Log10(Math.Max(magnitude, 1e-10));
                     }
                 }
+            }
+
+            // Keep only the top peaks and limit the list size
+            if (_fftPeaks.Count > MaxPeaksToTrack)
+            {
+                _fftPeaks.Sort((a, b) => b.magnitude.CompareTo(a.magnitude));
+                _fftPeaks.RemoveRange(MaxPeaksToTrack, _fftPeaks.Count - MaxPeaksToTrack);
             }
                 
             double peakFrequency = peakBin * frequencyResolution;
@@ -728,7 +807,6 @@ namespace PowerScope.Model
             {
                 output[i] = input[i] * _FFT_windowCoefficients[i];
             }
-            
         }
 
         /// <summary>

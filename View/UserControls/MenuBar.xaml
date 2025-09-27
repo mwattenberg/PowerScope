@@ -5,26 +5,31 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:PowerScope.View.UserControls"
              mc:Ignorable="d" 
-             d:Height="20" d:DesignWidth="800">
+             d:Height="26" d:DesignWidth="800">
     <UserControl.Resources>
         <!-- MenuBar dark theme styles using global resources -->
-        <Style TargetType="Menu">
+        <Style TargetType="Menu" BasedOn="{StaticResource SystemFontStyle}">
             <Setter Property="Background" Value="{DynamicResource PlotSettings_TitleBarBrush}"/>
             <Setter Property="Foreground" Value="{DynamicResource PlotSettings_LabelForegroundBrush}"/>
-            <Setter Property="FontSize" Value="14"/>
         </Style>
 
-        <Style TargetType="MenuItem">
+        <Style TargetType="MenuItem" BasedOn="{StaticResource SystemFontStyle}">
             <Setter Property="Background" Value="{DynamicResource PlotSettings_TitleBarBrush}"/>
             <Setter Property="Foreground" Value="{DynamicResource PlotSettings_LabelForegroundBrush}"/>
-            <Setter Property="FontSize" Value="14"/>
             <Setter Property="Padding" Value="10,5"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="MenuItem">
-                        <Border Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}">
-                            <ContentPresenter ContentSource="Header" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
+                        <Grid>
+                            <Border Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}">
+                                <ContentPresenter ContentSource="Header" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <Popup Name="SubMenuPopup" IsOpen="{TemplateBinding IsSubmenuOpen}" Placement="Bottom" StaysOpen="False" AllowsTransparency="True">
+                                <Border Background="{DynamicResource PlotSettings_TitleBarBrush}" BorderBrush="{DynamicResource PlotSettings_BorderBrush}" BorderThickness="1">
+                                    <ItemsPresenter/>
+                                </Border>
+                            </Popup>
+                        </Grid>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter Property="Background" Value="{DynamicResource PlotSettings_ButtonHoverBrush}"/>
@@ -37,6 +42,9 @@
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter Property="Foreground" Value="#FF888888"/>
                             </Trigger>
+                            <Trigger Property="IsSubmenuOpen" Value="True">
+                                <Setter TargetName="SubMenuPopup" Property="IsOpen" Value="True"/>
+                            </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
@@ -47,21 +55,22 @@
     <Border Background="{DynamicResource PlotSettings_BackgroundBrush}"
             BorderBrush="{DynamicResource PlotSettings_BorderBrush}"
             BorderThickness="1"
-            CornerRadius="5">
-        <Menu Height="20" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
+            CornerRadius="0"
+            Panel.ZIndex="1000">
+        <Menu Height="26" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
             <MenuItem Header="File">
-                <MenuItem Header="Save Settings"/>
-                <MenuItem Header="Open Settings"/>
-
-                <MenuItem Header="Exit"/>
+                <MenuItem Header="Load Settings                    Ctrl+O" Click="MenuItem_LoadSettings_Click"/>
+                <MenuItem Header="Save Settings                     Ctrl+S" Click="MenuItem_SaveSettings_Click"/>
+                <Separator/>
+                <MenuItem Header="Export Waveform             Ctrl+E" Click="MenuItem_ExportPlot_Click"/>
+                <Separator/>
+                <MenuItem Header="Exit" Click="MenuItem_Exit_Click"/>
             </MenuItem>
             <MenuItem Header="Edit">
-                <MenuItem Header="Preferences"/>
+                <MenuItem Header="Preferences                        Ctrl+P" Click="MenuItem_Preferences_Click"/>
             </MenuItem>
-
             <MenuItem Header="Help">
-                <MenuItem Header="About"/>
-
+                <MenuItem Header="About" Click="MenuItem_About_Click"/>
             </MenuItem>
         </Menu>
     </Border>

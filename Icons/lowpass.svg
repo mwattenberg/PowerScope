@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title">
+  <title>Low-pass filter</title>
+  <!-- Axes -->
+  <line x1="8" y1="36" x2="40" y2="36" stroke="#E6EAF2" stroke-width="2" stroke-linecap="round"/>
+  <line x1="8" y1="36" x2="8" y2="12" stroke="#E6EAF2" stroke-width="2" stroke-linecap="round"/>
+  <!-- Magnitude response -->
+  <path d="M10 16 H22 C28 16 32 22 38 34" stroke="#22D3EE" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>

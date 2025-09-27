@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   width="48"
+   height="48"
+   viewBox="0 0 48 48"
+   fill="none"
+   role="img"
+   aria-labelledby="title"
+   version="1.1"
+   id="svg2"
+   sodipodi:docname="notch.svg"
+   inkscape:version="1.3.2 (091e20e, 2023-11-25, custom)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs2" />
+  <sodipodi:namedview
+     id="namedview2"
+     pagecolor="#505050"
+     bordercolor="#ffffff"
+     borderopacity="1"
+     inkscape:showpageshadow="0"
+     inkscape:pageopacity="0"
+     inkscape:pagecheckerboard="1"
+     inkscape:deskcolor="#505050"
+     inkscape:zoom="23.6875"
+     inkscape:cx="23.978892"
+     inkscape:cy="24"
+     inkscape:window-width="2560"
+     inkscape:window-height="1351"
+     inkscape:window-x="-9"
+     inkscape:window-y="-9"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg2" />
+  <title
+     id="title1">Notch filter</title>
+  <!-- Axes -->
+  <line
+     x1="8"
+     y1="36"
+     x2="40"
+     y2="36"
+     stroke="#E6EAF2"
+     stroke-width="2"
+     stroke-linecap="round"
+     id="line1" />
+  <line
+     x1="8"
+     y1="36"
+     x2="8"
+     y2="12"
+     stroke="#E6EAF2"
+     stroke-width="2"
+     stroke-linecap="round"
+     id="line2" />
+  <!-- Magnitude response with narrow rejection dip -->
+  <path
+     d="m 10,16 c 5.383832,-0.07359 7.912299,-0.135854 10.018981,0.430987 C 23.346051,17.326196 25.413311,21.787213 28,32 29.87228,23.104142 32.037464,18.258468 34.086952,16.909923 35.635549,15.89096 38.37816,16.015228 40,16"
+     stroke="#22d3ee"
+     stroke-width="2"
+     stroke-linecap="round"
+     stroke-linejoin="round"
+     fill="none"
+     id="path2"
+     sodipodi:nodetypes="cscsc" />
+</svg>
