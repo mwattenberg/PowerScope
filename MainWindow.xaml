@@ -36,7 +36,7 @@
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="150" MinWidth="150"/>
                 <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="140" MinWidth="140"/>
+                <ColumnDefinition Width="160" MinWidth="140"/>
             </Grid.ColumnDefinitions>
             <!-- DataStreamBar (left) -->
             <UserControls:DataStreamBar Grid.Column="0" x:Name="DataStreamBar" VerticalAlignment="Stretch"/>

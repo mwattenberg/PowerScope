@@ -33,7 +33,7 @@
             <Setter Property="Padding" Value="10,5"/>
         </Style>
         <!-- Custom filter button style -->
-        <Style x:Key="FilterButtonStyle" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+        <Style x:Key="FilterButtonStyle" TargetType="Button" BasedOn="{StaticResource ButtonStyle}">
             <Setter Property="Width" Value="80"/>
             <Setter Property="Height" Value="80"/>
             <Setter Property="Margin" Value="5"/>
@@ -56,7 +56,7 @@
                                 <Setter Property="Background" Value="{DynamicResource PlotSettings_ButtonPressedBrush}"/>
                             </Trigger>
                             <Trigger Property="IsFocused" Value="True">
-                                <Setter Property="BorderBrush" Value="{DynamicResource PlotSettings_AccentBrush}"/>
+                                <Setter Property="BorderBrush" Value="{DynamicResource PlotSettings_ButtonPressedBrush}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>

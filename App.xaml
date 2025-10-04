@@ -20,6 +20,10 @@
         <Color x:Key="PlotSettings_CloseButtonPressedColor">#FFCC3333</Color>
         <Color x:Key="PlotSettings_ShadowColor">Black</Color>
 
+        <!-- Highlight colors for cursors -->
+        <Color x:Key="Highlight_Normal">#22D3EE</Color>
+        <Color x:Key="Highlight_Complementary">#EE6922</Color>
+
         <!-- Brushes for convenience -->
         <SolidColorBrush x:Key="PlotSettings_BackgroundBrush" Color="{StaticResource PlotSettings_BackgroundColor}"/>
         <SolidColorBrush x:Key="PlotSettings_TitleBarBrush" Color="{StaticResource PlotSettings_TitleBarColor}"/>
@@ -34,6 +38,10 @@
         <SolidColorBrush x:Key="PlotSettings_CloseButtonHoverBrush" Color="{StaticResource PlotSettings_CloseButtonHoverColor}"/>
         <SolidColorBrush x:Key="PlotSettings_CloseButtonPressedBrush" Color="{StaticResource PlotSettings_CloseButtonPressedColor}"/>
         <SolidColorBrush x:Key="PlotSettings_ShadowBrush" Color="{StaticResource PlotSettings_ShadowColor}"/>
+
+        <!-- Highlight brushes for cursors -->
+        <SolidColorBrush x:Key="Highlight_NormalBrush" Color="{StaticResource Highlight_Normal}"/>
+        <SolidColorBrush x:Key="Highlight_ComplementaryBrush" Color="{StaticResource Highlight_Complementary}"/>
 
         <!-- Add system font styles -->
         <Style x:Key="SystemFontStyle" TargetType="Control">

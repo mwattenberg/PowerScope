@@ -453,7 +453,7 @@
                                 </ComboBox>
                             </StackPanel>
                             
-                            <TextBlock Text="Demo mode will generate continuous data streams for visualization and testing." 
+                            <TextBlock x:Name="InfoTextBlock" Text="Demo mode will generate continuous data streams for visualization and testing." 
                                       Margin="0,20,0,0" Style="{StaticResource ItalicTextStyle}"/>
                         </StackPanel>
                     </TabItem>

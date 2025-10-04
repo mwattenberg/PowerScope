@@ -1,0 +1,46 @@
+<UserControl x:Class="PowerScope.View.UserControls.CursorHorizontal"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:PowerScope.View.UserControls"
+             xmlns:converters="clr-namespace:PowerScope.Converters"
+             mc:Ignorable="d" 
+             d:DesignHeight="60" d:DesignWidth="120"
+             MinWidth="120" MinHeight="60">
+    
+    <UserControl.Resources>
+        <converters:ExponentialNotationConverter x:Key="ExponentialNotationConverter"/>
+    </UserControl.Resources>
+    
+    <Grid Background="{DynamicResource PlotSettings_BackgroundBrush}" Margin="2">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- 2x4 grid for horizontal cursors (simpler layout) -->
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="2*" />
+                <ColumnDefinition Width="2*" />
+                <ColumnDefinition Width="2*" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Headers -->
+            <TextBlock Grid.Row="0" Grid.Column="1" Foreground="{DynamicResource Highlight_NormalBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="Bold" Text="A"/>
+            <TextBlock Grid.Row="0" Grid.Column="2" Foreground="{DynamicResource Highlight_ComplementaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="Bold" Text="B"/>
+            <TextBlock Grid.Row="0" Grid.Column="3" Text="Δ" Foreground="{DynamicResource PlotSettings_ButtonForegroundBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="Bold"/>
+
+            <!-- Y-Value row -->
+            <TextBlock Grid.Row="1" Grid.Column="0" Foreground="{DynamicResource PlotSettings_ButtonForegroundBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="Bold" Text="Y"/>
+            <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding CursorAYValue, Converter={StaticResource ExponentialNotationConverter}}" Foreground="{DynamicResource Highlight_NormalBrush}" HorizontalAlignment="Right" VerticalAlignment="Center" FontWeight="Bold"/>
+            <TextBlock Grid.Row="1" Grid.Column="2" Text="{Binding CursorBYValue, Converter={StaticResource ExponentialNotationConverter}}" Foreground="{DynamicResource Highlight_ComplementaryBrush}" HorizontalAlignment="Right" VerticalAlignment="Center" FontWeight="Bold"/>
+            <TextBlock Grid.Row="1" Grid.Column="3" Text="{Binding YValueDelta, Converter={StaticResource ExponentialNotationConverter}}" Foreground="{DynamicResource PlotSettings_ButtonForegroundBrush}" HorizontalAlignment="Right" VerticalAlignment="Center" FontWeight="Bold" Margin="0,0,2,0"/>
+        </Grid>
+    </Grid>
+</UserControl>

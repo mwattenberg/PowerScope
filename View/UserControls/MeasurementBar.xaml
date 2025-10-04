@@ -4,30 +4,89 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:PowerScope.View.UserControls"
+             xmlns:svgc="http://sharpvectors.codeplex.com/svgc/"
              mc:Ignorable="d" 
              d:DesignHeight="600" d:DesignWidth="140">
+    <UserControl.Resources>
+        <!-- Local button style that uses the global theme hover/pressed brushes -->
+        <Style TargetType="Button" BasedOn="{StaticResource ButtonStyle}">
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="4"/>
+            <Setter Property="Background" Value="{StaticResource PlotSettings_TextBoxBackgroundBrush}"/>
+            <Setter Property="Foreground" Value="{StaticResource PlotSettings_ButtonForegroundBrush}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="2">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="{StaticResource PlotSettings_ButtonHoverBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter Property="Background" Value="{StaticResource PlotSettings_ButtonPressedBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
     <Grid Background="{DynamicResource PlotSettings_BackgroundBrush}" MinWidth="140">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>      <!-- Button area -->
+            <RowDefinition Height="Auto"/>      <!-- Cursor area -->
             <RowDefinition Height="*"/>         <!-- MeasurementBoxes area -->
         </Grid.RowDefinitions>
 
         <!-- Buttons area -->
         <Grid Grid.Row="0" Margin="0,0,0,10">
-            <!-- Cursor button -->
-            <Button Content="Cursor"
-                    Click="Button_Cursor_Click"
-                    x:Name="Button_Cursor"
-                    Height="32"
-                    BorderThickness="0"
-                    Background="{DynamicResource PlotSettings_TextBoxBackgroundBrush}"
-                    Foreground="{DynamicResource PlotSettings_ButtonForegroundBrush}"
-                    HorizontalAlignment="Stretch"
-                    VerticalAlignment="Top"/>
+            <!-- Two equal-width columns for cursor buttons with no gap -->
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <Button x:Name="Button_CursorHorizontal"
+                    Click="Button_CursorHorizontal_Click"
+                    Height="48"
+                    Grid.Column="0">
+                <svgc:SvgViewbox Source="/Icons/CursorHorizontal.svg" Width="48" Height="48" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Button>
+
+            <Button x:Name="Button_CursorVertical"
+                    Click="Button_CursorVertical_Click"
+                    Height="48"
+                    Grid.Column="1">
+                <svgc:SvgViewbox Source="/Icons/CursorVertical.svg" Width="48" Height="48" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Button>
         </Grid>
 
+        <!-- Cursor display area -->
+        <StackPanel x:Name="CursorDisplayPanel" Grid.Row="1" VerticalAlignment="Top" Visibility="Collapsed">
+            <local:CursorVertical x:Name="CursorVerticalControl" Visibility="Collapsed" />
+            <local:CursorHorizontal x:Name="CursorHorizontalControl" Visibility="Collapsed" />
+            <ItemsControl x:Name="CursorChannelItemsControl">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <StackPanel Orientation="Vertical"/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <local:CursorChannel />
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
+
         <!-- Template-driven list of measurement boxes -->
-        <ItemsControl x:Name="MeasurementItemsControl" Grid.Row="1" VerticalAlignment="Top">
+        <ItemsControl x:Name="MeasurementItemsControl" Grid.Row="2" VerticalAlignment="Top">
             <ItemsControl.ItemsPanel>
                 <ItemsPanelTemplate>
                     <StackPanel Orientation="Vertical"/>

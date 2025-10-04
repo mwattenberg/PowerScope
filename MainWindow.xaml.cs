@@ -167,6 +167,8 @@ namespace PowerScope
             
             // Set dependencies for MeasurementBar - now gets channels from ChannelControlBar!
             MeasurementBar.ChannelControlBar = ChannelControlBar;
+            // Pass PlotManager for plot data access and plot control
+            MeasurementBar.PlotManager = _plotManager;
             
             // Set PlotManager as DataContext for RunControl (it now handles its own running state)
             RunControl.DataContext = _plotManager;

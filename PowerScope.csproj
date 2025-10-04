@@ -44,6 +44,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Remove="Model\CursorChannelViewModel.cs" />
+    <Compile Remove="View\UserControls\DraggableAxisLines.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <None Remove="View\UserControls\xExpand.svg" />
   </ItemGroup>
 

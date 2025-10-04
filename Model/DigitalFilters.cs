@@ -572,4 +572,89 @@ namespace PowerScope.Model
             }
         }
     }
+
+    /// <summary>
+    /// 2-Pole 2-Zero Digital Filter (Biquad) implementation
+    /// Uses the difference equation: y[n] = b0*x[n] + b1*x[n-1] + b2*x[n-2] - a1*y[n-1] - a2*y[n-2]
+    /// </summary>
+    public class BiquadFilter : IDigitalFilter
+    {
+        // Filter coefficients
+        public double B0 { get; set; } = 1.0;  // x[n] coefficient
+        public double B1 { get; set; } = 0.0;  // x[n-1] coefficient  
+        public double B2 { get; set; } = 0.0;  // x[n-2] coefficient
+
+        public double A1 { get; set; } = 0.0;  // y[n-1] coefficient
+        public double A2 { get; set; } = 0.0;  // y[n-2] coefficient
+
+        // State variables for input history
+        private double _x1, _x2;  // x[n-1], x[n-2]
+
+        // State variables for output history
+        private double _y1, _y2;  // y[n-1], y[n-2]
+
+        public BiquadFilter()
+        {
+            Reset();
+        }
+
+        public BiquadFilter(double b0, double b1, double b2, double a1, double a2)
+        {
+            B0 = b0; B1 = b1; B2 = b2;
+            A1 = a1; A2 = a2;
+            Reset();
+        }
+
+        /// <summary>
+        /// Filter a new input value
+        /// </summary>
+        /// <param name="input">Input value</param>
+        /// <returns>Filtered output</returns>
+        public double Filter(double input)
+        {
+            // Calculate output using difference equation (following your JS reference)
+            double output = B0 * input + B1 * _x1 + B2 * _x2 - A1 * _y1 - A2 * _y2;
+
+            // Update input history (shift register)
+            _x2 = _x1;
+            _x1 = input;
+
+            // Update output history (shift register)
+            _y2 = _y1;
+            _y1 = output;
+
+            return output;
+        }
+
+        public void Reset()
+        {
+            _x1 = _x2 = 0.0;
+            _y1 = _y2 = 0.0;
+        }
+
+        public string GetFilterType()
+        {
+            return "2-Pole 2-Zero Biquad Filter";
+        }
+
+        public Dictionary<string, double> GetFilterParameters()
+        {
+            return new Dictionary<string, double>
+        {
+            {"B0", B0}, {"B1", B1}, {"B2", B2},
+            {"A1", A1}, {"A2", A2}
+        };
+        }
+
+        /// <summary>
+        /// Sets all filter coefficients at once
+        /// </summary>
+        public void SetCoefficients(double b0, double b1, double b2, double a1, double a2)
+        {
+            B0 = b0; B1 = b1; B2 = b2;
+            A1 = a1; A2 = a2;
+        }
+    }
+
+
 }

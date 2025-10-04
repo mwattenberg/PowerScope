@@ -42,6 +42,12 @@ namespace PowerScope.View.UserForms
             SetRawBinaryPanelVisibility();
             SetASCIIPanelVisibility();
             
+            // Wire up demo signal type selection change to update the info text
+            ComboBox_DemoSignalType.SelectionChanged += ComboBox_DemoSignalType_SelectionChanged;
+
+            // Initialize demo info text based on the currently selected demo signal type
+            UpdateDemoInfoText();
+            
             // Automatically select the appropriate tab based on the configured StreamSource
             SelectTabBasedOnStreamSource();
         }
@@ -616,20 +622,74 @@ namespace PowerScope.View.UserForms
                 
             return true;
         }
-    }
 
-    public class PortInfo
-    {
-        public string Port { get; set; }
-        public string Description { get; set; }
-        public override string ToString() => Description; // For display in ComboBox
-    }
+        // New: update demo info text based on selected demo signal type
+        private void ComboBox_DemoSignalType_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            UpdateDemoInfoText();
+        }
 
-    public class AudioDeviceInfo
-    {
-        public int Index { get; set; }
-        public string Name { get; set; }
-        public WaveInCapabilities? WaveInCapabilities { get; set; }
-        public MMDevice WasapiDevice { get; set; }
+        private void UpdateDemoInfoText()
+        {
+            if (InfoTextBlock == null || ComboBox_DemoSignalType == null)
+                return;
+
+            string selected = null;
+            // SelectedValuePath is set to "Content" in XAML, so SelectedValue should be the display string
+            if (ComboBox_DemoSignalType.SelectedValue != null)
+                selected = ComboBox_DemoSignalType.SelectedValue.ToString();
+            else if (ComboBox_DemoSignalType.SelectedItem is ComboBoxItem cbi && cbi.Content != null)
+                selected = cbi.Content.ToString();
+
+            if (string.IsNullOrEmpty(selected))
+            {
+                InfoTextBlock.Text = string.Empty;
+                return;
+            }
+
+            switch (selected.Trim().ToLowerInvariant())
+            {
+                case "sine wave":
+                    InfoTextBlock.Text = "Generates a 1Hz sine wave for the first channel.\nFrequency will increase successively on other channels.";
+                    break;
+                case "square wave":
+                    InfoTextBlock.Text = "Generates a 1Hz square wave on CH1.\nFrequency will increase successively on other channels.";
+                    break;
+                case "triangle wave":
+                    InfoTextBlock.Text = "Generates a 1Hz triangle wave on CH1.\nFrequency will increase successively on other channels.";
+                    break;
+                case "random noise":
+                    InfoTextBlock.Text = "Generates white noise.";
+                    break;
+                case "mixed signals":
+                    InfoTextBlock.Text = "Generates a combination of sine, square, triangle nosie.";
+                    break;
+                case "chirp signal":
+                case "chirp":
+                    InfoTextBlock.Text = "Sweeps a sine wave from 100Hz to 10kHz.\nA sample rate of 20kHz or higher is recommended.";
+                    break;
+                case "tones":
+                    InfoTextBlock.Text = "Generates a 1kHz main sine wave with secondary sine waves at 750 and 1250Hz.\nA sample rate of 10kHz or higher is recommended.\nSecondary waves will successively move closer to 1kHz.";
+                    break;
+                default:
+                    InfoTextBlock.Text = string.Empty;
+                    break;
+            }
+        }
+    
+        public class PortInfo
+        {
+            public string Port { get; set; }
+            public string Description { get; set; }
+            public override string ToString() => Description; // For display in ComboBox
+        }
+
+        public class AudioDeviceInfo
+        {
+            public int Index { get; set; }
+            public string Name { get; set; }
+            public WaveInCapabilities? WaveInCapabilities { get; set; }
+            public MMDevice WasapiDevice { get; set; }
+        }
     }
 }

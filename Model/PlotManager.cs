@@ -218,6 +218,7 @@ namespace PowerScope.Model
         public void InitializePlot()
         {
             _plot.Plot.Clear();
+            _plot.Plot.Axes.Hairline(true);
             _plot.Plot.Add.Palette = new ScottPlot.Palettes.Tsitsulin();
             
             // Initialize data arrays
@@ -503,6 +504,54 @@ namespace PowerScope.Model
         protected virtual void OnPropertyChanged(string propertyName)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+
+        public double? GetPlotDataAt(int channelIndex, int sampleIndex)
+        {
+            if (channelIndex < 0 || channelIndex >= _maxChannels || _data[channelIndex] == null)
+                return null;
+                
+            if (sampleIndex >= 0 && sampleIndex < _data[channelIndex].Length)
+                return _data[channelIndex][sampleIndex];
+                
+            return null;
+        }
+
+        /// <summary>
+        /// Gets the plot data for a specific channel at a given sample index
+        /// This provides access to the exact data being displayed on the plot
+        /// </summary>
+        /// <param name="channel">The channel to get data for</param>
+        /// <param name="sampleIndex">The sample index (0 = leftmost on plot)</param>
+        /// <returns>The displayed value at that sample, or null if not available</returns>
+        public double? GetPlotDataAt(Channel channel, int sampleIndex)
+        {
+            if (channel == null || _channels == null)
+                return null;
+
+            // Find the channel index in our collection
+            int channelIndex = -1;
+            for (int i = 0; i < _channels.Count && i < _maxChannels; i++)
+            {
+                if (_channels[i] == channel)
+                {
+                    channelIndex = i;
+                    break;
+                }
+            }
+
+            if (channelIndex < 0)
+                return null; // Channel not found in plot
+
+            // Ensure the channel is enabled and has a signal
+            if (!channel.IsEnabled || _data[channelIndex] == null)
+                return null;
+
+            // Get the data from the plot's data array (what's actually displayed)
+            if (sampleIndex >= 0 && sampleIndex < _data[channelIndex].Length)
+                return _data[channelIndex][sampleIndex];
+            
+            return null;
         }
     }
 }
