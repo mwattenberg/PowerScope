@@ -4,17 +4,17 @@ using PowerScope.Model;
 namespace PowerScope.View.UserControls
 {
     /// <summary>
-    /// Interaction logic for CursorChannel.xaml
-    /// Now uses MVVM pattern with CursorChannelViewModel for proper data binding
-    /// No more imperative UI updates - everything is handled through binding
+    /// Interaction logic for CursorChannelView.xaml
+    /// Uses MVVM pattern with CursorChannelModel for proper data binding
+    /// No imperative UI updates - everything is handled through binding
     /// </summary>
-    public partial class CursorChannel : UserControl
+    public partial class CursorChannelView : UserControl
     {
-        public CursorChannel()
+        public CursorChannelView()
         {
             InitializeComponent();
             // DataContext will be set by the parent control (MeasurementBar)
-            // to a CursorChannelViewModel instance
+            // to a CursorChannelModel instance
         }
 
         /// <summary>

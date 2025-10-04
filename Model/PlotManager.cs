@@ -2,7 +2,9 @@
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
+using System.Linq;
 using System.Windows;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using ScottPlot;
@@ -17,6 +19,7 @@ namespace PowerScope.Model
     /// Manager class for ScottPlot integration in WPF
     /// Migrated to Channel-centric architecture - works directly with Channel objects
     /// that encapsulate both data streams and settings
+    /// Now owns and manages cursor functionality for proper separation of concerns
     /// </summary>
     public class PlotManager : INotifyPropertyChanged, IDisposable
     {
@@ -28,6 +31,15 @@ namespace PowerScope.Model
         private readonly int _maxChannels;
         private ObservableCollection<Channel> _channels;
 
+        // Cursor management - PlotManager now owns the cursor
+        private readonly Cursor _cursor;
+        private HorizontalLine _horizontalLineA;
+        private HorizontalLine _horizontalLineB;
+        private VerticalLine _verticalLineA;
+        private VerticalLine _verticalLineB;
+        private AxisLine _plottableBeingDragged;
+        private bool _cursorMouseHandlingEnabled;
+
         public PlotSettings Settings { get; private set; }
         
         public WpfPlotGL Plot 
@@ -36,6 +48,21 @@ namespace PowerScope.Model
         }
 
         public int NumberOfChannels { get; private set; }
+
+        /// <summary>
+        /// The cursor instance owned by this PlotManager
+        /// </summary>
+        public Cursor Cursor => _cursor;
+
+        /// <summary>
+        /// Whether cursors are currently active
+        /// </summary>
+        public bool HasActiveCursors { get; private set; }
+
+        /// <summary>
+        /// Current active cursor mode
+        /// </summary>
+        public CursorMode ActiveCursorMode { get; private set; }
 
         /// <summary>
         /// Gets a color from the ScottPlot Category10 palette
@@ -60,6 +87,9 @@ namespace PowerScope.Model
             Settings = new PlotSettings();
             _channels = new ObservableCollection<Channel>();
 
+            // Initialize cursor - PlotManager owns it
+            _cursor = new Cursor();
+
             // Initialize update timer with correct interval from settings
             _updateTimer = new DispatcherTimer(DispatcherPriority.Render);
             _updateTimer.Interval = TimeSpan.FromMilliseconds(Settings.TimerInterval);
@@ -70,10 +100,261 @@ namespace PowerScope.Model
             _maxChannels = maxChannels;
             _signals = new Signal[_maxChannels];
             _data = new double[_maxChannels][];
+
+            // Initialize cursor state
+            ActiveCursorMode = CursorMode.None;
+            HasActiveCursors = false;
+        }
+
+        /// <summary>
+        /// Enables vertical cursors - no parameter needed since PlotManager owns the cursor
+        /// </summary>
+        public void EnableVerticalCursors()
+        {
+            DisableCursors(); // Remove any existing cursors
+            CreateVerticalLines();
+            SetupCursorMouseHandling();
+            ActiveCursorMode = CursorMode.Vertical;
+            HasActiveCursors = true;
+            _cursor.ActiveMode = CursorMode.Vertical;
+            UpdateVerticalCursorData();
+            _plot.Refresh();
+            OnPropertyChanged(nameof(HasActiveCursors));
+            OnPropertyChanged(nameof(ActiveCursorMode));
+        }
+
+        /// <summary>
+        /// Enables horizontal cursors - no parameter needed since PlotManager owns the cursor
+        /// </summary>
+        public void EnableHorizontalCursors()
+        {
+            DisableCursors(); // Remove any existing cursors
+            CreateHorizontalLines();
+            SetupCursorMouseHandling();
+            ActiveCursorMode = CursorMode.Horizontal;
+            HasActiveCursors = true;
+            _cursor.ActiveMode = CursorMode.Horizontal;
+            UpdateHorizontalCursorData();
+            _plot.Refresh();
+            OnPropertyChanged(nameof(HasActiveCursors));
+            OnPropertyChanged(nameof(ActiveCursorMode));
+        }
+
+        /// <summary>
+        /// Disables all cursors and cleans up cursor state
+        /// </summary>
+        public void DisableCursors()
+        {
+            RemoveAllCursorLines();
+            RemoveCursorMouseHandling();
+            ActiveCursorMode = CursorMode.None;
+            HasActiveCursors = false;
+            _cursor.ActiveMode = CursorMode.None;
+            _plot.Refresh();
+            OnPropertyChanged(nameof(HasActiveCursors));
+            OnPropertyChanged(nameof(ActiveCursorMode));
+        }
+
+        private void CreateVerticalLines()
+        {
+            // Place lines at 25% and 75% of current x-axis span
+            var xAxisRange = _plot.Plot.Axes.GetXAxes().First().Range;
+            double x1 = xAxisRange.Min + (xAxisRange.Max - xAxisRange.Min) * 0.25;
+            double x2 = xAxisRange.Min + (xAxisRange.Max - xAxisRange.Min) * 0.75;
+
+            // Get the highlight colors from App.xaml resources
+            var highlightNormal = (Color)Application.Current.Resources["Highlight_Normal"];
+            var highlightComplementary = (Color)Application.Current.Resources["Highlight_Complementary"];
+
+            _verticalLineA = _plot.Plot.Add.VerticalLine(x1);
+            _verticalLineA.IsDraggable = true;
+            _verticalLineA.Text = "A";
+            _verticalLineA.Color = new ScottPlot.Color(highlightNormal.R, highlightNormal.G, highlightNormal.B);
+
+            _verticalLineB = _plot.Plot.Add.VerticalLine(x2);
+            _verticalLineB.IsDraggable = true;
+            _verticalLineB.Text = "B";
+            _verticalLineB.Color = new ScottPlot.Color(highlightComplementary.R, highlightComplementary.G, highlightComplementary.B);
+        }
+
+        private void CreateHorizontalLines()
+        {
+            // Place lines at 25% and 75% of current y-axis span
+            var limits = _plot.Plot.Axes.GetYAxes().First().Range;
+            double y1 = limits.Min + (limits.Max - limits.Min) * 0.25;
+            double y2 = limits.Min + (limits.Max - limits.Min) * 0.75;
+
+            // Get the highlight colors from App.xaml resources
+            var highlightNormal = (Color)Application.Current.Resources["Highlight_Normal"];
+            var highlightComplementary = (Color)Application.Current.Resources["Highlight_Complementary"];
+
+            _horizontalLineA = _plot.Plot.Add.HorizontalLine(y1);
+            _horizontalLineA.IsDraggable = true;
+            _horizontalLineA.Text = "A";
+            _horizontalLineA.Color = new ScottPlot.Color(highlightNormal.R, highlightNormal.G, highlightNormal.B);
+
+            _horizontalLineB = _plot.Plot.Add.HorizontalLine(y2);
+            _horizontalLineB.IsDraggable = true;
+            _horizontalLineB.Text = "B";
+            _horizontalLineB.Color = new ScottPlot.Color(highlightComplementary.R, highlightComplementary.G, highlightComplementary.B);
+        }
+
+        private void RemoveAllCursorLines()
+        {
+            RemoveVerticalLines();
+            RemoveHorizontalLines();
+        }
+
+        private void RemoveVerticalLines()
+        {
+            if (_verticalLineA != null)
+            {
+                _plot.Plot.Remove(_verticalLineA);
+                _verticalLineA = null;
+            }
+            if (_verticalLineB != null)
+            {
+                _plot.Plot.Remove(_verticalLineB);
+                _verticalLineB = null;
+            }
+        }
+
+        private void RemoveHorizontalLines()
+        {
+            if (_horizontalLineA != null)
+            {
+                _plot.Plot.Remove(_horizontalLineA);
+                _horizontalLineA = null;
+            }
+            if (_horizontalLineB != null)
+            {
+                _plot.Plot.Remove(_horizontalLineB);
+                _horizontalLineB = null;
+            }
+        }
+
+        private void SetupCursorMouseHandling()
+        {
+            if (!_cursorMouseHandlingEnabled)
+            {
+                _plot.MouseDown += Plot_MouseDown;
+                _plot.MouseUp += Plot_MouseUp;
+                _plot.MouseMove += Plot_MouseMove;
+                _cursorMouseHandlingEnabled = true;
+            }
+        }
+
+        private void RemoveCursorMouseHandling()
+        {
+            if (_cursorMouseHandlingEnabled)
+            {
+                _plot.MouseDown -= Plot_MouseDown;
+                _plot.MouseUp -= Plot_MouseUp;
+                _plot.MouseMove -= Plot_MouseMove;
+                _cursorMouseHandlingEnabled = false;
+            }
+        }
+
+        private void Plot_MouseDown(object sender, MouseButtonEventArgs e)
+        {
+            Point pos = e.GetPosition(_plot);
+            AxisLine line = GetLineUnderMouse((float)pos.X, (float)pos.Y);
+            if (line != null)
+            {
+                _plottableBeingDragged = line;
+                _plot.UserInputProcessor.Disable();
+                e.Handled = true;
+            }
+        }
+
+        private void Plot_MouseUp(object sender, MouseButtonEventArgs e)
+        {
+            _plottableBeingDragged = null;
+            _plot.UserInputProcessor.Enable();
+            _plot.Refresh();
+            Mouse.OverrideCursor = null;
+        }
+
+        private void Plot_MouseMove(object sender, MouseEventArgs e)
+        {
+            Point pos = e.GetPosition(_plot);
+            var rect = _plot.Plot.GetCoordinateRect((float)pos.X, (float)pos.Y, radius: 10);
+
+            if (_plottableBeingDragged == null)
+            {
+                AxisLine lineUnderMouse = GetLineUnderMouse((float)pos.X, (float)pos.Y);
+                if (lineUnderMouse == null)
+                    Mouse.OverrideCursor = null;
+                else if (lineUnderMouse.IsDraggable && lineUnderMouse is VerticalLine)
+                    Mouse.OverrideCursor = Cursors.SizeWE;
+                else if (lineUnderMouse.IsDraggable && lineUnderMouse is HorizontalLine)
+                    Mouse.OverrideCursor = Cursors.SizeNS;
+            }
+            else
+            {
+                if (_plottableBeingDragged is HorizontalLine horizontalLine)
+                {
+                    horizontalLine.Y = rect.VerticalCenter;
+                    horizontalLine.Text = $"{horizontalLine.Y:0.0}";
+                    UpdateHorizontalCursorData();
+                }
+                else if (_plottableBeingDragged is VerticalLine verticalLine)
+                {
+                    verticalLine.X = rect.HorizontalCenter;
+                    verticalLine.Text = $"{verticalLine.X:0}";
+                    UpdateVerticalCursorData();
+                }
+                _plot.Refresh();
+                e.Handled = true;
+            }
+        }
+
+        private AxisLine GetLineUnderMouse(float x, float y)
+        {
+            var rect = _plot.Plot.GetCoordinateRect(x, y, radius: 10);
+            foreach (AxisLine axLine in _plot.Plot.GetPlottables<AxisLine>().Reverse())
+            {
+                if (axLine.IsUnderMouse(rect))
+                    return axLine;
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Updates the cursor model with current vertical cursor positions
+        /// </summary>
+        private void UpdateVerticalCursorData()
+        {
+            if (_verticalLineA == null || _verticalLineB == null)
+                return;
+
+            double cursorASample = _verticalLineA.X;
+            double cursorBSample = _verticalLineB.X;
+            double sampleRate = GetCurrentSampleRate();
+
+            _cursor.UpdateVerticalCursors(cursorASample, cursorBSample, sampleRate);
+            
+            // Update channel values directly - much simpler since we have direct access
+            _cursor.UpdateChannelValues(this);
+        }
+
+        /// <summary>
+        /// Updates the cursor model with current horizontal cursor positions
+        /// </summary>
+        private void UpdateHorizontalCursorData()
+        {
+            if (_horizontalLineA == null || _horizontalLineB == null)
+                return;
+
+            double cursorAYValue = _horizontalLineA.Y;
+            double cursorBYValue = _horizontalLineB.Y;
+
+            _cursor.UpdateHorizontalCursors(cursorAYValue, cursorBYValue);
         }
 
         /// <summary>
         /// Sets the channels collection for the plot manager
+        /// Also updates the cursor channel data automatically
         /// </summary>
         /// <param name="channels">Collection of channels to display</param>
         public void SetChannels(ObservableCollection<Channel> channels)
@@ -96,6 +377,9 @@ namespace PowerScope.Model
             {
                 channel.PropertyChanged += OnChannelPropertyChanged;
             }
+
+            // Update cursor channel data automatically
+            _cursor.UpdateChannelData(_channels);
 
             // Update the display
             UpdateChannelDisplay();
@@ -189,6 +473,9 @@ namespace PowerScope.Model
                     channel.PropertyChanged -= OnChannelPropertyChanged;
                 }
             }
+
+            // Update cursor channel data automatically when channels change
+            _cursor.UpdateChannelData(_channels);
 
             UpdateChannelDisplay();
         }
@@ -480,6 +767,13 @@ namespace PowerScope.Model
             if (!_disposed)
             {
                 _disposed = true;
+                
+                // Disable cursors and clean up
+                DisableCursors();
+                
+                // Dispose cursor
+                _cursor?.Dispose();
+                
                 StopUpdates();
                 
                 // Unsubscribe from channels
@@ -552,6 +846,35 @@ namespace PowerScope.Model
                 return _data[channelIndex][sampleIndex];
             
             return null;
+        }
+
+        /// <summary>
+        /// Gets the current sample rate from the first available channel
+        /// </summary>
+        /// <returns>Sample rate in Hz, or 0 if no channels available</returns>
+        public double GetCurrentSampleRate()
+        {
+            if (_channels == null || _channels.Count == 0)
+                return 0;
+
+            Channel firstChannel = _channels[0];
+            if (firstChannel?.OwnerStream == null)
+                return 0;
+
+            return firstChannel.OwnerStream.SampleRate;
+        }
+
+        /// <summary>
+        /// Updates cursor channel values using the unified cursor view model
+        /// This centralizes cursor data retrieval and reduces coupling
+        /// </summary>
+        /// <param name="cursor">The cursor model to update</param>
+        public void UpdateCursorValues(Cursor cursor)
+        {
+            if (cursor == null)
+                return;
+
+            cursor.UpdateChannelValues(this);
         }
     }
 }

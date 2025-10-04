@@ -6,8 +6,8 @@
              xmlns:local="clr-namespace:PowerScope.View.UserControls"
              xmlns:converters="clr-namespace:PowerScope.Converters"
              mc:Ignorable="d" 
-             d:DesignHeight="60" d:DesignWidth="120"
-             MinWidth="120" MinHeight="60">
+             d:DesignHeight="60" d:DesignWidth="160"
+             MinWidth="160" MinHeight="60">
     
     <UserControl.Resources>
         <converters:ExponentialNotationConverter x:Key="ExponentialNotationConverter"/>
@@ -38,9 +38,9 @@
 
             <!-- Y-Value row -->
             <TextBlock Grid.Row="1" Grid.Column="0" Foreground="{DynamicResource PlotSettings_ButtonForegroundBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="Bold" Text="Y"/>
-            <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding CursorAYValue, Converter={StaticResource ExponentialNotationConverter}}" Foreground="{DynamicResource Highlight_NormalBrush}" HorizontalAlignment="Right" VerticalAlignment="Center" FontWeight="Bold"/>
-            <TextBlock Grid.Row="1" Grid.Column="2" Text="{Binding CursorBYValue, Converter={StaticResource ExponentialNotationConverter}}" Foreground="{DynamicResource Highlight_ComplementaryBrush}" HorizontalAlignment="Right" VerticalAlignment="Center" FontWeight="Bold"/>
-            <TextBlock Grid.Row="1" Grid.Column="3" Text="{Binding YValueDelta, Converter={StaticResource ExponentialNotationConverter}}" Foreground="{DynamicResource PlotSettings_ButtonForegroundBrush}" HorizontalAlignment="Right" VerticalAlignment="Center" FontWeight="Bold" Margin="0,0,2,0"/>
+            <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding HorizontalCursorA, Converter={StaticResource ExponentialNotationConverter}}" Foreground="{DynamicResource Highlight_NormalBrush}" HorizontalAlignment="Right" VerticalAlignment="Center" FontWeight="Bold"/>
+            <TextBlock Grid.Row="1" Grid.Column="2" Text="{Binding HorizontalCursorB, Converter={StaticResource ExponentialNotationConverter}}" Foreground="{DynamicResource Highlight_ComplementaryBrush}" HorizontalAlignment="Right" VerticalAlignment="Center" FontWeight="Bold"/>
+            <TextBlock Grid.Row="1" Grid.Column="3" Text="{Binding HorizontalValueDelta, Converter={StaticResource ExponentialNotationConverter}}" Foreground="{DynamicResource PlotSettings_ButtonForegroundBrush}" HorizontalAlignment="Right" VerticalAlignment="Center" FontWeight="Bold" Margin="0,0,2,0"/>
         </Grid>
     </Grid>
 </UserControl>

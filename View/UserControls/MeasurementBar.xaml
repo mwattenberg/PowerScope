@@ -79,7 +79,7 @@
                 </ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
-                        <local:CursorChannel />
+                        <local:CursorChannelView />
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>

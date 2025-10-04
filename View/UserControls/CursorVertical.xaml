@@ -6,8 +6,8 @@
              xmlns:local="clr-namespace:PowerScope.View.UserControls"
              xmlns:converters="clr-namespace:PowerScope.Converters"
              mc:Ignorable="d" 
-             d:DesignHeight="60" d:DesignWidth="120"
-             MinWidth="120" MinHeight="60">
+             d:DesignHeight="60" d:DesignWidth="160"
+             MinWidth="160" MinHeight="60">
     
     <UserControl.Resources>
         <converters:ExponentialNotationConverter x:Key="ExponentialNotationConverter"/>
@@ -43,17 +43,17 @@
 
             <!-- Sample row -->
 			<TextBlock Grid.Row="1" Grid.Column="0" Foreground="{DynamicResource PlotSettings_ButtonForegroundBrush}" HorizontalAlignment="Left" VerticalAlignment="Center" FontWeight="Bold"><Run Language="de-at" Text="#"/></TextBlock>
-			<TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding CursorASamplePosition, StringFormat={}{0:F0}}" Foreground="{DynamicResource Highlight_NormalBrush}" HorizontalAlignment="Right" VerticalAlignment="Center"/>
-            <TextBlock Grid.Row="1" Grid.Column="2" Text="{Binding CursorBSamplePosition, StringFormat={}{0:F0}}" Foreground="{DynamicResource Highlight_ComplementaryBrush}" HorizontalAlignment="Right" VerticalAlignment="Center"/>
-            <TextBlock Grid.Row="1" Grid.Column="3" Text="{Binding SampleDelta, StringFormat={}{0:F0}}" Foreground="{DynamicResource PlotSettings_ButtonForegroundBrush}" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,2,0"/>
+			<TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding VerticalCursorA, StringFormat={}{0:F0}}" Foreground="{DynamicResource Highlight_NormalBrush}" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+            <TextBlock Grid.Row="1" Grid.Column="2" Text="{Binding VerticalCursorB, StringFormat={}{0:F0}}" Foreground="{DynamicResource Highlight_ComplementaryBrush}" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+            <TextBlock Grid.Row="1" Grid.Column="3" Text="{Binding VerticalSampleDelta, StringFormat={}{0:F0}}" Foreground="{DynamicResource PlotSettings_ButtonForegroundBrush}" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,2,0"/>
 
             <!-- Time row - only visible when sample rate is available -->
             <TextBlock Grid.Row="2" Grid.Column="0" Foreground="{DynamicResource PlotSettings_ButtonForegroundBrush}" HorizontalAlignment="Left" VerticalAlignment="Center"  FontFamily="Times New Roman" FontStyle="Italic" Text="T" Visibility="{Binding HasValidSampleRate, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-            <TextBlock Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="3" Text="{Binding TimeDelta, Converter={StaticResource TimeUnitConverter}}" Foreground="{DynamicResource PlotSettings_ButtonForegroundBrush}" HorizontalAlignment="Right" VerticalAlignment="Center"  Visibility="{Binding HasValidSampleRate, Converter={StaticResource BooleanToVisibilityConverter}}" Margin="0,0,2,0"/>
+            <TextBlock Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="3" Text="{Binding VerticalTimeDelta, Converter={StaticResource TimeUnitConverter}}" Foreground="{DynamicResource PlotSettings_ButtonForegroundBrush}" HorizontalAlignment="Right" VerticalAlignment="Center"  Visibility="{Binding HasValidSampleRate, Converter={StaticResource BooleanToVisibilityConverter}}" Margin="0,0,2,0"/>
 
             <!-- Frequency row - only visible when sample rate is available -->
             <TextBlock Grid.Row="3" Grid.Column="0" Foreground="{DynamicResource PlotSettings_ButtonForegroundBrush}" HorizontalAlignment="Left" VerticalAlignment="Center"  Text="f" FontFamily="Times New Roman" FontStyle="Italic" Visibility="{Binding HasValidSampleRate, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-            <TextBlock Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="3" Foreground="{DynamicResource PlotSettings_ButtonForegroundBrush}" HorizontalAlignment="Right" VerticalAlignment="Center"  Text="{Binding Frequency, Converter={StaticResource FrequencyUnitConverter}}" Visibility="{Binding HasValidSampleRate, Converter={StaticResource BooleanToVisibilityConverter}}" Margin="0,0,2,0"/>
+            <TextBlock Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="3" Foreground="{DynamicResource PlotSettings_ButtonForegroundBrush}" HorizontalAlignment="Right" VerticalAlignment="Center"  Text="{Binding VerticalFrequency, Converter={StaticResource FrequencyUnitConverter}}" Visibility="{Binding HasValidSampleRate, Converter={StaticResource BooleanToVisibilityConverter}}" Margin="0,0,2,0"/>
         </Grid>
     </Grid>
 </UserControl>

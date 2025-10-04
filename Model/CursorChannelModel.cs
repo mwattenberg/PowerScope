@@ -92,7 +92,7 @@ namespace PowerScope.Model
         /// </summary>
         public string CursorAText
         {
-            get { return CursorAValue?.ToString("F3") ?? "-"; }
+            get { return CursorAValue?.ToString("F1") ?? "-"; }
         }
 
         /// <summary>
@@ -100,7 +100,7 @@ namespace PowerScope.Model
         /// </summary>
         public string CursorBText
         {
-            get { return CursorBValue?.ToString("F3") ?? "-"; }
+            get { return CursorBValue?.ToString("F1") ?? "-"; }
         }
 
         /// <summary>
@@ -108,7 +108,7 @@ namespace PowerScope.Model
         /// </summary>
         public string DeltaText
         {
-            get { return Delta?.ToString("F3") ?? "-"; }
+            get { return Delta?.ToString("F1") ?? "-"; }
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
