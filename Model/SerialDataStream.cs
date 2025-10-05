@@ -592,7 +592,7 @@ namespace PowerScope.Model
                 }
                 catch (InvalidOperationException ex)
                 {
-                    // Port was closed or became invalid
+                    // Port was closed or became invalid - always fatal
                     HandleRuntimeDisconnection($"Port operation failed: {ex.Message}");
                     break;
                 }
@@ -602,6 +602,7 @@ namespace PowerScope.Model
                     consecutiveErrorCount++;
                     if (consecutiveErrorCount >= maxConsecutiveErrors)
                     {
+                        // Too many I/O errors - disconnect properly
                         HandleRuntimeDisconnection($"I/O error (cable disconnected?): {ex.Message}");
                         break;
                     }
@@ -612,8 +613,14 @@ namespace PowerScope.Model
                 }
                 catch (UnauthorizedAccessException ex)
                 {
-                    // Port access was lost (another application took over)
+                    // Port access was lost (another application took over) - always fatal
                     HandleRuntimeDisconnection($"Port access lost: {ex.Message}");
+                    break;
+                }
+                catch (ArgumentException ex)
+                {
+                    // Invalid arguments indicate a programming error or corrupted state - fatal
+                    HandleRuntimeDisconnection($"Argument error: {ex.Message}");
                     break;
                 }
                 catch (Exception ex)
@@ -622,6 +629,7 @@ namespace PowerScope.Model
                     consecutiveErrorCount++;
                     if (consecutiveErrorCount >= maxConsecutiveErrors)
                     {
+                        // Too many unexpected errors - disconnect properly
                         HandleRuntimeDisconnection($"Unexpected error: {ex.Message}");
                         break;
                     }
@@ -686,17 +694,43 @@ namespace PowerScope.Model
         {
             int totalDataLength = bytesRead;
             int workingBufferOffset = 0;
+            
+            // Handle residue from previous processing
             if (_residue != null && _residue.Length > 0)
             {
-                _residue.CopyTo(workingBuffer, 0);
-                workingBufferOffset = _residue.Length;
-                totalDataLength += _residue.Length;
+                // Check if residue + new data will fit in working buffer
+                if (_residue.Length + bytesRead > workingBuffer.Length)
+                {
+                    // Residue is too large - this indicates a parsing problem
+                    // Reset residue and start fresh with just the new data
+                    _residue = null;
+                    workingBufferOffset = 0;
+                    totalDataLength = bytesRead;
+                }
+                else
+                {
+                    _residue.CopyTo(workingBuffer, 0);
+                    workingBufferOffset = _residue.Length;
+                    totalDataLength += _residue.Length;
+                }
             }
+            
+            // Copy new data to working buffer
             Array.Copy(readBuffer, 0, workingBuffer, workingBufferOffset, bytesRead);
+            
             try
             {
                 ParsedData parsedData = Parser.ParseData(workingBuffer.AsSpan(0, totalDataLength));
                 _residue = parsedData.Residue;
+                
+                // Prevent residue from growing too large (safety check)
+                if (_residue != null && _residue.Length > workingBuffer.Length / 2)
+                {
+                    // If residue is more than half the working buffer, something is wrong
+                    // Reset to prevent future overflows
+                    _residue = null;
+                }
+                
                 if (parsedData.Data != null)
                 {
                     AddDataToRingBuffers(parsedData.Data);

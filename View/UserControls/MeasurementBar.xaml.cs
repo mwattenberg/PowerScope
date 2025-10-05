@@ -103,24 +103,39 @@ namespace PowerScope.View.UserControls
         }
 
         /// <summary>
-        /// Updates the measurement display using direct channel access
+        /// Updates the measurement display using traditional loops (no LINQ)
         /// </summary>
         private void UpdateMeasurementDisplay()
         {
             if (_channelControlBar?.DataStreamBar == null)
                 return;
 
-            // Use CompositeCollection to directly bind to channel measurements without flattening
+            //Don't touch
+            //It's ugly but works
             System.Windows.Data.CompositeCollection compositeCollection = new System.Windows.Data.CompositeCollection();
-            
+
             foreach (Channel channel in _channelControlBar.DataStreamBar.Channels)
             {
                 System.Windows.Data.CollectionContainer container = new System.Windows.Data.CollectionContainer();
                 container.Collection = channel.Measurements;
                 compositeCollection.Add(container);
             }
-            
+
             MeasurementItemsControl.ItemsSource = compositeCollection;
+
+            //// Create a simple list to hold all measurements
+            //var allMeasurements = new List<Measurement>();
+            
+            //// Loop through each channel and add its measurements
+            //foreach (Channel channel in _channelControlBar.DataStreamBar.Channels)
+            //{
+            //    foreach (Measurement measurement in channel.Measurements)
+            //    {
+            //        allMeasurements.Add(measurement);
+            //    }
+            //}
+            
+            //MeasurementItemsControl.ItemsSource = allMeasurements;
         }
 
         /// <summary>
