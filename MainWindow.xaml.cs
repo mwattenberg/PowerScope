@@ -185,7 +185,9 @@ namespace PowerScope
         private void InitializeEventHandlers()
         {
             RunControl.RunStateChanged += RunControl_RunStateChanged;
+            RunControl.RecordStateChanged += RunControl_RecordStateChanged;
             RunControl.ClearClicked += RunControl_ClearClicked;
+            RunControl.LoadClicked += RunControl_LoadClicked;
 
             // Subscribe directly to ObservableCollection.CollectionChanged for automatic notifications
             DataStreamBar.Channels.CollectionChanged += OnChannelsCollectionChanged;
@@ -236,9 +238,72 @@ namespace PowerScope
             }
         }
 
+        private void RunControl_RecordStateChanged(object sender, RunControl.RecordStates newState)
+        {
+            if (newState == RunControl.RecordStates.Recording)
+            {
+                // Show save dialog to select file
+                SaveFileDialog saveDialog = new SaveFileDialog
+                {
+                    Filter = "CSV files (*.csv)|*.csv|All files (*.*)|*.*",
+                    DefaultExt = "csv",
+                    FileName = $"recording_{DateTime.Now:yyyyMMdd_HHmmss}.csv"
+                };
+                
+                if (saveDialog.ShowDialog() == true)
+                {
+                    if (!_plotManager.StartRecording(saveDialog.FileName))
+                    {
+                        MessageBox.Show("Failed to start recording. Please check that you have enabled channels and they are streaming data.", 
+                            "Recording Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                        // Reset RunControl record state if recording failed - this would require adding a method to RunControl
+                    }
+                }
+                else
+                {
+                    // User cancelled, reset the button state - this would require adding a method to RunControl
+                }
+            }
+            else
+            {
+                _plotManager.StopRecording();
+            }
+        }
+
         private void RunControl_ClearClicked(object sender, EventArgs e)
         {
             _plotManager.Clear();
+        }
+
+        private void RunControl_LoadClicked(object sender, EventArgs e)
+        {
+            try
+            {
+                // Create StreamSettings configured for File mode
+                var settings = new StreamSettings();
+                settings.StreamSource = StreamSource.File;
+                
+                // Show the stream configuration window starting with the File tab
+                var configWindow = new SerialConfigWindow(settings);
+                if (configWindow.ShowDialog() == true)
+                {
+                    // Create and connect the file data stream
+                    var fileStream = DataStreamBar.CreateDataStreamFromUserInput(settings);
+                    fileStream.Connect();
+                    fileStream.StartStreaming();
+                    
+                    // Add channels for the file stream
+                    DataStreamBar.AddChannelsForStream(fileStream);
+                    
+                    // Add UI panel for the stream
+                    DataStreamBar.AddStreamInfoPanel(settings, fileStream);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error loading file: {ex.Message}", "Load File Error", 
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         /// <summary>

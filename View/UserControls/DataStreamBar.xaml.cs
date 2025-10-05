@@ -230,6 +230,17 @@ namespace PowerScope.View.UserControls
                     AudioDataStream audioStream = new AudioDataStream(vm.AudioDevice, vm.AudioSampleRate);
                     return audioStream;
                     
+                case StreamSource.File:
+                    FileSettings fileSettings = new FileSettings(
+                        filePath: vm.FilePath,
+                        sampleRate: vm.FileSampleRate,
+                        loopPlayback: vm.FileLoopPlayback,
+                        hasHeader: vm.FileHasHeader,
+                        delimiter: vm.FileDelimiter
+                    );
+                    FileDataStream fileStream = new FileDataStream(fileSettings);
+                    return fileStream;
+                    
                 case StreamSource.SerialPort:
                 default:
                     // Default to SerialDataStream

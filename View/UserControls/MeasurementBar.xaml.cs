@@ -122,20 +122,6 @@ namespace PowerScope.View.UserControls
             }
 
             MeasurementItemsControl.ItemsSource = compositeCollection;
-
-            //// Create a simple list to hold all measurements
-            //var allMeasurements = new List<Measurement>();
-            
-            //// Loop through each channel and add its measurements
-            //foreach (Channel channel in _channelControlBar.DataStreamBar.Channels)
-            //{
-            //    foreach (Measurement measurement in channel.Measurements)
-            //    {
-            //        allMeasurements.Add(measurement);
-            //    }
-            //}
-            
-            //MeasurementItemsControl.ItemsSource = allMeasurements;
         }
 
         /// <summary>

@@ -1,0 +1,15 @@
+# PowerScope Version: V1.0
+# Sample Rate (Hz): 1000
+# Recording Started: 2024-12-10 15:30:00
+# Number of Channels: 3
+# Channel Information:
+# CH1: Stream=Demo, Index=0
+# CH2: Stream=Demo, Index=1
+# CH3: Stream=Demo, Index=2
+#
+Sample,Time_s,CH1,CH2,CH3
+0,0.000000,100.123456,200.234567,300.345678
+1,0.001000,101.456789,201.567890,301.678901
+2,0.002000,102.789012,202.890123,302.901234
+3,0.003000,103.012345,203.123456,303.234567
+4,0.004000,104.345678,204.456789,304.567890

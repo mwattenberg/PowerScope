@@ -12,6 +12,8 @@ using ScottPlot.WPF;
 using ScottPlot.Plottables;
 using PowerScope.Model;
 using Color = System.Windows.Media.Color;
+using System.IO;
+using System.Collections.Generic;
 
 namespace PowerScope.Model
 {
@@ -20,6 +22,7 @@ namespace PowerScope.Model
     /// Migrated to Channel-centric architecture - works directly with Channel objects
     /// that encapsulate both data streams and settings
     /// Now owns and manages cursor functionality for proper separation of concerns
+    /// Also handles data recording functionality
     /// </summary>
     public class PlotManager : INotifyPropertyChanged, IDisposable
     {
@@ -30,6 +33,13 @@ namespace PowerScope.Model
         private readonly double[][] _data;
         private readonly int _maxChannels;
         private ObservableCollection<Channel> _channels;
+
+        // Recording functionality
+        private bool _isRecording = false;
+        private string _recordingFilePath = "";
+        private StreamWriter _recordingWriter = null;
+        private readonly object _recordingLock = new object();
+        private long _recordingSampleCount = 0;
 
         // Cursor management
         private readonly Cursor _cursor;
@@ -80,6 +90,32 @@ namespace PowerScope.Model
         /// Whether plot updates are currently running
         /// </summary>
         public bool IsRunning { get; private set; }
+
+        /// <summary>
+        /// Whether recording is currently active
+        /// </summary>
+        public bool IsRecording 
+        { 
+            get => _isRecording;
+            private set
+            {
+                if (_isRecording != value)
+                {
+                    _isRecording = value;
+                    OnPropertyChanged(nameof(IsRecording));
+                }
+            }
+        }
+
+        /// <summary>
+        /// Current recording file path
+        /// </summary>
+        public string RecordingFilePath => _recordingFilePath;
+
+        /// <summary>
+        /// Number of samples recorded so far
+        /// </summary>
+        public long RecordingSampleCount => _recordingSampleCount;
 
         public PlotManager(WpfPlotGL wpfPlot, int maxChannels = 16)
         {                
@@ -413,6 +449,143 @@ namespace PowerScope.Model
             }
         }
 
+        /// <summary>
+        /// Starts recording data to the specified file
+        /// </summary>
+        /// <param name="filePath">Path to the output CSV file</param>
+        /// <returns>True if recording started successfully</returns>
+        public bool StartRecording(string filePath)
+        {
+            if (IsRecording)
+                return false;
+
+            try
+            {
+                lock (_recordingLock)
+                {
+                    _recordingFilePath = filePath;
+                    _recordingWriter = new StreamWriter(filePath);
+                    
+                    // Write CSV header with channel labels and sample rate info
+                    WriteRecordingHeader();
+                    
+                    _recordingSampleCount = 0;
+                    IsRecording = true;
+                }
+                
+                return true;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to start recording: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Stops recording and closes the file
+        /// </summary>
+        public void StopRecording()
+        {
+            if (!IsRecording)
+                return;
+                
+            lock (_recordingLock)
+            {
+                try
+                {
+                    _recordingWriter?.Flush();
+                    _recordingWriter?.Close();
+                    _recordingWriter?.Dispose();
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error stopping recording: {ex.Message}");
+                }
+                finally
+                {
+                    _recordingWriter = null;
+                    IsRecording = false;
+                    _recordingFilePath = "";
+                }
+            }
+        }
+
+        private void WriteRecordingHeader()
+        {
+            if (_recordingWriter == null || _channels == null)
+                return;
+
+            var headerParts = new List<string>();
+            
+            // Add metadata as comments with version information
+            _recordingWriter.WriteLine($"# PowerScope Version: {StreamSettings.CURRENT_VERSION}");
+            double sampleRate = GetCurrentSampleRate();
+            _recordingWriter.WriteLine($"# Sample Rate (Hz): {sampleRate.ToString(System.Globalization.CultureInfo.InvariantCulture)}");
+            _recordingWriter.WriteLine($"# Recording Started: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+            _recordingWriter.WriteLine($"# Number of Channels: {_channels.Count(c => c.IsEnabled)}");
+            
+            // Write channel information
+            _recordingWriter.WriteLine("# Channel Information:");
+            foreach (var channel in _channels.Where(c => c.IsEnabled))
+            {
+                _recordingWriter.WriteLine($"# {channel.Label}: Stream={channel.StreamType}, Index={channel.LocalChannelIndex}");
+            }
+            _recordingWriter.WriteLine("#");
+            
+            // Write CSV header
+            headerParts.Add("Sample");
+            headerParts.Add("Time_s");
+            
+            foreach (var channel in _channels.Where(c => c.IsEnabled))
+            {
+                headerParts.Add(channel.Label);
+            }
+            
+            _recordingWriter.WriteLine(string.Join(",", headerParts));
+        }
+
+        private void WriteRecordingData()
+        {
+            if (!IsRecording || _recordingWriter == null || _channels == null)
+                return;
+                
+            lock (_recordingLock)
+            {
+                try
+                {
+                    var dataParts = new List<string>();
+                    
+                    // Add sample number and time
+                    dataParts.Add(_recordingSampleCount.ToString());
+                    
+                    double sampleRate = GetCurrentSampleRate();
+                    double timeSeconds = sampleRate > 0 ? _recordingSampleCount / sampleRate : 0;
+                    dataParts.Add(timeSeconds.ToString("F6", System.Globalization.CultureInfo.InvariantCulture));
+                    
+                    // Add channel data
+                    foreach (var channel in _channels.Where(c => c.IsEnabled))
+                    {
+                        // Get the most recent sample from the channel
+                        double[] tempBuffer = new double[1];
+                        int samplesRead = channel.CopyLatestDataTo(tempBuffer, 1);
+                        
+                        if (samplesRead > 0)
+                            dataParts.Add(tempBuffer[0].ToString("F6", System.Globalization.CultureInfo.InvariantCulture));
+                        else
+                            dataParts.Add("0");
+                    }
+                    
+                    _recordingWriter.WriteLine(string.Join(",", dataParts));
+                    _recordingSampleCount++;
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error writing recording data: {ex.Message}");
+                }
+            }
+        }
+
         private void OnSettingsChanged(object sender, PropertyChangedEventArgs e)
         {
             Application.Current.Dispatcher.BeginInvoke(() =>
@@ -584,6 +757,12 @@ namespace PowerScope.Model
             _plot.Plot.RenderManager.EnableRendering = false;
 
             CopyChannelDataToPlot();
+            
+            // Record data if recording is active
+            if (IsRecording)
+            {
+                WriteRecordingData();
+            }
 
             if (Settings.YAutoScale)
                 _plot.Plot.Axes.AutoScaleY();
@@ -768,6 +947,9 @@ namespace PowerScope.Model
             {
                 _disposed = true;
                 
+                // Stop recording if active
+                StopRecording();
+                
                 // Disable cursors and clean up
                 DisableCursors();
                 
@@ -799,17 +981,6 @@ namespace PowerScope.Model
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
-
-        //public double? GetPlotDataAt(int channelIndex, int sampleIndex)
-        //{
-        //    if (channelIndex < 0 || channelIndex >= _maxChannels || _data[channelIndex] == null)
-        //        return null;
-                
-        //    if (sampleIndex >= 0 && sampleIndex < _data[channelIndex].Length)
-        //        return _data[channelIndex][sampleIndex];
-                
-        //    return null;
-        //}
 
         /// <summary>
         /// Gets the plot data for a specific channel at a given sample index

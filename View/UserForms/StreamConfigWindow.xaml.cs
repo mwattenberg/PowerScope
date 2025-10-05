@@ -10,6 +10,7 @@ using System.Collections.Generic;
 using System.Windows.Input;
 using System.Text.RegularExpressions;
 using PowerScope.Model;
+using Microsoft.Win32;
 
 namespace PowerScope.View.UserForms
 {
@@ -69,6 +70,7 @@ namespace PowerScope.View.UserForms
                 StreamSource.SerialPort => TabItem_Serial,
                 StreamSource.AudioInput => TabItem_Audio,
                 StreamSource.Demo => TabItem_Demo,
+                StreamSource.File => TabItem_File,
                 StreamSource.USB => null, // USB tab exists but is not implemented yet
                 _ => TabItem_Serial // Default fallback to Serial tab
             };
@@ -506,6 +508,25 @@ namespace PowerScope.View.UserForms
                     }
                     break;
                     
+                case StreamSource.File:
+                    // Validate file settings
+                    if (string.IsNullOrWhiteSpace(ViewModel.FilePath))
+                    {
+                        MessageBox.Show("Please select a data file.", "Invalid Input", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        return;
+                    }
+                    if (!System.IO.File.Exists(ViewModel.FilePath))
+                    {
+                        MessageBox.Show("The selected file does not exist.", "Invalid Input", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        return;
+                    }
+                    if (ViewModel.NumberOfChannels <= 0)
+                    {
+                        MessageBox.Show("The file appears to have no valid channels. Please check the file format.", "Invalid Input", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        return;
+                    }
+                    break;
+                    
                 case StreamSource.USB:
                     // USB validation would go here when implemented
                     MessageBox.Show("USB streams are not yet implemented.", "Not Implemented", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -524,6 +545,32 @@ namespace PowerScope.View.UserForms
         {
             DialogResult = false;
             Close();
+        }
+
+        private void Button_BrowseFile_Click(object sender, RoutedEventArgs e)
+        {
+            OpenFileDialog openDialog = new OpenFileDialog
+            {
+                Filter = "CSV files (*.csv)|*.csv|Text files (*.txt)|*.txt|All files (*.*)|*.*",
+                DefaultExt = "csv",
+                Title = "Select Data File"
+            };
+
+            if (openDialog.ShowDialog() == true)
+            {
+                ViewModel.FilePath = openDialog.FileName;
+                
+                // Parse the file header automatically
+                if (ViewModel.ParseFileHeader(openDialog.FileName))
+                {
+                    // File parsed successfully - UI will update automatically via data binding
+                }
+                else
+                {
+                    MessageBox.Show($"Failed to parse file: {ViewModel.FileParseStatus}", 
+                        "File Parse Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+            }
         }
 
         private void DataFormatCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -569,6 +616,10 @@ namespace PowerScope.View.UserForms
                 else if (selectedTab.Name == "TabItem_Demo")
                 {
                     ViewModel.StreamSource = StreamSource.Demo;
+                }
+                else if (selectedTab.Name == "TabItem_File")
+                {
+                    ViewModel.StreamSource = StreamSource.File;
                 }
                 // USB tab would set StreamSource.USB when implemented
             }

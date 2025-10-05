@@ -457,6 +457,97 @@
                                       Margin="0,20,0,0" Style="{StaticResource ItalicTextStyle}"/>
                         </StackPanel>
                     </TabItem>
+                    
+                    <!-- File Tab -->
+                    <TabItem Header="File" x:Name="TabItem_File">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel Margin="10" VerticalAlignment="Top">
+                                <Label Content="File Data Stream Configuration" Style="{StaticResource BoldLabelStyle}" Margin="0,0,0,10"/>
+                                <Label Content="Load data from CSV or text files for playback and analysis."/>
+                                <Label Content="File header will be automatically parsed for metadata." Margin="0,0,0,15"/>
+                                
+                                <!-- File Selection -->
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                                    <Label Content="File Path:" VerticalAlignment="Center" Width="80"/>
+                                    <TextBox x:Name="TextBox_FilePath" Width="250" Text="{Binding FilePath, Mode=TwoWay}" 
+                                             IsReadOnly="True" ToolTip="Click Browse to select a data file"/>
+                                    <Button x:Name="Button_BrowseFile" Content="Browse..." Width="75" 
+                                            Margin="10,0,0,0" Click="Button_BrowseFile_Click"/>
+                                </StackPanel>
+                                
+                                <!-- File Parse Status -->
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,15">
+                                    <Label Content="Status:" VerticalAlignment="Center" Width="80"/>
+                                    <TextBlock x:Name="TextBlock_FileStatus" Text="{Binding FileParseStatus, Mode=OneWay}" 
+                                               VerticalAlignment="Center" TextWrapping="Wrap" Width="320"
+                                               Foreground="{DynamicResource PlotSettings_LabelForegroundBrush}"/>
+                                </StackPanel>
+                                
+                                <!-- Parsed File Information -->
+                                <GroupBox Header="Detected File Properties" Margin="0,0,0,10" 
+                                          BorderBrush="{DynamicResource PlotSettings_BorderBrush}"
+                                          Foreground="{DynamicResource PlotSettings_LabelForegroundBrush}">
+                                    <StackPanel Margin="10">
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                                            <Label Content="Sample Rate:" Width="100"/>
+                                            <TextBlock Text="{Binding FileSampleRate, StringFormat='{}{0} Hz'}" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                        
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                                            <Label Content="Channels:" Width="100"/>
+                                            <TextBlock Text="{Binding NumberOfChannels}" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                        
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                                            <Label Content="Delimiter:" Width="100"/>
+                                            <TextBlock Text="{Binding FileDelimiter}" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                        
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                                            <Label Content="Has Header:" Width="100"/>
+                                            <TextBlock Text="{Binding FileHasHeader}" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                        
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                                            <Label Content="Loop Playback:" Width="100"/>
+                                            <TextBlock Text="{Binding FileLoopPlayback}" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </GroupBox>
+                                
+                                <!-- Channel Labels -->
+                                <GroupBox Header="Channel Labels" Margin="0,0,0,10"
+                                          BorderBrush="{DynamicResource PlotSettings_BorderBrush}"
+                                          Foreground="{DynamicResource PlotSettings_LabelForegroundBrush}">
+                                    <ScrollViewer MaxHeight="120" VerticalScrollBarVisibility="Auto">
+                                        <ItemsControl x:Name="ItemsControl_ChannelLabels" ItemsSource="{Binding FileChannelLabels}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <StackPanel Orientation="Horizontal" Margin="5,2">
+                                                        <TextBlock Text="•" Margin="0,0,5,0"/>
+                                                        <TextBlock Text="{Binding}" 
+                                                                   Foreground="{DynamicResource PlotSettings_LabelForegroundBrush}"/>
+                                                    </StackPanel>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+                                </GroupBox>
+                                
+                                <!-- Instructions -->
+                                <TextBlock Text="Instructions:" FontWeight="Bold" Margin="0,10,0,5"/>
+                                <TextBlock TextWrapping="Wrap" Margin="0,0,0,0" Style="{StaticResource ItalicTextStyle}">
+                                    <Run Text="• Select a CSV or text file containing your data"/>
+                                    <LineBreak/>
+                                    <Run Text="• The file header will be automatically parsed for metadata"/>
+                                    <LineBreak/>
+                                    <Run Text="• Files created by PowerScope recording are fully supported"/>
+                                    <LineBreak/>
+                                    <Run Text="• Playback will loop continuously as configured"/>
+                                </TextBlock>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </TabItem>
                 </TabControl>
             </DockPanel>
             <!-- Buttons -->

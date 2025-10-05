@@ -4,6 +4,7 @@ using System.Windows.Media; // Add for SolidColorBrush and Colors
 using System; // Add for IDisposable
 using System.Collections.Generic; // Add for List<T>
 using System.Windows.Controls; // Add for ComboBoxItem
+using System.IO; // Add for File operations
 
 namespace PowerScope.Model
 {
@@ -18,7 +19,8 @@ namespace PowerScope.Model
         SerialPort,
         AudioInput,
         USB,
-        Demo
+        Demo,
+        File
     }
 
     public enum NumberTypeEnum
@@ -34,6 +36,11 @@ namespace PowerScope.Model
 
     public class StreamSettings : INotifyPropertyChanged
     {
+        /// <summary>
+        /// Current PowerScope file format version
+        /// </summary>
+        public const string CURRENT_VERSION = "V1.0";
+
         private string _port;
         private int _baud;
         private int _dataBits;
@@ -52,6 +59,15 @@ namespace PowerScope.Model
         private string _frameStart; // for CustomFrame
         private int _demoSampleRate; // for Demo mode
         private string _demoSignalType; // for Demo mode
+        
+        // File-related properties
+        private string _filePath;
+        private double _fileSampleRate;
+        private bool _fileLoopPlayback;
+        private bool _fileHasHeader;
+        private string _fileDelimiter;
+        private List<string> _fileChannelLabels;
+        private string _fileParseStatus;
 
         public StreamSettings()
         {
@@ -69,6 +85,14 @@ namespace PowerScope.Model
             // Demo defaults
             DemoSampleRate = 1000; // Keep for demo mode
             DemoSignalType = "Sine Wave"; // Keep for demo mode
+            
+            // File defaults
+            FileSampleRate = 1000.0;
+            FileLoopPlayback = true; // Always loop as requested
+            FileHasHeader = true; // Assume header by default
+            FileDelimiter = ","; // Default to CSV
+            FileChannelLabels = new List<string>();
+            FileParseStatus = "No file selected";
             
             // StreamSource will be set by the configuration dialog based on selected tab
             StreamSource = StreamSource.SerialPort; // Default to serial port;
@@ -287,6 +311,77 @@ namespace PowerScope.Model
             }
         }
 
+        // File properties
+        public string FilePath
+        {
+            get { return _filePath; }
+            set
+            {
+                _filePath = value;
+                OnPropertyChanged(nameof(FilePath));
+            }
+        }
+
+        public double FileSampleRate
+        {
+            get { return _fileSampleRate; }
+            set
+            {
+                _fileSampleRate = value;
+                OnPropertyChanged(nameof(FileSampleRate));
+            }
+        }
+
+        public bool FileLoopPlayback
+        {
+            get { return _fileLoopPlayback; }
+            set
+            {
+                _fileLoopPlayback = value;
+                OnPropertyChanged(nameof(FileLoopPlayback));
+            }
+        }
+
+        public bool FileHasHeader
+        {
+            get { return _fileHasHeader; }
+            set
+            {
+                _fileHasHeader = value;
+                OnPropertyChanged(nameof(FileHasHeader));
+            }
+        }
+
+        public string FileDelimiter
+        {
+            get { return _fileDelimiter; }
+            set
+            {
+                _fileDelimiter = value;
+                OnPropertyChanged(nameof(FileDelimiter));
+            }
+        }
+
+        public List<string> FileChannelLabels
+        {
+            get { return _fileChannelLabels; }
+            set
+            {
+                _fileChannelLabels = value;
+                OnPropertyChanged(nameof(FileChannelLabels));
+            }
+        }
+
+        public string FileParseStatus
+        {
+            get { return _fileParseStatus; }
+            set
+            {
+                _fileParseStatus = value;
+                OnPropertyChanged(nameof(FileParseStatus));
+            }
+        }
+
         public event PropertyChangedEventHandler PropertyChanged;
 
         protected virtual void OnPropertyChanged(string propertyName)
@@ -342,6 +437,160 @@ namespace PowerScope.Model
             // - Serial properties (Port, Baud, DataBits, StopBits, Parity)
             // - Audio properties (AudioDevice, AudioDeviceIndex, AudioSampleRate)
             // - Other properties (Endianness, Delimiter, FrameStart, EnableChecksum)
+        }
+
+        /// <summary>
+        /// Parses the header of a file to extract metadata and channel information
+        /// </summary>
+        /// <param name="filePath">Path to the file to parse</param>
+        /// <returns>True if parsing was successful</returns>
+        public bool ParseFileHeader(string filePath)
+        {
+            try
+            {
+                if (!File.Exists(filePath))
+                {
+                    FileParseStatus = "File not found";
+                    return false;
+                }
+
+                string[] lines = File.ReadAllLines(filePath);
+                if (lines.Length == 0)
+                {
+                    FileParseStatus = "File is empty";
+                    return false;
+                }
+
+                // Check if this is a V1.0 PowerScope file
+                string fileVersion = DetectFileVersion(lines);
+                
+                if (fileVersion != "V1.0")
+                {
+                    FileParseStatus = $"Unsupported file version: {fileVersion}. Please use PowerScope V1.0 format.";
+                    return false;
+                }
+
+                return ParseV1FileHeader(lines);
+            }
+            catch (Exception ex)
+            {
+                FileParseStatus = $"Error parsing file: {ex.Message}";
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Detects the PowerScope file version from header comments
+        /// </summary>
+        /// <param name="lines">All lines from the file</param>
+        /// <returns>Version string or "Unknown" for files without version info</returns>
+        private string DetectFileVersion(string[] lines)
+        {
+            foreach (string line in lines)
+            {
+                if (line.StartsWith("#") && line.Contains("PowerScope Version") && line.Contains(":"))
+                {
+                    string versionStr = line.Split(':')[1].Trim();
+                    return versionStr;
+                }
+                
+                // Stop looking at first non-comment line
+                if (!line.StartsWith("#") && !string.IsNullOrWhiteSpace(line))
+                    break;
+            }
+            
+            return "Unknown";
+        }
+
+        /// <summary>
+        /// Parses V1.0 PowerScope file format
+        /// </summary>
+        private bool ParseV1FileHeader(string[] lines)
+        {
+            bool foundMetadata = false;
+            double sampleRate = 1000.0; // Default
+            List<string> channelLabels = new List<string>();
+            string delimiter = ",";
+
+            foreach (string line in lines)
+            {
+                if (line.StartsWith("#"))
+                {
+                    foundMetadata = true;
+                    
+                    // Parse sample rate using invariant culture to always expect "." as decimal separator
+                    if (line.Contains("Sample Rate") && line.Contains(":"))
+                    {
+                        string rateStr = line.Split(':')[1].Trim().Split(' ')[0];
+                        if (double.TryParse(rateStr, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double rate) && rate > 0)
+                        {
+                            sampleRate = rate;
+                        }
+                    }
+                    // Parse channel information
+                    else if (line.Contains(":") && 
+                            !line.Contains("Sample Rate") && !line.Contains("Recording Started") && 
+                            !line.Contains("Number of Channels") && !line.Contains("PowerScope Version") &&
+                            !line.Contains("Channel Information"))
+                    {
+                        // Channel line: "# CH1: Stream=Demo, Index=0"
+                        string[] parts = line.Split(':');
+                        if (parts.Length >= 2)
+                        {
+                            string channelName = parts[0].Replace("#", "").Trim();
+                            if (!string.IsNullOrEmpty(channelName) && !channelLabels.Contains(channelName))
+                            {
+                                channelLabels.Add(channelName);
+                            }
+                        }
+                    }
+                }
+                else if (!string.IsNullOrWhiteSpace(line))
+                {
+                    // First non-comment line should be the CSV header
+                    if (channelLabels.Count == 0)
+                    {
+                        // Try to detect delimiter
+                        if (line.Contains(",")) delimiter = ",";
+                        else if (line.Contains("\t")) delimiter = "\t";
+                        else if (line.Contains(";")) delimiter = ";";
+                        else if (line.Contains(" ")) delimiter = " ";
+                        
+                        // Parse header columns
+                        string[] columns = line.Split(delimiter.ToCharArray(), StringSplitOptions.RemoveEmptyEntries);
+                        foreach (string col in columns)
+                        {
+                            string cleanCol = col.Trim();
+                            if (!string.IsNullOrEmpty(cleanCol) && 
+                                !cleanCol.Equals("Sample", StringComparison.OrdinalIgnoreCase) &&
+                                !cleanCol.Equals("Time_s", StringComparison.OrdinalIgnoreCase) &&
+                                !cleanCol.Equals("Time", StringComparison.OrdinalIgnoreCase))
+                            {
+                                channelLabels.Add(cleanCol);
+                            }
+                        }
+                    }
+                    break; // Stop after first data line
+                }
+            }
+
+            // Update properties
+            FileSampleRate = sampleRate;
+            FileDelimiter = delimiter;
+            FileChannelLabels = channelLabels;
+            NumberOfChannels = channelLabels.Count;
+            FileHasHeader = foundMetadata || channelLabels.Count > 0;
+
+            if (channelLabels.Count > 0)
+            {
+                FileParseStatus = $"Found {channelLabels.Count} channels at {sampleRate} Hz (Version: V1.0)";
+                return true;
+            }
+            else
+            {
+                FileParseStatus = "No channel information found in file";
+                return false;
+            }
         }
     }
 }
