@@ -54,28 +54,28 @@ namespace PowerScope.View.UserControls
                 return _channelControlBar; 
             }
             set 
-            { 
+            {
                 // Unsubscribe from previous DataStreamBar if it exists
-                if (_channelControlBar?.DataStreamBar != null)
-                {
-                    _channelControlBar.DataStreamBar.Channels.CollectionChanged -= OnChannelsCollectionChanged;
-                }
+                //if (_channelControlBar?.DataStreamBar != null)
+                //{
+                //    _channelControlBar.DataStreamBar.Channels.CollectionChanged -= OnChannelsCollectionChanged;
+                //}
 
                 _channelControlBar = value;
-                
+
                 // Subscribe to new DataStreamBar collection changes
-                if (_channelControlBar?.DataStreamBar != null)
-                {
-                    _channelControlBar.DataStreamBar.Channels.CollectionChanged += OnChannelsCollectionChanged;
-                }
+                //if (_channelControlBar?.DataStreamBar != null)
+                //{
+                //    _channelControlBar.DataStreamBar.Channels.CollectionChanged += OnChannelsCollectionChanged;
+                //}
 
                 UpdateMeasurementDisplay();
                 
-                // Update PlotManager with channels (it will handle cursor channel data automatically)
-                if (_plotManager != null)
-                {
-                    _plotManager.SetChannels(_channelControlBar.DataStreamBar.Channels);
-                }
+                //// Update PlotManager with channels (it will handle cursor channel data automatically)
+                //if (_plotManager != null)
+                //{
+                //    _plotManager.SetChannels(_channelControlBar.DataStreamBar.Channels);
+                //}
             }
         }
 
@@ -89,16 +89,16 @@ namespace PowerScope.View.UserControls
             _measurementTimer.Tick += UpdateAllChannelMeasurements;
         }
 
-        /// <summary>
-        /// Handles changes to the channels collection (add/remove)
-        /// </summary>
-        /// <param name="sender">The ObservableCollection sender</param>
-        /// <param name="e">Collection change event args</param>
-        private void OnChannelsCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
-        {
-            // PlotManager handles cursor channel data updates automatically via SetChannels
-            // No need for manual coordination here
-        }
+        ///// <summary>
+        ///// Handles changes to the channels collection (add/remove)
+        ///// </summary>
+        ///// <param name="sender">The ObservableCollection sender</param>
+        ///// <param name="e">Collection change event args</param>
+        //private void OnChannelsCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
+        //{
+        //    // PlotManager handles cursor channel data updates automatically via SetChannels
+        //    // No need for manual coordination here
+        //}
 
         /// <summary>
         /// Updates all measurements across all channels
@@ -312,11 +312,11 @@ namespace PowerScope.View.UserControls
                 
                 // No need to dispose cursor - PlotManager owns it
                 
-                // Unsubscribe from collection changes
-                if (_channelControlBar?.DataStreamBar != null)
-                {
-                    _channelControlBar.DataStreamBar.Channels.CollectionChanged -= OnChannelsCollectionChanged;
-                }
+                //// Unsubscribe from collection changes
+                //if (_channelControlBar?.DataStreamBar != null)
+                //{
+                //    _channelControlBar.DataStreamBar.Channels.CollectionChanged -= OnChannelsCollectionChanged;
+                //}
                 
                 StopUpdates();
             }
