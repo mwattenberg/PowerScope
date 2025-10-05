@@ -251,19 +251,54 @@ namespace PowerScope.Model
                     return false;
                 }
 
-                // Skip header if specified
-                int startLine = FileSettings.HasHeader ? 1 : 0;
-                var dataLines = lines.Skip(startLine).Where(line => !string.IsNullOrWhiteSpace(line)).ToArray();
+                // Filter out comment lines and empty lines, but keep track of header
+                var processedLines = new List<string>();
+                string headerLine = null;
+                bool foundHeader = false;
+
+                foreach (string line in lines)
+                {
+                    string trimmedLine = line.Trim();
+                    
+                    // Skip empty lines
+                    if (string.IsNullOrWhiteSpace(trimmedLine))
+                        continue;
+                        
+                    // Skip comment lines (lines starting with #)
+                    if (trimmedLine.StartsWith("#"))
+                        continue;
+                    
+                    // If we expect a header and haven't found one yet, this should be the header
+                    if (FileSettings.HasHeader && !foundHeader)
+                    {
+                        headerLine = trimmedLine;
+                        foundHeader = true;
+                        continue;
+                    }
+                    
+                    // This is a data line
+                    processedLines.Add(trimmedLine);
+                }
                 
-                if (dataLines.Length == 0)
+                if (processedLines.Count == 0)
                 {
                     StatusMessage = "Error: No data found in file";
                     return false;
                 }
 
-                // Parse first line to determine number of columns/channels
-                string[] firstLineValues = ParseLine(dataLines[0]);
-                ChannelCount = firstLineValues.Length;
+                // Parse first data line to determine number of columns/channels
+                string[] firstLineValues = ParseLine(processedLines[0]);
+                
+                // For V1.0 PowerScope CSV files, all columns are channel data (no Sample/Time columns)
+                if (FileSettings.HasHeader && headerLine != null)
+                {
+                    string[] headerColumns = ParseLine(headerLine);
+                    ChannelCount = headerColumns.Length; // All columns are channels in V1.0 format
+                }
+                else
+                {
+                    ChannelCount = firstLineValues.Length;
+                }
 
                 if (ChannelCount == 0)
                 {
@@ -275,13 +310,13 @@ namespace PowerScope.Model
                 _fileData = new double[ChannelCount][];
                 for (int i = 0; i < ChannelCount; i++)
                 {
-                    _fileData[i] = new double[dataLines.Length];
+                    _fileData[i] = new double[processedLines.Count];
                 }
 
-                // Parse all data
-                for (int row = 0; row < dataLines.Length; row++)
+                // Parse all data - all columns are channels in V1.0 format
+                for (int row = 0; row < processedLines.Count; row++)
                 {
-                    string[] values = ParseLine(dataLines[row]);
+                    string[] values = ParseLine(processedLines[row]);
                     
                     // Handle rows with different number of columns (pad with zeros)
                     for (int col = 0; col < ChannelCount; col++)
@@ -305,7 +340,7 @@ namespace PowerScope.Model
                 _channelSettings = new ChannelSettings[ChannelCount];
                 _channelFilters = new IDigitalFilter[ChannelCount];
 
-                StatusMessage = $"Loaded {dataLines.Length} samples, {ChannelCount} channels";
+                StatusMessage = $"Loaded {processedLines.Count} samples, {ChannelCount} channels";
                 return true;
             }
             catch (Exception ex)

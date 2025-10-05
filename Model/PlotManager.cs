@@ -34,12 +34,13 @@ namespace PowerScope.Model
         private readonly int _maxChannels;
         private ObservableCollection<Channel> _channels;
 
-        // Recording functionality
+        // Recording functionality - simple tracking using TotalSamples
         private bool _isRecording = false;
         private string _recordingFilePath = "";
         private StreamWriter _recordingWriter = null;
         private readonly object _recordingLock = new object();
         private long _recordingSampleCount = 0;
+        private long _lastRecordedSampleCount = 0;
 
         // Cursor management
         private readonly Cursor _cursor;
@@ -468,7 +469,7 @@ namespace PowerScope.Model
                     
                     // Write CSV header with channel labels and sample rate info
                     WriteRecordingHeader();
-                    
+                    _recordingWriter.Flush();
                     _recordingSampleCount = 0;
                     IsRecording = true;
                 }
@@ -523,21 +524,19 @@ namespace PowerScope.Model
             double sampleRate = GetCurrentSampleRate();
             _recordingWriter.WriteLine($"# Sample Rate (Hz): {sampleRate.ToString(System.Globalization.CultureInfo.InvariantCulture)}");
             _recordingWriter.WriteLine($"# Recording Started: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-            _recordingWriter.WriteLine($"# Number of Channels: {_channels.Count(c => c.IsEnabled)}");
+            _recordingWriter.WriteLine($"# Total Channels: {_channels.Count}");
+            _recordingWriter.WriteLine($"# Data Format: Raw values only, samples are sequential and equally spaced");
             
-            // Write channel information
+            // Write channel information for all channels
             _recordingWriter.WriteLine("# Channel Information:");
-            foreach (var channel in _channels.Where(c => c.IsEnabled))
+            foreach (var channel in _channels)
             {
                 _recordingWriter.WriteLine($"# {channel.Label}: Stream={channel.StreamType}, Index={channel.LocalChannelIndex}");
             }
             _recordingWriter.WriteLine("#");
             
-            // Write CSV header
-            headerParts.Add("Sample");
-            headerParts.Add("Time_s");
-            
-            foreach (var channel in _channels.Where(c => c.IsEnabled))
+            // Write CSV header - just channel labels for all channels
+            foreach (var channel in _channels)
             {
                 headerParts.Add(channel.Label);
             }
@@ -547,37 +546,58 @@ namespace PowerScope.Model
 
         private void WriteRecordingData()
         {
-            if (!IsRecording || _recordingWriter == null || _channels == null)
+            if (!IsRecording || _recordingWriter == null || _channels == null || _channels.Count == 0)
                 return;
                 
             lock (_recordingLock)
             {
                 try
                 {
-                    var dataParts = new List<string>();
-                    
-                    // Add sample number and time
-                    dataParts.Add(_recordingSampleCount.ToString());
-                    
-                    double sampleRate = GetCurrentSampleRate();
-                    double timeSeconds = sampleRate > 0 ? _recordingSampleCount / sampleRate : 0;
-                    dataParts.Add(timeSeconds.ToString("F6", System.Globalization.CultureInfo.InvariantCulture));
-                    
-                    // Add channel data
-                    foreach (var channel in _channels.Where(c => c.IsEnabled))
-                    {
-                        // Get the most recent sample from the channel
-                        double[] tempBuffer = new double[1];
-                        int samplesRead = channel.CopyLatestDataTo(tempBuffer, 1);
+                    // Get the current sample count from the first stream
+                    // (assuming all channels from the same stream have the same sample count)
+                    var firstStream = _channels[0].OwnerStream;
+                    if (firstStream == null)
+                        return;
                         
-                        if (samplesRead > 0)
-                            dataParts.Add(tempBuffer[0].ToString("F6", System.Globalization.CultureInfo.InvariantCulture));
-                        else
-                            dataParts.Add("0");
+                    long currentSampleCount = firstStream.TotalSamples;
+                    long newSamplesCount = currentSampleCount - _lastRecordedSampleCount;
+                    
+                    // If no new samples, return early
+                    if (newSamplesCount <= 0)
+                        return;
+
+                    // Create buffers for each channel to hold the new samples
+                    var channelBuffers = new double[_channels.Count][];
+                    for (int i = 0; i < _channels.Count; i++)
+                    {
+                        channelBuffers[i] = new double[newSamplesCount];
+                    }
+
+                    // Get the new samples from each channel
+                    for (int channelIndex = 0; channelIndex < _channels.Count; channelIndex++)
+                    {
+                        var channel = _channels[channelIndex];
+                        channel.CopyLatestDataTo(channelBuffers[channelIndex], (int)newSamplesCount);
                     }
                     
-                    _recordingWriter.WriteLine(string.Join(",", dataParts));
-                    _recordingSampleCount++;
+                    // Write all new samples - one row per sample
+                    for (int sampleIndex = 0; sampleIndex < newSamplesCount; sampleIndex++)
+                    {
+                        var dataParts = new List<string>();
+                        
+                        // Add data for all channels at this sample index
+                        for (int channelIndex = 0; channelIndex < _channels.Count; channelIndex++)
+                        {
+                            double value = channelBuffers[channelIndex][sampleIndex];
+                            dataParts.Add(value.ToString("F6", System.Globalization.CultureInfo.InvariantCulture));
+                        }
+                        
+                        _recordingWriter.WriteLine(string.Join(",", dataParts));
+                        _recordingSampleCount++;
+                    }
+                    
+                    // Update the last recorded sample count
+                    _lastRecordedSampleCount = currentSampleCount;
                 }
                 catch (Exception ex)
                 {
@@ -762,6 +782,7 @@ namespace PowerScope.Model
             if (IsRecording)
             {
                 WriteRecordingData();
+                _recordingWriter.Flush();
             }
 
             if (Settings.YAutoScale)

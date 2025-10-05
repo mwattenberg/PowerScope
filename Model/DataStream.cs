@@ -18,7 +18,9 @@ namespace PowerScope.Model
         //True when actively sampling from the data source
         bool IsStreaming { get;}
         //Total number of samples acquired since the stream started
-        //Useful for calculating sampling rate
+        //This value increases as new samples are added and is used for:
+        // - Calculating sampling rate
+        // - Recording new data tracking (detecting new samples available)
         long TotalSamples { get;}
         //Total number of bits acquired since the stream started
         //Useful for calculating bus bandwidth

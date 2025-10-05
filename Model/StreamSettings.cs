@@ -461,16 +461,23 @@ namespace PowerScope.Model
                     return false;
                 }
 
-                // Check if this is a V1.0 PowerScope file
+                // Check if this is a PowerScope file with version header
                 string fileVersion = DetectFileVersion(lines);
                 
-                if (fileVersion != "V1.0")
+                if (fileVersion == "V1.0")
                 {
-                    FileParseStatus = $"Unsupported file version: {fileVersion}. Please use PowerScope V1.0 format.";
+                    return ParseV1FileHeader(lines);
+                }
+                else if (fileVersion == "Unknown")
+                {
+                    // Try to parse as generic CSV file
+                    return ParseGenericCSVFile(lines);
+                }
+                else
+                {
+                    FileParseStatus = $"Unsupported file version: {fileVersion}. Please use PowerScope V1.0 format or a standard CSV file.";
                     return false;
                 }
-
-                return ParseV1FileHeader(lines);
             }
             catch (Exception ex)
             {
@@ -527,13 +534,13 @@ namespace PowerScope.Model
                             sampleRate = rate;
                         }
                     }
-                    // Parse channel information
+                    // Parse channel information from channel info lines
                     else if (line.Contains(":") && 
                             !line.Contains("Sample Rate") && !line.Contains("Recording Started") && 
-                            !line.Contains("Number of Channels") && !line.Contains("PowerScope Version") &&
-                            !line.Contains("Channel Information"))
+                            !line.Contains("Total Channels") && !line.Contains("PowerScope Version") &&
+                            !line.Contains("Data Format") && !line.Contains("Channel Information"))
                     {
-                        // Channel line: "# CH1: Stream=Demo, Index=0"
+                        // Channel line: "# CH1: Stream=Serial, Index=0"
                         string[] parts = line.Split(':');
                         if (parts.Length >= 2)
                         {
@@ -556,15 +563,12 @@ namespace PowerScope.Model
                         else if (line.Contains(";")) delimiter = ";";
                         else if (line.Contains(" ")) delimiter = " ";
                         
-                        // Parse header columns
+                        // Parse header columns - all columns are channels in V1.0 format
                         string[] columns = line.Split(delimiter.ToCharArray(), StringSplitOptions.RemoveEmptyEntries);
                         foreach (string col in columns)
                         {
                             string cleanCol = col.Trim();
-                            if (!string.IsNullOrEmpty(cleanCol) && 
-                                !cleanCol.Equals("Sample", StringComparison.OrdinalIgnoreCase) &&
-                                !cleanCol.Equals("Time_s", StringComparison.OrdinalIgnoreCase) &&
-                                !cleanCol.Equals("Time", StringComparison.OrdinalIgnoreCase))
+                            if (!string.IsNullOrEmpty(cleanCol))
                             {
                                 channelLabels.Add(cleanCol);
                             }
@@ -589,6 +593,94 @@ namespace PowerScope.Model
             else
             {
                 FileParseStatus = "No channel information found in file";
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Parses a generic CSV file without PowerScope headers
+        /// </summary>
+        /// <param name="lines">All lines from the file</param>
+        /// <returns>True if parsing was successful</returns>
+        private bool ParseGenericCSVFile(string[] lines)
+        {
+            List<string> channelLabels = new List<string>();
+            string delimiter = ",";
+            double sampleRate = 1000.0; // Default for generic files
+
+            // Find first non-empty line
+            string firstLine = null;
+            foreach (string line in lines)
+            {
+                if (!string.IsNullOrWhiteSpace(line))
+                {
+                    firstLine = line.Trim();
+                    break;
+                }
+            }
+
+            if (firstLine == null)
+            {
+                FileParseStatus = "No valid data found in file";
+                return false;
+            }
+
+            // Try to detect delimiter
+            if (firstLine.Contains(",")) delimiter = ",";
+            else if (firstLine.Contains("\t")) delimiter = "\t";
+            else if (firstLine.Contains(";")) delimiter = ";";
+            else if (firstLine.Contains(" ")) delimiter = " ";
+
+            // Parse header/first line to get column names
+            string[] columns = firstLine.Split(delimiter.ToCharArray(), StringSplitOptions.RemoveEmptyEntries);
+
+            // Check if first line looks like data (all numbers) or header (contains text)
+            bool firstLineIsHeader = false;
+            foreach (string col in columns)
+            {
+                if (!double.TryParse(col.Trim(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out _))
+                {
+                    firstLineIsHeader = true;
+                    break;
+                }
+            }
+
+            if (firstLineIsHeader)
+            {
+                // Use column names as channel labels
+                foreach (string col in columns)
+                {
+                    string cleanCol = col.Trim();
+                    if (!string.IsNullOrEmpty(cleanCol))
+                    {
+                        channelLabels.Add(cleanCol);
+                    }
+                }
+            }
+            else
+            {
+                // Generate generic channel names
+                for (int i = 0; i < columns.Length; i++)
+                {
+                    channelLabels.Add($"CH{i + 1}");
+                }
+            }
+
+            // Update properties
+            FileSampleRate = sampleRate;
+            FileDelimiter = delimiter;
+            FileChannelLabels = channelLabels;
+            NumberOfChannels = channelLabels.Count;
+            FileHasHeader = firstLineIsHeader;
+
+            if (channelLabels.Count > 0)
+            {
+                FileParseStatus = $"Found {channelLabels.Count} channels (Generic CSV file, sample rate assumed: {sampleRate} Hz)";
+                return true;
+            }
+            else
+            {
+                FileParseStatus = "No valid columns found in file";
                 return false;
             }
         }
