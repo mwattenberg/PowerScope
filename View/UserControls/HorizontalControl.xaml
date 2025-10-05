@@ -135,13 +135,13 @@
                 <Button x:Name="ButtonGrow" VerticalAlignment="Center" MinWidth="50" Height="50" Margin="2,0,5,0" 
                         Style="{StaticResource WideButtonStyle}" Click="ButtonGrow_Click"
                         ToolTip="Expand horizontal scale">
-                    <svgc:SvgViewbox Source="/Icons/xExpand.svg" Width="32" Height="32" />
+                    <svgc:SvgViewbox Source="/Icons/xExpand.svg" Width="42" Height="42" />
                 </Button>
                 
                 <Button x:Name="ButtonShrink" VerticalAlignment="Center" MinWidth="50" Height="50" Margin="5,0,2,0" 
                         Style="{StaticResource WideButtonStyle}" Click="ButtonShrink_Click"
                         ToolTip="Shrink horizontal scale">
-                    <svgc:SvgViewbox Source="/Icons/xShring.svg" Width="32" Height="32" />
+                    <svgc:SvgViewbox Source="/Icons/xShring.svg" Width="42" Height="42" />
                 </Button>
             </StackPanel>
 

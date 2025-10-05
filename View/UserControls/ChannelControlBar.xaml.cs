@@ -22,6 +22,9 @@ namespace PowerScope.View.UserControls
         /// <summary>
         /// Reference to the DataStreamBar for direct channel access
         /// </summary>
+        /// 
+        // Looking at this I find it strange that we provide a reference to DataStreamBar but it has been useful
+        // Maybe in future we can remove this or find a cleaner way to link them
         public DataStreamBar DataStreamBar { get; set; }
 
         public ChannelControlBar()

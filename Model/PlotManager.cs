@@ -31,12 +31,12 @@ namespace PowerScope.Model
         private readonly int _maxChannels;
         private ObservableCollection<Channel> _channels;
 
-        // Cursor management - PlotManager now owns the cursor
+        // Cursor management
         private readonly Cursor _cursor;
-        private HorizontalLine _horizontalLineA;
-        private HorizontalLine _horizontalLineB;
-        private VerticalLine _verticalLineA;
-        private VerticalLine _verticalLineB;
+        private HorizontalLine _horizontalCursorA;
+        private HorizontalLine _horizontalCursorB;
+        private VerticalLine _verticalCursorA;
+        private VerticalLine _verticalCursorB;
         private AxisLine _plottableBeingDragged;
         private bool _cursorMouseHandlingEnabled;
 
@@ -65,7 +65,7 @@ namespace PowerScope.Model
         public CursorMode ActiveCursorMode { get; private set; }
 
         /// <summary>
-        /// Gets a color from the ScottPlot Category10 palette
+        /// Gets a color from the ScottPlot Tsitsulin palette
         /// </summary>
         /// <param name="index">Index of the color to retrieve</param>
         /// <returns>WPF Color from the palette</returns>
@@ -112,7 +112,7 @@ namespace PowerScope.Model
         public void EnableVerticalCursors()
         {
             DisableCursors(); // Remove any existing cursors
-            CreateVerticalLines();
+            CreateVerticalCursors();
             SetupCursorMouseHandling();
             ActiveCursorMode = CursorMode.Vertical;
             HasActiveCursors = true;
@@ -129,7 +129,7 @@ namespace PowerScope.Model
         public void EnableHorizontalCursors()
         {
             DisableCursors(); // Remove any existing cursors
-            CreateHorizontalLines();
+            CreateHorizontalCursors();
             SetupCursorMouseHandling();
             ActiveCursorMode = CursorMode.Horizontal;
             HasActiveCursors = true;
@@ -145,7 +145,7 @@ namespace PowerScope.Model
         /// </summary>
         public void DisableCursors()
         {
-            RemoveAllCursorLines();
+            RemoveAllCursor();
             RemoveCursorMouseHandling();
             ActiveCursorMode = CursorMode.None;
             HasActiveCursors = false;
@@ -155,7 +155,7 @@ namespace PowerScope.Model
             OnPropertyChanged(nameof(ActiveCursorMode));
         }
 
-        private void CreateVerticalLines()
+        private void CreateVerticalCursors()
         {
             // Place lines at 25% and 75% of current x-axis span
             var xAxisRange = _plot.Plot.Axes.GetXAxes().First().Range;
@@ -166,18 +166,18 @@ namespace PowerScope.Model
             var highlightNormal = (Color)Application.Current.Resources["Highlight_Normal"];
             var highlightComplementary = (Color)Application.Current.Resources["Highlight_Complementary"];
 
-            _verticalLineA = _plot.Plot.Add.VerticalLine(x1);
-            _verticalLineA.IsDraggable = true;
-            _verticalLineA.Text = "A";
-            _verticalLineA.Color = new ScottPlot.Color(highlightNormal.R, highlightNormal.G, highlightNormal.B);
+            _verticalCursorA = _plot.Plot.Add.VerticalLine(x1);
+            _verticalCursorA.IsDraggable = true;
+            _verticalCursorA.Text = "A";
+            _verticalCursorA.Color = new ScottPlot.Color(highlightNormal.R, highlightNormal.G, highlightNormal.B);
 
-            _verticalLineB = _plot.Plot.Add.VerticalLine(x2);
-            _verticalLineB.IsDraggable = true;
-            _verticalLineB.Text = "B";
-            _verticalLineB.Color = new ScottPlot.Color(highlightComplementary.R, highlightComplementary.G, highlightComplementary.B);
+            _verticalCursorB = _plot.Plot.Add.VerticalLine(x2);
+            _verticalCursorB.IsDraggable = true;
+            _verticalCursorB.Text = "B";
+            _verticalCursorB.Color = new ScottPlot.Color(highlightComplementary.R, highlightComplementary.G, highlightComplementary.B);
         }
 
-        private void CreateHorizontalLines()
+        private void CreateHorizontalCursors()
         {
             // Place lines at 25% and 75% of current y-axis span
             var limits = _plot.Plot.Axes.GetYAxes().First().Range;
@@ -188,48 +188,48 @@ namespace PowerScope.Model
             var highlightNormal = (Color)Application.Current.Resources["Highlight_Normal"];
             var highlightComplementary = (Color)Application.Current.Resources["Highlight_Complementary"];
 
-            _horizontalLineA = _plot.Plot.Add.HorizontalLine(y1);
-            _horizontalLineA.IsDraggable = true;
-            _horizontalLineA.Text = "A";
-            _horizontalLineA.Color = new ScottPlot.Color(highlightNormal.R, highlightNormal.G, highlightNormal.B);
+            _horizontalCursorA = _plot.Plot.Add.HorizontalLine(y1);
+            _horizontalCursorA.IsDraggable = true;
+            _horizontalCursorA.Text = "A";
+            _horizontalCursorA.Color = new ScottPlot.Color(highlightNormal.R, highlightNormal.G, highlightNormal.B);
 
-            _horizontalLineB = _plot.Plot.Add.HorizontalLine(y2);
-            _horizontalLineB.IsDraggable = true;
-            _horizontalLineB.Text = "B";
-            _horizontalLineB.Color = new ScottPlot.Color(highlightComplementary.R, highlightComplementary.G, highlightComplementary.B);
+            _horizontalCursorB = _plot.Plot.Add.HorizontalLine(y2);
+            _horizontalCursorB.IsDraggable = true;
+            _horizontalCursorB.Text = "B";
+            _horizontalCursorB.Color = new ScottPlot.Color(highlightComplementary.R, highlightComplementary.G, highlightComplementary.B);
         }
 
-        private void RemoveAllCursorLines()
+        private void RemoveAllCursor()
         {
-            RemoveVerticalLines();
-            RemoveHorizontalLines();
+            RemoveVerticalCursor();
+            RemoveHorizontalCursor();
         }
 
-        private void RemoveVerticalLines()
+        private void RemoveVerticalCursor()
         {
-            if (_verticalLineA != null)
+            if (_verticalCursorA != null)
             {
-                _plot.Plot.Remove(_verticalLineA);
-                _verticalLineA = null;
+                _plot.Plot.Remove(_verticalCursorA);
+                _verticalCursorA = null;
             }
-            if (_verticalLineB != null)
+            if (_verticalCursorB != null)
             {
-                _plot.Plot.Remove(_verticalLineB);
-                _verticalLineB = null;
+                _plot.Plot.Remove(_verticalCursorB);
+                _verticalCursorB = null;
             }
         }
 
-        private void RemoveHorizontalLines()
+        private void RemoveHorizontalCursor()
         {
-            if (_horizontalLineA != null)
+            if (_horizontalCursorA != null)
             {
-                _plot.Plot.Remove(_horizontalLineA);
-                _horizontalLineA = null;
+                _plot.Plot.Remove(_horizontalCursorA);
+                _horizontalCursorA = null;
             }
-            if (_horizontalLineB != null)
+            if (_horizontalCursorB != null)
             {
-                _plot.Plot.Remove(_horizontalLineB);
-                _horizontalLineB = null;
+                _plot.Plot.Remove(_horizontalCursorB);
+                _horizontalCursorB = null;
             }
         }
 
@@ -325,11 +325,11 @@ namespace PowerScope.Model
         /// </summary>
         private void UpdateVerticalCursorData()
         {
-            if (_verticalLineA == null || _verticalLineB == null)
+            if (_verticalCursorA == null || _verticalCursorB == null)
                 return;
 
-            double cursorASample = _verticalLineA.X;
-            double cursorBSample = _verticalLineB.X;
+            double cursorASample = _verticalCursorA.X;
+            double cursorBSample = _verticalCursorB.X;
             double sampleRate = GetCurrentSampleRate();
 
             _cursor.UpdateVerticalCursors(cursorASample, cursorBSample, sampleRate);
@@ -343,11 +343,11 @@ namespace PowerScope.Model
         /// </summary>
         private void UpdateHorizontalCursorData()
         {
-            if (_horizontalLineA == null || _horizontalLineB == null)
+            if (_horizontalCursorA == null || _horizontalCursorB == null)
                 return;
 
-            double cursorAYValue = _horizontalLineA.Y;
-            double cursorBYValue = _horizontalLineB.Y;
+            double cursorAYValue = _horizontalCursorA.Y;
+            double cursorBYValue = _horizontalCursorB.Y;
 
             _cursor.UpdateHorizontalCursors(cursorAYValue, cursorBYValue);
         }
@@ -520,7 +520,7 @@ namespace PowerScope.Model
 
         private void ApplyDarkTheme()
         {
-            _plot.Plot.FigureBackground.Color = ScottPlot.Color.FromHex("#181818");
+            _plot.Plot.FigureBackground.Color = ScottPlot.Color.FromHex("#1f1f1f");
             _plot.Plot.DataBackground.Color = ScottPlot.Color.FromHex("#1f1f1f");
             _plot.Plot.Axes.Color(ScottPlot.Color.FromHex("#d7d7d7"));
             _plot.Plot.Grid.LineWidth = (float)Settings.LineWidth;
@@ -800,16 +800,16 @@ namespace PowerScope.Model
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
 
-        public double? GetPlotDataAt(int channelIndex, int sampleIndex)
-        {
-            if (channelIndex < 0 || channelIndex >= _maxChannels || _data[channelIndex] == null)
-                return null;
+        //public double? GetPlotDataAt(int channelIndex, int sampleIndex)
+        //{
+        //    if (channelIndex < 0 || channelIndex >= _maxChannels || _data[channelIndex] == null)
+        //        return null;
                 
-            if (sampleIndex >= 0 && sampleIndex < _data[channelIndex].Length)
-                return _data[channelIndex][sampleIndex];
+        //    if (sampleIndex >= 0 && sampleIndex < _data[channelIndex].Length)
+        //        return _data[channelIndex][sampleIndex];
                 
-            return null;
-        }
+        //    return null;
+        //}
 
         /// <summary>
         /// Gets the plot data for a specific channel at a given sample index
@@ -852,6 +852,7 @@ namespace PowerScope.Model
         /// Gets the current sample rate from the first available channel
         /// </summary>
         /// <returns>Sample rate in Hz, or 0 if no channels available</returns>
+        /// This could be problematic if channels have different sample rates but we assume they are the same for now
         public double GetCurrentSampleRate()
         {
             if (_channels == null || _channels.Count == 0)

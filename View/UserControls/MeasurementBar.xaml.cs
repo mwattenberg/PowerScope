@@ -24,6 +24,8 @@ namespace PowerScope.View.UserControls
         private readonly DispatcherTimer _measurementTimer;
         private bool _disposed = false;
 
+        private readonly ObservableCollection<Measurement> _allMeasurements = new();
+
         /// <summary>
         /// Whether measurement updates are currently running
         /// </summary>
@@ -48,8 +50,7 @@ namespace PowerScope.View.UserControls
         }
 
         public ChannelControlBar ChannelControlBar
-        {
-            get 
+        {            get 
             { 
                 return _channelControlBar; 
             }
@@ -78,6 +79,8 @@ namespace PowerScope.View.UserControls
                 }
             }
         }
+
+
 
         public MeasurementBar()
         {
@@ -135,29 +138,7 @@ namespace PowerScope.View.UserControls
         /// </summary>
         private void UpdateMeasurementDisplay()
         {
-            if (_channelControlBar?.DataStreamBar == null)
-                return;
 
-            // Use CompositeCollection to directly bind to channel measurements without flattening
-            System.Windows.Data.CompositeCollection compositeCollection = new System.Windows.Data.CompositeCollection();
-            
-            foreach (Channel channel in _channelControlBar.DataStreamBar.Channels)
-            {
-                System.Windows.Data.CollectionContainer container = new System.Windows.Data.CollectionContainer();
-                container.Collection = channel.Measurements;
-                compositeCollection.Add(container);
-            }
-            
-            MeasurementItemsControl.ItemsSource = compositeCollection;
-        }
-
-        /// <summary>
-        /// Public method to refresh measurement display when channels change
-        /// Called by external components when channels are added/removed
-        /// </summary>
-        public void RefreshMeasurements()
-        {
-            UpdateMeasurementDisplay();
         }
 
         /// <summary>

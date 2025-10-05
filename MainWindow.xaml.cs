@@ -219,7 +219,7 @@ namespace PowerScope
             ChannelControlBar.UpdateFromDataStreamBar(DataStreamBar);
             
             // Refresh measurements when channels change
-            MeasurementBar.RefreshMeasurements();
+            MeasurementBar.UpdateMeasurementDisplay();
         }
 
         private void RunControl_RunStateChanged(object sender, RunControl.RunStates newState)
