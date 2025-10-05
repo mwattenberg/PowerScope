@@ -50,7 +50,8 @@ namespace PowerScope.View.UserControls
         }
 
         public ChannelControlBar ChannelControlBar
-        {            get 
+        {            
+            get 
             { 
                 return _channelControlBar; 
             }
@@ -60,6 +61,12 @@ namespace PowerScope.View.UserControls
                 if (_channelControlBar?.DataStreamBar != null)
                 {
                     _channelControlBar.DataStreamBar.Channels.CollectionChanged -= OnChannelsCollectionChanged;
+                    
+                    // Unsubscribe from individual channel measurement changes
+                    foreach (var channel in _channelControlBar.DataStreamBar.Channels)
+                    {
+                        channel.Measurements.CollectionChanged -= OnChannelMeasurementsChanged;
+                    }
                 }
 
                 _channelControlBar = value;
@@ -68,6 +75,12 @@ namespace PowerScope.View.UserControls
                 if (_channelControlBar?.DataStreamBar != null)
                 {
                     _channelControlBar.DataStreamBar.Channels.CollectionChanged += OnChannelsCollectionChanged;
+                    
+                    // Subscribe to measurement changes for existing channels
+                    foreach (var channel in _channelControlBar.DataStreamBar.Channels)
+                    {
+                        channel.Measurements.CollectionChanged += OnChannelMeasurementsChanged;
+                    }
                 }
 
                 UpdateMeasurementDisplay();
@@ -80,11 +93,12 @@ namespace PowerScope.View.UserControls
             }
         }
 
-
-
         public MeasurementBar()
         {
             InitializeComponent();
+            
+            // Bind the measurements collection to the ItemsControl
+            MeasurementItemsControl.ItemsSource = _allMeasurements;
             
             // Initialize measurement update timer
             _measurementTimer = new DispatcherTimer(DispatcherPriority.Background);
@@ -99,8 +113,35 @@ namespace PowerScope.View.UserControls
         /// <param name="e">Collection change event args</param>
         private void OnChannelsCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
         {
-            // PlotManager handles cursor channel data updates automatically via SetChannels
-            // No need for manual coordination here
+            // Handle removed channels
+            if (e.OldItems != null)
+            {
+                foreach (Channel channel in e.OldItems)
+                {
+                    channel.Measurements.CollectionChanged -= OnChannelMeasurementsChanged;
+                }
+            }
+            
+            // Handle added channels
+            if (e.NewItems != null)
+            {
+                foreach (Channel channel in e.NewItems)
+                {
+                    channel.Measurements.CollectionChanged += OnChannelMeasurementsChanged;
+                }
+            }
+            
+            UpdateMeasurementDisplay();
+        }
+
+        /// <summary>
+        /// Handles changes to measurements within any channel
+        /// </summary>
+        /// <param name="sender">The measurements collection</param>
+        /// <param name="e">Collection change event args</param>
+        private void OnChannelMeasurementsChanged(object sender, NotifyCollectionChangedEventArgs e)
+        {
+            UpdateMeasurementDisplay();
         }
 
         /// <summary>
@@ -134,11 +175,31 @@ namespace PowerScope.View.UserControls
         }
 
         /// <summary>
-        /// Updates the measurement display using direct channel access
+        /// Updates the measurement display by collecting all measurements from all channels
+        /// Made public so it can be called from MainWindow when channels change
         /// </summary>
-        private void UpdateMeasurementDisplay()
+        public void UpdateMeasurementDisplay()
         {
+            if (_channelControlBar?.DataStreamBar == null)
+            {
+                _allMeasurements.Clear();
+                return;
+            }
 
+            // Use dispatcher to ensure UI updates happen on UI thread
+            Dispatcher.BeginInvoke(() =>
+            {
+                _allMeasurements.Clear();
+
+                // Collect all measurements from all channels
+                foreach (var channel in _channelControlBar.DataStreamBar.Channels)
+                {
+                    foreach (var measurement in channel.Measurements)
+                    {
+                        _allMeasurements.Add(measurement);
+                    }
+                }
+            });
         }
 
         /// <summary>
@@ -297,6 +358,12 @@ namespace PowerScope.View.UserControls
                 if (_channelControlBar?.DataStreamBar != null)
                 {
                     _channelControlBar.DataStreamBar.Channels.CollectionChanged -= OnChannelsCollectionChanged;
+                    
+                    // Unsubscribe from individual channel measurement changes
+                    foreach (var channel in _channelControlBar.DataStreamBar.Channels)
+                    {
+                        channel.Measurements.CollectionChanged -= OnChannelMeasurementsChanged;
+                    }
                 }
                 
                 StopUpdates();
