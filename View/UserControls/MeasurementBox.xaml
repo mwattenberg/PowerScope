@@ -14,6 +14,68 @@
         <converters:ColorToBrushConverter x:Key="ColorToBrushConverter"/>
         <!-- Converter to show spectrum button only for FFT measurements -->
         <local:FFTVisibilityConverter x:Key="FFTVisibilityConverter"/>
+        
+        <!-- Button style with hover effects -->
+        <Style x:Key="HoverButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="ButtonBorder" 
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="3"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" 
+                                            VerticalAlignment="Center"
+                                            Content="{TemplateBinding Content}"
+                                            ContentTemplate="{TemplateBinding ContentTemplate}"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ButtonBorder" Property="Background" Value="#40FFFFFF"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="ButtonBorder" Property="Background" Value="#60FFFFFF"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        
+        <!-- Style for buttons in details panel -->
+        <Style x:Key="DetailButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource PlotSettings_BorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="ButtonBorder" 
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="2"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" 
+                                            VerticalAlignment="Center"
+                                            Content="{TemplateBinding Content}"
+                                            ContentTemplate="{TemplateBinding ContentTemplate}"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ButtonBorder" Property="Background" Value="#20FFFFFF"/>
+                                <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="#80FFFFFF"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="ButtonBorder" Property="Background" Value="#40FFFFFF"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </UserControl.Resources>
 
     <Grid x:Name="MainGrid" Background="{DynamicResource PlotSettings_BackgroundBrush}" Margin="2">
@@ -60,8 +122,7 @@
                 <Button Grid.Column="2"
                         Content="📊"
                         Click="Button_Spectrum_Click"
-                        Background="Transparent"
-                        BorderThickness="0"
+                        Style="{StaticResource HoverButtonStyle}"
                         Foreground="White"
                         FontSize="10"
                         HorizontalAlignment="Center"
@@ -75,8 +136,7 @@
                 <Button x:Name="ExpandButton" Grid.Column="3"
                         Content="▼"
                         Click="Button_Expand_Click"
-                        Background="Transparent"
-                        BorderThickness="0"
+                        Style="{StaticResource HoverButtonStyle}"
                         Foreground="White"
                         FontSize="8"
                         FontWeight="Bold"
@@ -90,8 +150,7 @@
                 <Button Grid.Column="4"
                         Content="×"
                         Click="Button_Remove_Click"
-                        Background="Transparent"
-                        BorderThickness="0"
+                        Style="{StaticResource HoverButtonStyle}"
                         Foreground="White"
                         FontSize="12"
                         FontWeight="Bold"
@@ -138,9 +197,7 @@
                     <Button x:Name="ClearButton" Grid.Column="1"
                             Content="Clear"
                             Click="Button_Clear_Click"
-                            Background="Transparent"
-                            BorderBrush="{DynamicResource PlotSettings_BorderBrush}"
-                            BorderThickness="1"
+                            Style="{StaticResource DetailButtonStyle}"
                             Foreground="{DynamicResource PlotSettings_ButtonForegroundBrush}"
                             FontSize="8"
                             Padding="3,1"
@@ -151,8 +208,7 @@
                     <Button x:Name="CollapseButton" Grid.Column="2"
                             Content="▲"
                             Click="Button_Expand_Click"
-                            Background="Transparent"
-                            BorderThickness="0"
+                            Style="{StaticResource HoverButtonStyle}"
                             Foreground="{DynamicResource PlotSettings_ButtonForegroundBrush}"
                             FontSize="8"
                             FontWeight="Bold"

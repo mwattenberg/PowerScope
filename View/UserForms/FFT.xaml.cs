@@ -11,6 +11,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
+using System.Windows.Threading;
 
 namespace PowerScope.View.UserForms
 {
@@ -20,6 +21,9 @@ namespace PowerScope.View.UserForms
     /// </summary>
     public partial class FFT : Window
     {
+        //maybe this is a bit hacky but it works
+        private DispatcherTimer _autoScaleTimer;
+
         public FFT()
         {
             InitializeComponent();
@@ -33,6 +37,7 @@ namespace PowerScope.View.UserForms
         private void FFT_Loaded(object sender, RoutedEventArgs e)
         {
             InitializeFFTPlot();
+            StartAutoScaleTimer();
         }
 
         /// <summary>
@@ -54,7 +59,35 @@ namespace PowerScope.View.UserForms
             
             // Setup user input for zoom/pan
             SetupPlotUserInput();
-            
+
+            WpfPlotFFT.Refresh();
+        }
+
+        /// <summary>
+        /// Start a timer to auto-scale the plot after initialization delay
+        /// </summary>
+        private void StartAutoScaleTimer()
+        {
+            _autoScaleTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(100)
+            };
+            _autoScaleTimer.Tick += AutoScaleTimer_Tick;
+            _autoScaleTimer.Start();
+        }
+
+        /// <summary>
+        /// Handle auto-scale timer tick - scales the plot and stops the timer
+        /// </summary>
+        private void AutoScaleTimer_Tick(object sender, EventArgs e)
+        {
+            // Stop the timer (one-time execution)
+            _autoScaleTimer.Stop();
+            _autoScaleTimer.Tick -= AutoScaleTimer_Tick;
+            _autoScaleTimer = null;
+
+            // Apply auto-scale after initialization delay
+            WpfPlotFFT.Plot.Axes.AutoScale();
             WpfPlotFFT.Refresh();
         }
 
@@ -94,6 +127,13 @@ namespace PowerScope.View.UserForms
         /// </summary>
         private void CloseButton_Click(object sender, RoutedEventArgs e)
         {
+            // Clean up timer if still running
+            if (_autoScaleTimer != null)
+            {
+                _autoScaleTimer.Stop();
+                _autoScaleTimer.Tick -= AutoScaleTimer_Tick;
+                _autoScaleTimer = null;
+            }
             Close();
         }
 

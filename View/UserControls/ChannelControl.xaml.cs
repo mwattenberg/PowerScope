@@ -151,7 +151,7 @@ namespace PowerScope.View.UserControls
                 e.Handled = true;
             }
 
-            if (e.Key != Key.Add || e.Key != Key.Subtract)
+            if (e.Key != Key.Add && e.Key != Key.Subtract)
                 return;
 
                 // Increment/decrement the first decimal place (0.1 increments)
