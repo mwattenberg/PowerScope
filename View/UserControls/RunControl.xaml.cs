@@ -62,8 +62,6 @@ namespace PowerScope.View.UserControls
             }
         }
 
-
-
         public RunControl()
         {
             InitializeComponent();
@@ -101,11 +99,13 @@ namespace PowerScope.View.UserControls
             {
                 RunButton.Content = "Stop";
                 RunButton.Background = new SolidColorBrush(Colors.Red);
+                RunButton.Tag = "Red"; // Update Tag for hover effects
             }
             else
             {
                 RunButton.Content = "Run 🏃‍♂️‍➡️";
                 RunButton.Background = new SolidColorBrush(Colors.LimeGreen);
+                RunButton.Tag = "LimeGreen"; // Update Tag for hover effects
             }
         }
 
@@ -116,13 +116,43 @@ namespace PowerScope.View.UserControls
                 
             if (RecordState == RecordStates.Recording)
             {
-                RecordButton.Content = "Pause";
+                RecordButton.Content = new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Children = 
+                    {
+                        new TextBlock 
+                        { 
+                            Text = "Pause", 
+                            Foreground = Brushes.White, 
+                            VerticalAlignment = VerticalAlignment.Center 
+                        }
+                    }
+                };
                 RecordButton.Background = new SolidColorBrush(Colors.Gray);
+                RecordButton.Tag = "Gray"; // Update Tag for hover effects
             }
             else
             {
-                RecordButton.Content = "⬤ Record";
+                RecordButton.Content = new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Children = 
+                    {
+                        new TextBlock 
+                        { 
+                            Text = "⬤ Record", 
+                            Foreground = Brushes.White, 
+                            VerticalAlignment = VerticalAlignment.Center 
+                        }
+                    }
+                };
                 RecordButton.Background = new SolidColorBrush(Colors.Red);
+                RecordButton.Tag = "Red"; // Update Tag for hover effects
             }
         }
 

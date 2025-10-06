@@ -68,6 +68,7 @@ namespace PowerScope.Model
         private string _fileDelimiter;
         private List<string> _fileChannelLabels;
         private string _fileParseStatus;
+        private long _fileTotalSamples;
 
         public StreamSettings()
         {
@@ -93,6 +94,7 @@ namespace PowerScope.Model
             FileDelimiter = ","; // Default to CSV
             FileChannelLabels = new List<string>();
             FileParseStatus = "No file selected";
+            FileTotalSamples = 0;
             
             // StreamSource will be set by the configuration dialog based on selected tab
             StreamSource = StreamSource.SerialPort; // Default to serial port;
@@ -382,6 +384,16 @@ namespace PowerScope.Model
             }
         }
 
+        public long FileTotalSamples
+        {
+            get { return _fileTotalSamples; }
+            set
+            {
+                _fileTotalSamples = value;
+                OnPropertyChanged(nameof(FileTotalSamples));
+            }
+        }
+
         public event PropertyChangedEventHandler PropertyChanged;
 
         protected virtual void OnPropertyChanged(string propertyName)
@@ -518,6 +530,7 @@ namespace PowerScope.Model
             double sampleRate = 1000.0; // Default
             List<string> channelLabels = new List<string>();
             string delimiter = ",";
+            long totalSamples = 0;
 
             foreach (string line in lines)
             {
@@ -574,7 +587,31 @@ namespace PowerScope.Model
                             }
                         }
                     }
-                    break; // Stop after first data line
+                    else
+                    {
+                        // Count data lines
+                        totalSamples++;
+                    }
+                }
+            }
+
+            // Count remaining data lines (skip header if present)
+            if (foundMetadata || channelLabels.Count > 0)
+            {
+                // Count all non-comment, non-header lines
+                bool headerFound = false;
+                foreach (string line in lines)
+                {
+                    if (line.StartsWith("#") || string.IsNullOrWhiteSpace(line))
+                        continue;
+                        
+                    if (!headerFound && (foundMetadata || channelLabels.Count > 0))
+                    {
+                        headerFound = true; // Skip the first data line if it's a header
+                        continue;
+                    }
+                    
+                    totalSamples++;
                 }
             }
 
@@ -584,10 +621,11 @@ namespace PowerScope.Model
             FileChannelLabels = channelLabels;
             NumberOfChannels = channelLabels.Count;
             FileHasHeader = foundMetadata || channelLabels.Count > 0;
+            FileTotalSamples = totalSamples;
 
             if (channelLabels.Count > 0)
             {
-                FileParseStatus = $"Found {channelLabels.Count} channels at {sampleRate} Hz (Version: V1.0)";
+                FileParseStatus = $"Found {channelLabels.Count} channels, {totalSamples:N0} samples at {sampleRate} Hz (Version: V1.0)";
                 return true;
             }
             else
@@ -607,6 +645,7 @@ namespace PowerScope.Model
             List<string> channelLabels = new List<string>();
             string delimiter = ",";
             double sampleRate = 1000.0; // Default for generic files
+            long totalSamples = 0;
 
             // Find first non-empty line
             string firstLine = null;
@@ -666,16 +705,29 @@ namespace PowerScope.Model
                 }
             }
 
+            // Count data lines
+            foreach (string line in lines)
+            {
+                if (string.IsNullOrWhiteSpace(line))
+                    continue;
+                    
+                if (firstLineIsHeader && line == firstLine)
+                    continue; // Skip header line
+                    
+                totalSamples++;
+            }
+
             // Update properties
             FileSampleRate = sampleRate;
             FileDelimiter = delimiter;
             FileChannelLabels = channelLabels;
             NumberOfChannels = channelLabels.Count;
             FileHasHeader = firstLineIsHeader;
+            FileTotalSamples = totalSamples;
 
             if (channelLabels.Count > 0)
             {
-                FileParseStatus = $"Found {channelLabels.Count} channels (Generic CSV file, sample rate assumed: {sampleRate} Hz)";
+                FileParseStatus = $"Found {channelLabels.Count} channels, {totalSamples:N0} samples (Generic CSV file, sample rate assumed: {sampleRate} Hz)";
                 return true;
             }
             else

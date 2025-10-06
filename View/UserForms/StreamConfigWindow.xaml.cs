@@ -591,12 +591,6 @@ namespace PowerScope.View.UserForms
                 Panel_ASCII.Visibility = ViewModel.DataFormat == DataFormatType.ASCII ? Visibility.Visible : Visibility.Collapsed;
         }
 
-        private void PopulateDemoControls()
-        {
-            // Demo controls are already defined in XAML, just ensure they're bound properly
-            // The binding is handled through the DataContext (ViewModel)
-        }
-
         private void TabControl_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (ViewModel == null || !(sender is TabControl tabControl))

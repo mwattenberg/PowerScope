@@ -463,9 +463,7 @@
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
                             <StackPanel Margin="10" VerticalAlignment="Top">
                                 <Label Content="File Data Stream Configuration" Style="{StaticResource BoldLabelStyle}" Margin="0,0,0,10"/>
-                                <Label Content="Load data from CSV or text files for playback and analysis."/>
-                                <Label Content="File header will be automatically parsed for metadata." Margin="0,0,0,15"/>
-                                
+
                                 <!-- File Selection -->
                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                                     <Label Content="File Path:" VerticalAlignment="Center" Width="80"/>
@@ -499,6 +497,11 @@
                                         </StackPanel>
                                         
                                         <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                                            <Label Content="Total Samples:" Width="100"/>
+                                            <TextBlock Text="{Binding FileTotalSamples, StringFormat='{}{0:N0}'}" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                        
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
                                             <Label Content="Delimiter:" Width="100"/>
                                             <TextBlock Text="{Binding FileDelimiter}" VerticalAlignment="Center"/>
                                         </StackPanel>
@@ -507,33 +510,11 @@
                                             <Label Content="Has Header:" Width="100"/>
                                             <TextBlock Text="{Binding FileHasHeader}" VerticalAlignment="Center"/>
                                         </StackPanel>
-                                        
-                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
-                                            <Label Content="Loop Playback:" Width="100"/>
-                                            <TextBlock Text="{Binding FileLoopPlayback}" VerticalAlignment="Center"/>
-                                        </StackPanel>
                                     </StackPanel>
                                 </GroupBox>
                                 
                                 <!-- Channel Labels -->
-                                <GroupBox Header="Channel Labels" Margin="0,0,0,10"
-                                          BorderBrush="{DynamicResource PlotSettings_BorderBrush}"
-                                          Foreground="{DynamicResource PlotSettings_LabelForegroundBrush}">
-                                    <ScrollViewer MaxHeight="120" VerticalScrollBarVisibility="Auto">
-                                        <ItemsControl x:Name="ItemsControl_ChannelLabels" ItemsSource="{Binding FileChannelLabels}">
-                                            <ItemsControl.ItemTemplate>
-                                                <DataTemplate>
-                                                    <StackPanel Orientation="Horizontal" Margin="5,2">
-                                                        <TextBlock Text="•" Margin="0,0,5,0"/>
-                                                        <TextBlock Text="{Binding}" 
-                                                                   Foreground="{DynamicResource PlotSettings_LabelForegroundBrush}"/>
-                                                    </StackPanel>
-                                                </DataTemplate>
-                                            </ItemsControl.ItemTemplate>
-                                        </ItemsControl>
-                                    </ScrollViewer>
-                                </GroupBox>
-                                
+
                                 <!-- Instructions -->
                                 <TextBlock Text="Instructions:" FontWeight="Bold" Margin="0,10,0,5"/>
                                 <TextBlock TextWrapping="Wrap" Margin="0,0,0,0" Style="{StaticResource ItalicTextStyle}">
