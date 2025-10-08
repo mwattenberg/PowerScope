@@ -39,7 +39,9 @@ namespace PowerScope
         public MainWindow()
         {
             InitializeComponent();
+          
             
+
             // Initialize commands
             InitializeCommands();
 

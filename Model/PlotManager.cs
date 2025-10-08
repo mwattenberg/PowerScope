@@ -42,6 +42,13 @@ namespace PowerScope.Model
         private long _recordingSampleCount = 0;
         private long _lastRecordedSampleCount = 0;
 
+        //We need the DPI to scale the cursor correctly
+        //The implementation is a bit hacky and it should have already been fixed
+        //Maybe I am misunderstanding something...
+        //See https://github.com/ScottPlot/ScottPlot/issues/563
+        //it works for now
+        private DpiScale _dpi;
+
         // Cursor management
         private readonly Cursor _cursor;
         private HorizontalLine _horizontalCursorA;
@@ -141,6 +148,8 @@ namespace PowerScope.Model
             // Initialize cursor state
             ActiveCursorMode = CursorMode.None;
             HasActiveCursors = false;
+
+             _dpi = VisualTreeHelper.GetDpi(Plot); // Ensure proper DPI scaling for WPF
         }
 
         /// <summary>
@@ -319,7 +328,8 @@ namespace PowerScope.Model
 
             if (_plottableBeingDragged == null)
             {
-                AxisLine lineUnderMouse = GetLineUnderMouse((float)pos.X, (float)pos.Y);
+                AxisLine lineUnderMouse = GetLineUnderMouse((float)(pos.X), (float)(pos.Y));
+                //AxisLine lineUnderMouse = GetLineUnderMouse((float)(pos.X / 0.8), (float)(pos.Y / 0.8));
                 if (lineUnderMouse == null)
                     Mouse.OverrideCursor = null;
                 else if (lineUnderMouse.IsDraggable && lineUnderMouse is VerticalLine)
@@ -331,13 +341,13 @@ namespace PowerScope.Model
             {
                 if (_plottableBeingDragged is HorizontalLine horizontalLine)
                 {
-                    horizontalLine.Y = rect.VerticalCenter;
+                    horizontalLine.Y = rect.VerticalCenter*_dpi.DpiScaleX;
                     horizontalLine.Text = $"{horizontalLine.Y:0.0}";
                     UpdateHorizontalCursorData();
                 }
                 else if (_plottableBeingDragged is VerticalLine verticalLine)
                 {
-                    verticalLine.X = rect.HorizontalCenter;
+                    verticalLine.X = rect.HorizontalCenter*_dpi.DpiScaleY;
                     verticalLine.Text = $"{verticalLine.X:0}";
                     UpdateVerticalCursorData();
                 }
@@ -348,7 +358,7 @@ namespace PowerScope.Model
 
         private AxisLine GetLineUnderMouse(float x, float y)
         {
-            var rect = _plot.Plot.GetCoordinateRect(x, y, radius: 10);
+            var rect = _plot.Plot.GetCoordinateRect((float)(x * _dpi.DpiScaleX),(float)(y * _dpi.DpiScaleY), radius: 10);
             foreach (AxisLine axLine in _plot.Plot.GetPlottables<AxisLine>().Reverse())
             {
                 if (axLine.IsUnderMouse(rect))
