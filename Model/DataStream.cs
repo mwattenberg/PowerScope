@@ -74,15 +74,9 @@ namespace PowerScope.Model
     public interface IBufferResizable
     {
         /// <summary>
-        /// Gets the current buffer size (capacity of ring buffers)
+        /// Gets or sets the buffer size (capacity of ring buffers)
+        /// Setting this will clear existing data and recreate ring buffers
         /// </summary>
-        int BufferSize { get; }
-        
-        /// <summary>
-        /// Updates the buffer size for all channels
-        /// Note: This will clear existing data and recreate ring buffers
-        /// </summary>
-        /// <param name="newBufferSize">New buffer size to set</param>
-        void SetBufferSize(int newBufferSize);
+        int BufferSize { get; set; }
     }
 }

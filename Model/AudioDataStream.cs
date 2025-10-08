@@ -643,39 +643,38 @@ namespace PowerScope.Model
         { 
             get 
             { 
-                lock (_dataLock)
+                lock (_channelConfigLock)
                 {
                     return ReceivedData?[0]?.Capacity ?? 0;
                 }
             }
-        }
-
-        public void SetBufferSize(int newBufferSize)
-        {
-            if (newBufferSize <= 0)
-                return;
-
-            lock (_dataLock)
+            set
             {
-                // Clear existing data
-                if (ReceivedData != null)
-                {
-                    foreach (var buffer in ReceivedData)
-                    {
-                        buffer?.Clear();
-                    }
-                }
+                if (value <= 0)
+                    return;
 
-                // Recreate ring buffers with new size - no need to stop/restart streaming
-                InitializeRingBuffers(newBufferSize);
+                lock (_channelConfigLock)
+                {
+                    // Clear existing data
+                    if (ReceivedData != null)
+                    {
+                        foreach (var buffer in ReceivedData)
+                        {
+                            buffer?.Clear();
+                        }
+                    }
+
+                    // Recreate ring buffers with new size - no need to stop/restart streaming
+                    InitializeRingBuffers(value);
+                    
+                    // Reset statistics
+                    TotalSamples = 0;
+                    TotalBits = 0;
+                }
                 
-                // Reset statistics
-                TotalSamples = 0;
-                TotalBits = 0;
+                // Notify that buffer size changed
+                OnPropertyChanged(nameof(BufferSize));
             }
-            
-            // Notify that buffer size changed
-            OnPropertyChanged(nameof(BufferSize));
         }
 
         private void InitializeRingBuffers(int bufferSize)

@@ -887,8 +887,7 @@ namespace PowerScope.Model
             {
                 if (stream is IBufferResizable resizableStream)
                 {
-
-                    resizableStream.SetBufferSize(Settings.BufferSize);
+                    resizableStream.BufferSize = Settings.BufferSize;
                 }
             }
         }

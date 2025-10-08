@@ -284,35 +284,34 @@ namespace PowerScope.Model
                     return ReceivedData?[0]?.Capacity ?? 0;
                 }
             }
-        }
-
-        public void SetBufferSize(int newBufferSize)
-        {
-            if (newBufferSize <= 0)
-                return;
-
-            lock (_channelConfigLock)
+            set
             {
-                // Clear existing data
-                if (ReceivedData != null)
+                if (value <= 0)
+                    return;
+
+                lock (_channelConfigLock)
                 {
-                    foreach (var buffer in ReceivedData)
+                    // Clear existing data
+                    if (ReceivedData != null)
                     {
-                        buffer?.Clear();
+                        foreach (var buffer in ReceivedData)
+                        {
+                            buffer?.Clear();
+                        }
+
                     }
 
+                    // Recreate ring buffers with new size - no need to stop/restart streaming
+                    InitializeRingBuffers(value);
+                    
+                    // Reset statistics
+                    TotalSamples = 0;
+                    TotalBits = 0;
                 }
-
-                // Recreate ring buffers with new size - no need to stop/restart streaming
-                InitializeRingBuffers(newBufferSize);
                 
-                // Reset statistics
-                TotalSamples = 0;
-                TotalBits = 0;
+                // Notify that buffer size changed
+                OnPropertyChanged(nameof(BufferSize));
             }
-            
-            // Notify that buffer size changed
-            OnPropertyChanged(nameof(BufferSize));
         }
 
         private void InitializeRingBuffers(int bufferSize)
