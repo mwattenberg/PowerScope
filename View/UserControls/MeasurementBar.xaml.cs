@@ -18,7 +18,8 @@ namespace PowerScope.View.UserControls
     /// </summary>
     public partial class MeasurementBar : UserControl, IDisposable
     {
-        
+        private ChannelControlBar _channelControlBar;
+
         // Self-managed timer for measurement updates
         private readonly DispatcherTimer _measurementTimer;
         private bool _disposed = false;
@@ -27,13 +28,16 @@ namespace PowerScope.View.UserControls
         /// Whether measurement updates are currently running
         /// </summary>
         public bool IsRunning { get; private set; }
+
+        // PlotManager dependency - now for both plot access and cursor management
+        private PlotManager _plotManager;
         public PlotManager PlotManager
         {
             get { return _plotManager; }
-            set 
-            { 
+            set
+            {
                 _plotManager = value;
-                
+
                 // Set cursor model for UI controls to use PlotManager's cursor
                 if (_plotManager != null)
                 {
@@ -45,11 +49,11 @@ namespace PowerScope.View.UserControls
 
         public ChannelControlBar ChannelControlBar
         {
-            get 
-            { 
-                return _channelControlBar; 
+            get
+            {
+                return _channelControlBar;
             }
-            set 
+            set
             {
                 _channelControlBar = value;
                 UpdateMeasurementDisplay();
@@ -59,7 +63,7 @@ namespace PowerScope.View.UserControls
         public MeasurementBar()
         {
             InitializeComponent();
-            
+
             // Initialize measurement update timer
             _measurementTimer = new DispatcherTimer(DispatcherPriority.Background);
             _measurementTimer.Interval = TimeSpan.FromMilliseconds(125);
@@ -82,7 +86,7 @@ namespace PowerScope.View.UserControls
             {
                 // Get all channels from the ChannelControlBar's DataStreamBar
                 Channel[] channels = _channelControlBar.DataStreamBar.Channels.ToArray();
-                
+
                 // Update all measurements in all channels
                 Parallel.ForEach(channels, channel =>
                 {
@@ -212,7 +216,7 @@ namespace PowerScope.View.UserControls
             CursorDisplayPanel.Visibility = Visibility.Visible;
             CursorVerticalControl.Visibility = Visibility.Visible;
             CursorHorizontalControl.Visibility = Visibility.Collapsed;
-            
+
             // Bind to PlotManager's cursor data - no manual updates needed
             CursorChannelItemsControl.ItemsSource = _plotManager.Cursor.ChannelData;
         }
@@ -226,7 +230,7 @@ namespace PowerScope.View.UserControls
             CursorDisplayPanel.Visibility = Visibility.Visible;
             CursorVerticalControl.Visibility = Visibility.Collapsed;
             CursorHorizontalControl.Visibility = Visibility.Visible;
-            
+
             // Don't show channel-specific cursor controls for horizontal cursors
             // Horizontal cursors only show Y-axis delta, not per-channel measurements
             CursorChannelItemsControl.ItemsSource = null;
@@ -278,8 +282,8 @@ namespace PowerScope.View.UserControls
             if (!_disposed)
             {
                 _disposed = true;
-                
-                
+
+
                 StopUpdates();
             }
         }

@@ -49,8 +49,8 @@
       <FileName>Model\Measurement.cs</FileName>
     </TypeIdentifier>
     <ShowAsAssociation>
-      <Field Name="_channelSettings" />
       <Field Name="_dataStream" />
+      <Field Name="_channelSettings" />
     </ShowAsAssociation>
     <Lollipop Position="0.2" />
   </Class>
@@ -134,18 +134,18 @@
     <Position X="17.5" Y="34" Width="2.75" />
     <AssociationLine Name="PlotManager" Type="PowerScope.Model.PlotManager" ManuallyRouted="true" FixedFromPoint="true" FixedToPoint="true">
       <Path>
-        <Point X="17.5" Y="35.938" />
-        <Point X="7.938" Y="35.938" />
+        <Point X="17.5" Y="36.086" />
+        <Point X="7.938" Y="36.086" />
         <Point X="7.938" Y="18.305" />
       </Path>
     </AssociationLine>
     <TypeIdentifier>
-      <HashCode>AAEAAIAAECDEABAIAAwgQAAAAAAABAAgAAIQIAAAAAA=</HashCode>
+      <HashCode>AAEgAIAAECDEABAIAAwgQAAAAAAgBAAgAAIQIAAAAAA=</HashCode>
       <FileName>View\UserControls\MeasurementBar.xaml.cs</FileName>
     </TypeIdentifier>
     <ShowAsAssociation>
-      <Property Name="ChannelControlBar" />
       <Property Name="PlotManager" />
+      <Property Name="ChannelControlBar" />
     </ShowAsAssociation>
     <Lollipop Position="0.2" />
   </Class>
@@ -153,14 +153,14 @@
     <Position X="17.75" Y="30.5" Width="1.5" />
     <AssociationLine Name="ChannelSettings" Type="PowerScope.Model.ChannelSettings" ManuallyRouted="true" FixedFromPoint="true" FixedToPoint="true">
       <Path>
-        <Point X="17.75" Y="31.375" />
-        <Point X="16.303" Y="31.375" />
+        <Point X="17.75" Y="31.652" />
+        <Point X="16.303" Y="31.652" />
         <Point X="16.303" Y="28.288" />
         <Point X="15" Y="28.288" />
       </Path>
     </AssociationLine>
     <TypeIdentifier>
-      <HashCode>AAAAAAAAAAAAAACAAAAAAAAgAAAAAAAAAAAAAAAAAAA=</HashCode>
+      <HashCode>AAAAAAAAAAAAAACAAAAAAAAgAAAAAAAACAAAAAAAAAA=</HashCode>
       <FileName>View\UserControls\ChannelControlBar.xaml.cs</FileName>
     </TypeIdentifier>
     <ShowAsCollectionAssociation>
@@ -182,7 +182,7 @@
   <Class Name="PowerScope.Model.PlotSettings">
     <Position X="10.5" Y="19.75" Width="1.5" />
     <TypeIdentifier>
-      <HashCode>QAJQACAECGAAABAAKQAGAAIgkASAAAAAAAAkABAECQA=</HashCode>
+      <HashCode>QAJQACAECHAAABAACQAGAAIgEASAAAAAAAAkABAECQA=</HashCode>
       <FileName>Model\PlotSettings.cs</FileName>
     </TypeIdentifier>
     <Lollipop Position="0.2" />
