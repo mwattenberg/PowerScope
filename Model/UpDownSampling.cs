@@ -16,14 +16,21 @@ namespace PowerScope.Model
         // Upsampling state for continuous processing (to eliminate discontinuities)
         private class ChannelUpsamplingState
         {
-            public double[] PreviousTail { get; set; }
+            public double[] PreviousTail { get; set; }      // Tail from two samples ago
+            public double[] PreviousBody { get; set; }     // Body from last sample (becomes tail)
             public int TailLength { get; set; }
+            public int BodyLength { get; set; }
+            public bool IsFirstBlock { get; set; }
 
             public ChannelUpsamplingState(int tailLength)
             {
                 TailLength = tailLength;
+                BodyLength = tailLength; // Body length same as tail for smooth transitions
                 PreviousTail = new double[tailLength];
+                PreviousBody = new double[BodyLength];
                 Array.Clear(PreviousTail);
+                Array.Clear(PreviousBody);
+                IsFirstBlock = true;
             }
         }
         
@@ -346,8 +353,9 @@ namespace PowerScope.Model
         }
 
         /// <summary>
-        /// Applies sinc interpolation to input data
-        /// Continuous version that uses previous data tail for seamless processing
+        /// Applies sinc interpolation to input data with improved continuity
+        /// Uses a three-buffer system: tail (from two samples ago) + body (from last sample) + head (from current sample)
+        /// This eliminates all discontinuities by properly overlapping processing blocks
         /// </summary>
         /// <param name="inputData">Input samples to interpolate</param>
         /// <param name="factor">Interpolation factor</param>
@@ -361,32 +369,67 @@ namespace PowerScope.Model
             int inputLength = inputData.Length;
             int outputLength = inputLength * factor;
             
-            // Prepare continuous input by combining previous tail with new data
-            int tailLength = state != null ? state.TailLength : 0;
-            double[] continuousInput = new double[tailLength + inputLength];
-            
-            if (state != null && state.PreviousTail != null)
+            // Handle first block case (no previous data)
+            if (state == null || state.IsFirstBlock)
             {
-                Array.Copy(state.PreviousTail, 0, continuousInput, 0, tailLength);
+                if (state != null)
+                {
+                    // Store the body for next iteration (take the tail portion of current input)
+                    int bodyStartIndex = Math.Max(0, inputLength - state.BodyLength);
+                    int actualBodyLength = Math.Min(state.BodyLength, inputLength);
+                    Array.Copy(inputData, bodyStartIndex, state.PreviousBody, 0, actualBodyLength);
+                    
+                    // Clear any remaining body if input is shorter than body length
+                    if (actualBodyLength < state.BodyLength)
+                    {
+                        Array.Clear(state.PreviousBody, actualBodyLength, state.BodyLength - actualBodyLength);
+                    }
+                    
+                    state.IsFirstBlock = false;
+                }
+                
+                // For first block, just do simple interpolation with padding
+                return SimpleInterpolationWithPadding(inputData, factor);
             }
-            Array.Copy(inputData, 0, continuousInput, tailLength, inputLength);
+
+            // Prepare the three-buffer system: tail + body + head
+            int headLength = Math.Min(state.TailLength, inputLength); // Take head from current input
+            int tailLength = state.TailLength;
+            int bodyLength = state.BodyLength;
+            
+            // Calculate total processing length
+            int totalProcessingLength = tailLength + bodyLength + headLength;
+            double[] processingBuffer = new double[totalProcessingLength];
+            
+            // Fill processing buffer: tail + body + head
+            int bufferOffset = 0;
+            
+            // 1. Copy tail (from two samples ago)
+            Array.Copy(state.PreviousTail, 0, processingBuffer, bufferOffset, tailLength);
+            bufferOffset += tailLength;
+            
+            // 2. Copy body (from last sample)
+            Array.Copy(state.PreviousBody, 0, processingBuffer, bufferOffset, bodyLength);
+            bufferOffset += bodyLength;
+            
+            // 3. Copy head (from current sample)
+            Array.Copy(inputData, 0, processingBuffer, bufferOffset, headLength);
             
             // Create zero-padded upsampled signal
-            int continuousInputLength = continuousInput.Length;
-            int continuousOutputLength = continuousInputLength * factor;
-            double[] upsampled = new double[continuousOutputLength];
+            int upsampledLength = totalProcessingLength * factor;
+            double[] upsampled = new double[upsampledLength];
             
             // Insert original samples at zero-padded positions
-            for (int i = 0; i < continuousInputLength; i++)
+            for (int i = 0; i < totalProcessingLength; i++)
             {
-                upsampled[i * factor] = continuousInput[i] * factor; // Scale by factor to maintain energy
+                upsampled[i * factor] = processingBuffer[i] * factor; // Scale by factor to maintain energy
             }
             
             // Apply sinc interpolation filter
-            double[] filtered = new double[continuousOutputLength];
+            double[] filtered = new double[upsampledLength];
             int kernelHalfLength = SincKernelHalfLength;
             
-            for (int i = 0; i < continuousOutputLength; i++)
+            for (int i = 0; i < upsampledLength; i++)
             {
                 double sum = 0.0;
                 
@@ -394,7 +437,7 @@ namespace PowerScope.Model
                 {
                     int sampleIndex = i - kernelHalfLength + j;
                     
-                    if (sampleIndex >= 0 && sampleIndex < continuousOutputLength)
+                    if (sampleIndex >= 0 && sampleIndex < upsampledLength)
                     {
                         sum += upsampled[sampleIndex] * _sincKernel[j];
                     }
@@ -403,24 +446,110 @@ namespace PowerScope.Model
                 filtered[i] = sum;
             }
             
-            // Extract the relevant portion (skip the tail part from previous processing)
-            int skipSamples = tailLength * factor;
-            double[] output = new double[outputLength];
-            Array.Copy(filtered, skipSamples, output, 0, outputLength);
+            // Extract the output portion (skip tail and body, take only the interpolated current data)
+            int skipSamples = (tailLength + bodyLength) * factor;
+            int extractLength = Math.Min(outputLength, filtered.Length - skipSamples);
             
-            // Update state with the tail of the current input for next processing
-            if (state != null)
+            double[] output = new double[outputLength];
+            if (extractLength > 0)
             {
-                int tailStartIndex = Math.Max(0, inputLength - state.TailLength);
-                int actualTailLength = Math.Min(state.TailLength, inputLength);
-                Array.Copy(inputData, tailStartIndex, state.PreviousTail, 0, actualTailLength);
+                Array.Copy(filtered, skipSamples, output, 0, extractLength);
+            }
+            
+            // If we need more samples (input was longer than head), process the remainder with simple interpolation
+            if (extractLength < outputLength)
+            {
+                int remainingInputStart = headLength;
+                int remainingInputLength = inputLength - headLength;
                 
-                // Clear any remaining tail if input is shorter than tail length
-                if (actualTailLength < state.TailLength)
+                if (remainingInputLength > 0)
                 {
-                    Array.Clear(state.PreviousTail, actualTailLength, state.TailLength - actualTailLength);
+                    double[] remainingInput = new double[remainingInputLength];
+                    Array.Copy(inputData, remainingInputStart, remainingInput, 0, remainingInputLength);
+                    
+                    double[] remainingOutput = SimpleInterpolationWithPadding(remainingInput, factor);
+                    int remainingOutputLength = Math.Min(remainingOutput.Length, outputLength - extractLength);
+                    
+                    Array.Copy(remainingOutput, 0, output, extractLength, remainingOutputLength);
                 }
             }
+            
+            // Update state for next iteration
+            // Current body becomes the tail for next time
+            Array.Copy(state.PreviousBody, 0, state.PreviousTail, 0, state.TailLength);
+            
+            // Extract new body from current input (tail portion becomes new body)
+            int newBodyStartIndex = Math.Max(0, inputLength - state.BodyLength);
+            int actualNewBodyLength = Math.Min(state.BodyLength, inputLength);
+            Array.Clear(state.PreviousBody, 0, state.BodyLength); // Clear first
+            Array.Copy(inputData, newBodyStartIndex, state.PreviousBody, 0, actualNewBodyLength);
+            
+            return output;
+        }
+        
+        /// <summary>
+        /// Simple interpolation with mirrored padding for edge cases
+        /// Used for first block and remainder processing
+        /// </summary>
+        /// <param name="inputData">Input data to interpolate</param>
+        /// <param name="factor">Interpolation factor</param>
+        /// <returns>Interpolated data</returns>
+        private double[] SimpleInterpolationWithPadding(double[] inputData, int factor)
+        {
+            if (inputData == null || inputData.Length == 0)
+                return inputData;
+                
+            int inputLength = inputData.Length;
+            int outputLength = inputLength * factor;
+            
+            // Create padded input (mirror boundaries)
+            int padLength = SincKernelHalfLength;
+            double[] paddedInput = new double[inputLength + 2 * padLength];
+            
+            // Mirror boundary conditions
+            for (int i = 0; i < padLength; i++)
+            {
+                paddedInput[i] = inputData[Math.Min(padLength - i - 1, inputLength - 1)]; // Left boundary
+                paddedInput[inputLength + padLength + i] = inputData[Math.Max(0, inputLength - i - 1)]; // Right boundary
+            }
+            
+            // Copy original data
+            Array.Copy(inputData, 0, paddedInput, padLength, inputLength);
+            
+            // Zero-pad and upsample
+            int paddedOutputLength = paddedInput.Length * factor;
+            double[] upsampled = new double[paddedOutputLength];
+            
+            for (int i = 0; i < paddedInput.Length; i++)
+            {
+                upsampled[i * factor] = paddedInput[i] * factor;
+            }
+            
+            // Apply sinc filter
+            double[] filtered = new double[paddedOutputLength];
+            int kernelHalfLength = SincKernelHalfLength;
+            
+            for (int i = 0; i < paddedOutputLength; i++)
+            {
+                double sum = 0.0;
+                
+                for (int j = 0; j < _sincKernel.Length; j++)
+                {
+                    int sampleIndex = i - kernelHalfLength + j;
+                    
+                    if (sampleIndex >= 0 && sampleIndex < paddedOutputLength)
+                    {
+                        sum += upsampled[sampleIndex] * _sincKernel[j];
+                    }
+                }
+                
+                filtered[i] = sum;
+            }
+            
+            // Extract unpadded portion
+            int skipSamples = padLength * factor;
+            double[] output = new double[outputLength];
+            Array.Copy(filtered, skipSamples, output, 0, outputLength);
             
             return output;
         }
@@ -556,9 +685,13 @@ namespace PowerScope.Model
                 {
                     foreach (var state in _upsamplingStates)
                     {
-                        if (state?.PreviousTail != null)
+                        if (state != null)
                         {
-                            Array.Clear(state.PreviousTail);
+                            if (state.PreviousTail != null)
+                                Array.Clear(state.PreviousTail);
+                            if (state.PreviousBody != null)
+                                Array.Clear(state.PreviousBody);
+                            state.IsFirstBlock = true;
                         }
                     }
                 }
