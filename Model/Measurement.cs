@@ -165,16 +165,6 @@ namespace PowerScope.Model
             }
         }
 
-        /// <summary>
-        /// Whether this measurement has been disposed
-        /// </summary>
-        public bool IsDisposed
-        {
-            get
-            {
-                return _disposed;
-            }
-        }
 
         /// <summary>
         /// The calculated result value
@@ -192,10 +182,31 @@ namespace PowerScope.Model
             }
         }
 
+        #region Statistics
+
         /// <summary>
         /// Controls whether statistics (Min, Max, Mean, Count) are calculated for each measurement.
         /// </summary>
         public bool CalculateStatistics { get; set; } = false;
+
+
+        /// <summary>
+        /// Updates the running statistics with a new measurement value.
+        /// </summary>
+        private void UpdateStatistics(double value)
+        {
+            if (!double.IsNaN(value) && !double.IsInfinity(value))
+            {
+                // Update Min/Max
+                if (value < Min) Min = value;
+                if (value > Max) Max = value;
+
+                // Update running mean and count
+                SamplesCount++;
+                Mean += (value - Mean) / SamplesCount;
+            }
+        }
+
 
         /// <summary>
         /// The minimum value recorded since statistics were last reset.
@@ -237,6 +248,21 @@ namespace PowerScope.Model
         }
 
         /// <summary>
+        /// Resets the calculated statistics (Min, Max, Mean, Count) to their initial values.
+        /// </summary>
+        public void ClearStatistics()
+        {
+            Min = double.MaxValue;
+            Max = double.MinValue;
+            Mean = 0.0;
+            SamplesCount = 0;
+            _fftPeaks.Clear();
+        }
+
+
+        #endregion
+
+        /// <summary>
         /// The total number of samples included in the statistics calculation.
         /// </summary>
         public long SamplesCount
@@ -248,6 +274,8 @@ namespace PowerScope.Model
                 OnPropertyChanged(nameof(SamplesCount));
             }
         }
+
+        #region FFT
 
         /// <summary>
         /// FFT size (number of samples for FFT calculation)
@@ -339,27 +367,6 @@ namespace PowerScope.Model
                 _FFT_averaging = value;
                 OnPropertyChanged(nameof(FFT_Averaging));
             }
-        }
-
-        /// <summary>
-        /// Request removal of this measurement (for template-based UI)
-        /// </summary>
-        public void RequestRemove()
-        {
-            if (RemoveRequested != null)
-                RemoveRequested(this, EventArgs.Empty);
-        }
-
-        /// <summary>
-        /// Resets the calculated statistics (Min, Max, Mean, Count) to their initial values.
-        /// </summary>
-        public void ClearStatistics()
-        {
-            Min = double.MaxValue;
-            Max = double.MinValue;
-            Mean = 0.0;
-            SamplesCount = 0;
-            _fftPeaks.Clear();
         }
 
         /// <summary>
@@ -457,6 +464,120 @@ namespace PowerScope.Model
             _fftWindow.WpfPlotFFT.Refresh();
         }
 
+        private void FFT_ApplyWindowFunction(ReadOnlySpan<double> input, Span<double> output, int length)
+        {
+            // Ensure window coefficients are valid
+            if (!_FFT_windowCoefficientsValid || _FFT_windowCoefficients == null || _FFT_windowCoefficients.Length != _FFT_Size)
+            {
+                FFT_PreCalculateWindowCoefficients();
+            }
+
+            // Apply pre-calculated window coefficients (element-wise multiplication)
+            int applyLength = Math.Min(length, _FFT_windowCoefficients.Length);
+            for (int i = 0; i < applyLength; i++)
+            {
+                output[i] = input[i] * _FFT_windowCoefficients[i];
+            }
+        }
+
+        /// <summary>
+        /// Pre-calculate window function coefficients for optimal performance
+        /// Called when FFT size or window function changes
+        /// </summary>
+        private void FFT_PreCalculateWindowCoefficients()
+        {
+            // Allocate or reallocate window coefficients array
+            if (_FFT_windowCoefficients == null || _FFT_windowCoefficients.Length != _FFT_Size)
+            {
+                _FFT_windowCoefficients = new double[_FFT_Size];
+            }
+
+            // Calculate coefficients based on window function type
+            switch (_FFT_windowFunction)
+            {
+                case "Hann":
+                    FFT_PreCalculateHannWindow();
+                    break;
+                case "Flat Top":
+                    FFT_PreCalculateFlatTopWindow();
+                    break;
+                case "None":
+                    FFT_PreCalculateRectangularWindow();
+                    break;
+                case "Blackman-Harris":
+                default:
+                    FFT_PreCalculateBlackmanHarrisWindow();
+                    break;
+            }
+
+            _FFT_windowCoefficientsValid = true;
+        }
+
+        /// <summary>
+        /// Pre-calculate Blackman-Harris window coefficients
+        /// </summary>
+        private void FFT_PreCalculateBlackmanHarrisWindow()
+        {
+            const double a0 = 0.35875;
+            const double a1 = 0.48829;
+            const double a2 = 0.14128;
+            const double a3 = 0.01168;
+
+            for (int i = 0; i < _FFT_Size; i++)
+            {
+                double n = i / (double)(_FFT_Size - 1);
+                _FFT_windowCoefficients[i] = a0 - a1 * Math.Cos(2.0 * Math.PI * n) +
+                                        a2 * Math.Cos(4.0 * Math.PI * n) -
+                                        a3 * Math.Cos(6.0 * Math.PI * n);
+            }
+        }
+
+        /// <summary>
+        /// Pre-calculate Hann window coefficients
+        /// </summary>
+        private void FFT_PreCalculateHannWindow()
+        {
+            for (int i = 0; i < _FFT_Size; i++)
+            {
+                _FFT_windowCoefficients[i] = 0.5 * (1.0 - Math.Cos(2.0 * Math.PI * i / (_FFT_Size - 1)));
+            }
+        }
+
+        /// <summary>
+        /// Pre-calculate Flat Top window coefficients
+        /// </summary>
+        private void FFT_PreCalculateFlatTopWindow()
+        {
+            const double a0 = 0.21557895;
+            const double a1 = 0.41663158;
+            const double a2 = 0.277263158;
+            const double a3 = 0.083578947;
+            const double a4 = 0.006947368;
+
+            for (int i = 0; i < _FFT_Size; i++)
+            {
+                double n = i / (double)(_FFT_Size - 1);
+                _FFT_windowCoefficients[i] = a0 - a1 * Math.Cos(2.0 * Math.PI * n) +
+                                        a2 * Math.Cos(4.0 * Math.PI * n) -
+                                        a3 * Math.Cos(6.0 * Math.PI * n) +
+                                        a4 * Math.Cos(8.0 * Math.PI * n);
+            }
+        }
+
+        /// <summary>
+        /// Pre-calculate rectangular window coefficients (all ones - no windowing)
+        /// </summary>
+        private void FFT_PreCalculateRectangularWindow()
+        {
+            for (int i = 0; i < _FFT_Size; i++)
+            {
+                _FFT_windowCoefficients[i] = 1.0;
+            }
+        }
+
+
+        #endregion
+
         /// <summary>
         /// Update measurement - called by SystemManager
         /// </summary>
@@ -505,24 +626,8 @@ namespace PowerScope.Model
             }
         }
 
-        /// <summary>
-        /// Updates the running statistics with a new measurement value.
-        /// </summary>
-        private void UpdateStatistics(double value)
-        {
-            if (!double.IsNaN(value) && !double.IsInfinity(value))
-            {
-                // Update Min/Max
-                if (value < Min) Min = value;
-                if (value > Max) Max = value;
-
-                // Update running mean and count
-                SamplesCount++;
-                Mean += (value - Mean) / SamplesCount;
-            }
-        }
-
-        #region Private Methods - Function Pointer Pattern
+        #region Clean-up
+        #region "Normal" measurements
 
         /// <summary>
         /// Gets the appropriate calculation function based on measurement type (like function pointer in C)
@@ -808,116 +913,6 @@ namespace PowerScope.Model
         /// <summary>
         /// Apply the selected window function to the input data using pre-calculated coefficients
         /// </summary>
-        private void FFT_ApplyWindowFunction(ReadOnlySpan<double> input, Span<double> output, int length)
-        {
-            // Ensure window coefficients are valid
-            if (!_FFT_windowCoefficientsValid || _FFT_windowCoefficients == null || _FFT_windowCoefficients.Length != _FFT_Size)
-            {
-                FFT_PreCalculateWindowCoefficients();
-            }
-            
-            // Apply pre-calculated window coefficients (element-wise multiplication)
-            int applyLength = Math.Min(length, _FFT_windowCoefficients.Length);
-            for (int i = 0; i < applyLength; i++)
-            {
-                output[i] = input[i] * _FFT_windowCoefficients[i];
-            }
-        }
-
-        /// <summary>
-        /// Pre-calculate window function coefficients for optimal performance
-        /// Called when FFT size or window function changes
-        /// </summary>
-        private void FFT_PreCalculateWindowCoefficients()
-        {            
-            // Allocate or reallocate window coefficients array
-            if (_FFT_windowCoefficients == null || _FFT_windowCoefficients.Length != _FFT_Size)
-            {
-                _FFT_windowCoefficients = new double[_FFT_Size];
-            }
-            
-            // Calculate coefficients based on window function type
-            switch (_FFT_windowFunction)
-            {
-                case "Hann":
-                    FFT_PreCalculateHannWindow();
-                    break;
-                case "Flat Top":
-                    FFT_PreCalculateFlatTopWindow();
-                    break;
-                case "None":
-                    FFT_PreCalculateRectangularWindow();
-                    break;
-                case "Blackman-Harris":
-                default:
-                    FFT_PreCalculateBlackmanHarrisWindow();
-                    break;
-            }
-            
-            _FFT_windowCoefficientsValid = true;
-        }
-
-        /// <summary>
-        /// Pre-calculate Blackman-Harris window coefficients
-        /// </summary>
-        private void FFT_PreCalculateBlackmanHarrisWindow()
-        {
-            const double a0 = 0.35875;
-            const double a1 = 0.48829;
-            const double a2 = 0.14128;
-            const double a3 = 0.01168;
-            
-            for (int i = 0; i < _FFT_Size; i++)
-            {
-                double n = i / (double)(_FFT_Size - 1);
-                _FFT_windowCoefficients[i] = a0 - a1 * Math.Cos(2.0 * Math.PI * n) + 
-                                        a2 * Math.Cos(4.0 * Math.PI * n) - 
-                                        a3 * Math.Cos(6.0 * Math.PI * n);
-            }
-        }
-
-        /// <summary>
-        /// Pre-calculate Hann window coefficients
-        /// </summary>
-        private void FFT_PreCalculateHannWindow()
-        {
-            for (int i = 0; i < _FFT_Size; i++)
-            {
-                _FFT_windowCoefficients[i] = 0.5 * (1.0 - Math.Cos(2.0 * Math.PI * i / (_FFT_Size - 1)));
-            }
-        }
-
-        /// <summary>
-        /// Pre-calculate Flat Top window coefficients
-        /// </summary>
-        private void FFT_PreCalculateFlatTopWindow()
-        {
-            const double a0 = 0.21557895;
-            const double a1 = 0.41663158;
-            const double a2 = 0.277263158;
-            const double a3 = 0.083578947;
-            const double a4 = 0.006947368;
-            
-            for (int i = 0; i < _FFT_Size; i++)
-            {
-                double n = i / (double)(_FFT_Size - 1);
-                _FFT_windowCoefficients[i] = a0 - a1 * Math.Cos(2.0 * Math.PI * n) + 
-                                        a2 * Math.Cos(4.0 * Math.PI * n) - 
-                                        a3 * Math.Cos(6.0 * Math.PI * n) + 
-                                        a4 * Math.Cos(8.0 * Math.PI * n);
-            }
-        }
-
-        /// <summary>
-        /// Pre-calculate rectangular window coefficients (all ones - no windowing)
-        /// </summary>
-        private void FFT_PreCalculateRectangularWindow()
-        {
-            for (int i = 0; i < _FFT_Size; i++)
-            {
-                _FFT_windowCoefficients[i] = 1.0;
-            }
-        }
 
         /// <summary>
         /// Raises the PropertyChanged event
@@ -948,6 +943,27 @@ namespace PowerScope.Model
                     _fftWindow = null;
                 }
             }
+        }
+
+        #endregion
+
+        /// <summary>
+        /// Whether this measurement has been disposed
+        /// </summary>
+        public bool IsDisposed
+        {
+            get
+            {
+                return _disposed;
+            }
+        }
+
+
+
+        public void RequestRemove()
+        {
+            if (RemoveRequested != null)
+                RemoveRequested(this, EventArgs.Empty);
         }
 
         #endregion

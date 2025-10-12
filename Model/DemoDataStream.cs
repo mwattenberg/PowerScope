@@ -343,6 +343,7 @@ namespace PowerScope.Model
                 "Mixed Signals" => GenerateMixedSignal(channel, time, amplitude),
                 "Chirp Signal" => GenerateChirpSignal(channel, time, amplitude),
                 "Tones" => GenerateTonesSignal(channel, time, amplitude),
+                "sin(x)/x" => GenerateSinXOverXSignal(channel, time, amplitude),
                 _ => amplitude * Math.Sin(2 * Math.PI * baseFrequency * time)
             };
         }
@@ -427,6 +428,32 @@ namespace PowerScope.Model
             
             // Combine all tones
             return mainTone + lowerTone + upperTone;
+        }
+
+        /// <summary>
+        /// Generates a 400Hz sine wave for testing sin(x)/x interpolation
+        /// This frequency is just below the Nyquist rate for 1000Hz sampling (Nyquist = 500Hz)
+        /// Each channel gets a slight frequency offset to make them distinguishable
+        /// </summary>
+        /// <param name="channel">Channel index (adds slight frequency offset per channel)</param>
+        /// <param name="time">Current time in seconds</param>
+        /// <param name="amplitude">Signal amplitude</param>
+        /// <returns>400Hz sine wave sample for sin(x)/x interpolation testing</returns>
+        private double GenerateSinXOverXSignal(int channel, double time, double amplitude)
+        {
+            // Base frequency at 400Hz - just below Nyquist for 1000Hz sample rate
+            const double baseFrequency = 400.0; // 400 Hz
+            
+            // Add slight frequency offset per channel to make them distinguishable
+            // Keep offsets small to stay well below Nyquist frequency
+            double channelFreqOffset = channel * 10.0; // 10 Hz offset per channel
+            double actualFrequency = baseFrequency + channelFreqOffset;
+            
+            // Ensure we don't exceed a reasonable limit (stay below 480Hz to maintain margin from Nyquist)
+            actualFrequency = Math.Min(actualFrequency, 480.0);
+            
+            // Generate sine wave at the target frequency
+            return amplitude * Math.Sin(2 * Math.PI * actualFrequency * time);
         }
 
         public int CopyLatestTo(int channel, double[] destination, int n)

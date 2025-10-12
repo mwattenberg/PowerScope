@@ -716,6 +716,9 @@ namespace PowerScope.View.UserForms
                 case "tones":
                     InfoTextBlock.Text = "Generates a 1kHz main sine wave with secondary sine waves at 750 and 1250Hz.\nA sample rate of 10kHz or higher is recommended.\nSecondary waves will successively move closer to 1kHz.";
                     break;
+                case "sin(x)/x":
+                    InfoTextBlock.Text = "Generates a 400Hz sine wave for testing sin(x)/x interpolation.\nFrequency is just below Nyquist for 1000Hz sampling.\nEach channel gets a slight frequency offset (+5Hz per channel).";
+                    break;
                 default:
                     InfoTextBlock.Text = string.Empty;
                     break;
@@ -735,6 +738,69 @@ namespace PowerScope.View.UserForms
             public string Name { get; set; }
             public WaveInCapabilities? WaveInCapabilities { get; set; }
             public MMDevice WasapiDevice { get; set; }
+        }
+
+        // Sampling factor validation and event handlers
+        private void SamplingFactor_PreviewTextInput(object sender, TextCompositionEventArgs e)
+        {
+            var textBox = sender as TextBox;
+            var newText = textBox.Text.Insert(textBox.SelectionStart, e.Text);
+            
+            // Allow empty string, minus sign at start, and numbers
+            if (string.IsNullOrEmpty(newText) || newText == "-")
+            {
+                e.Handled = false;
+                return;
+            }
+            
+            // Check if it's a valid integer between -9 and 9
+            if (int.TryParse(newText, out int value))
+            {
+                e.Handled = value < -9 || value > 9;
+            }
+            else
+            {
+                e.Handled = true;
+            }
+        }
+
+        private void SamplingFactor_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            var textBox = sender as TextBox;
+            if (textBox == null) return;
+            
+            // Validate and clamp the value when text changes
+            if (int.TryParse(textBox.Text, out int value))
+            {
+                var clampedValue = Math.Max(-9, Math.Min(9, value));
+                if (value != clampedValue)
+                {
+                    textBox.Text = clampedValue.ToString();
+                    textBox.SelectionStart = textBox.Text.Length; // Move cursor to end
+                }
+            }
+            else if (!string.IsNullOrEmpty(textBox.Text) && textBox.Text != "-")
+            {
+                // Invalid input, reset to 0
+                textBox.Text = "0";
+                textBox.SelectionStart = textBox.Text.Length;
+            }
+        }
+
+        private void Button_SamplingUp_Click(object sender, RoutedEventArgs e)
+        {
+            if (ViewModel != null && ViewModel.UpDownSampling < 9)
+            {
+                ViewModel.UpDownSampling++;
+            }
+        }
+
+        private void Button_SamplingDown_Click(object sender, RoutedEventArgs e)
+        {
+            if (ViewModel != null && ViewModel.UpDownSampling > -9)
+            {
+                ViewModel.UpDownSampling--;
+            }
         }
     }
 }

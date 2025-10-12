@@ -267,6 +267,7 @@
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
                 <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
             <!-- Custom title bar -->
             <Grid Grid.Row="0" Background="{DynamicResource PlotSettings_TitleBarBrush}" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
@@ -450,6 +451,7 @@
                                     <ComboBoxItem Content="Mixed Signals"/>
                                     <ComboBoxItem Content="Chirp Signal"/>
                                     <ComboBoxItem Content="Tones"/>
+                                    <ComboBoxItem Content="sin(x)/x"/>
                                 </ComboBox>
                             </StackPanel>
                             
@@ -531,8 +533,9 @@
                     </TabItem>
                 </TabControl>
             </DockPanel>
+            
             <!-- Buttons -->
-            <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="20,10,20,20">
+            <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right" Margin="20,10,20,20">
                 <Button Content="Connect" Width="75" Margin="0,0,10,0" Click="Button_Connect_Click"/>
                 <Button Content="Cancel" Width="75" Click="Button_Cancel_Click"/>
             </StackPanel>

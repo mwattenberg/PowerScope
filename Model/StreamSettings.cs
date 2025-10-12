@@ -69,6 +69,7 @@ namespace PowerScope.Model
         private string _frameStart; // for CustomFrame
         private int _demoSampleRate; // for Demo mode
         private string _demoSignalType; // for Demo mode
+        private int _upDownSampling; // for UP/down sampling factor
         
         // File-related properties
         private string _filePath;
@@ -96,6 +97,9 @@ namespace PowerScope.Model
             // Demo defaults
             DemoSampleRate = 1000; // Keep for demo mode
             DemoSignalType = "Sine Wave"; // Keep for demo mode
+            
+            // Sampling defaults
+            UpDownSampling = 0; // Default to no sampling change
             
             // File defaults
             FileSampleRate = 1000.0;
@@ -310,6 +314,21 @@ namespace PowerScope.Model
             {
                 _demoSignalType = value;
                 OnPropertyChanged(nameof(DemoSignalType));
+            }
+        }
+
+        public int UpDownSampling
+        {
+            get { return _upDownSampling; }
+            set
+            {
+                // Clamp value between -9 and 9
+                var clampedValue = Math.Max(-9, Math.Min(9, value));
+                if (_upDownSampling != clampedValue)
+                {
+                    _upDownSampling = clampedValue;
+                    OnPropertyChanged(nameof(UpDownSampling));
+                }
             }
         }
 
