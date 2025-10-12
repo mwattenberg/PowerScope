@@ -47,7 +47,7 @@ namespace PowerScope.Model
         }
     }
 
-    public class SerialDataStream : IDataStream, IChannelConfigurable, IBufferResizable
+    public class SerialDataStream : IDataStream, IChannelConfigurable, IBufferResizable, IUpDownSampling
     {
         private readonly SerialPort _port;
         private byte[] _residue;
@@ -68,6 +68,9 @@ namespace PowerScope.Model
         // Exponential low pass filter parameters for sample rate smoothing
         private const double DefaultFilterAlpha = 0.1; // Default smoothing factor (0.1 = heavy smoothing, 0.9 = light smoothing)
         private double _sampleRateFilterAlpha = DefaultFilterAlpha;
+
+        // Up/Down sampling
+        private readonly UpDownSampling _upDownSampling;
 
         public SourceSetting SourceSetting { get; init; }
         public long TotalSamples { get; private set; }
@@ -100,6 +103,7 @@ namespace PowerScope.Model
         /// <summary>
         /// Sample rate of the serial data stream in samples per second (Hz)
         /// Calculated dynamically based on received data rate with exponential low pass filtering
+        /// When up/down sampling is enabled, this reflects the final sample rate after processing
         /// </summary>
         public double SampleRate 
         { 
@@ -107,7 +111,15 @@ namespace PowerScope.Model
             { 
                 lock (_sampleRateCalculationLock)
                 {
-                    return _calculatedSampleRate;
+                    double baseSampleRate = _calculatedSampleRate;
+                    
+                    // Apply up/down sampling multiplier if enabled
+                    if (_upDownSampling.IsEnabled)
+                    {
+                        return baseSampleRate * _upDownSampling.SampleRateMultiplier;
+                    }
+                    
+                    return baseSampleRate;
                 }
             } 
         }
@@ -185,6 +197,11 @@ namespace PowerScope.Model
             SourceSetting = source;
             Parser = dataParser;
             ValidatePortExists(source.PortName);
+            
+            // Initialize up/down sampling
+            _upDownSampling = new UpDownSampling();
+            _upDownSampling.PropertyChanged += OnUpDownSamplingPropertyChanged;
+            
             _port = new SerialPort(source.PortName)
             {
                 ReadBufferSize = 4096,
@@ -225,6 +242,22 @@ namespace PowerScope.Model
             StatusMessage = "Disconnected";
         }
 
+        private void OnUpDownSamplingPropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            // Forward up/down sampling property change notifications
+            if (e.PropertyName == nameof(UpDownSampling.SamplingFactor))
+            {
+                OnPropertyChanged(nameof(UpDownSamplingFactor));
+                OnPropertyChanged(nameof(SampleRateMultiplier));
+                OnPropertyChanged(nameof(IsUpDownSamplingEnabled));
+                OnPropertyChanged(nameof(UpDownSamplingDescription));
+                OnPropertyChanged(nameof(SampleRate));
+                
+                // Reinitialize for new sampling factor
+                _upDownSampling.InitializeChannels(ChannelCount);
+            }
+        }
+        
         #region IChannelConfigurable Implementation
 
         public void SetChannelSetting(int channelIndex, ChannelSettings settings)
@@ -473,6 +506,10 @@ namespace PowerScope.Model
             // Reset filters when starting streaming
             ResetChannelFilters();
             
+            // Initialize up/down sampling for current channel configuration
+            _upDownSampling.InitializeChannels(ChannelCount);
+            _upDownSampling.Reset();
+            
             if ( _readSerialPortThread != null && _readSerialPortThread.IsAlive)
             {
                 IsStreaming = false;
@@ -544,8 +581,9 @@ namespace PowerScope.Model
                 _totalSamplesAtLastCalculation = 0;
             }
             
-            // Reset filters when clearing data
+            // Reset filters and up/down sampling when clearing data
             ResetChannelFilters();
+            _upDownSampling?.Reset();
         }
 
         private void ReadSerialData()
@@ -756,16 +794,54 @@ namespace PowerScope.Model
                     for (int sample = 0; sample < parsedData[channel].Length; sample++)
                     {
                         processedSamples[sample] = ApplyChannelProcessing(channel, parsedData[channel][sample]);
+                        
+                        // Safety check for invalid values
+                        if (!double.IsFinite(processedSamples[sample]))
+                        {
+                            processedSamples[sample] = 0.0; // Replace NaN/Infinity with zero
+                        }
                     }
                     
-                    // Add processed data to ring buffer
-                    ReceivedData[channel].AddRange(processedSamples);
+                    // Apply up/down sampling if enabled
+                    double[] finalSamples = processedSamples;
+                    if (_upDownSampling.IsEnabled)
+                    {
+                        try
+                        {
+                            finalSamples = _upDownSampling.ProcessChannelData(channel, processedSamples);
+                            
+                            // Safety check for up/down sampled data
+                            for (int i = 0; i < finalSamples.Length; i++)
+                            {
+                                if (!double.IsFinite(finalSamples[i]))
+                                {
+                                    finalSamples[i] = 0.0; // Replace NaN/Infinity with zero
+                                }
+                            }
+                        }
+                        catch (Exception)
+                        {
+                            // If up/down sampling fails, fall back to processed samples
+                            finalSamples = processedSamples;
+                        }
+                    }
+                    
+                    // Add final data to ring buffer
+                    ReceivedData[channel].AddRange(finalSamples);
                 }
             }
             
             if (channelsToProcess > 0 && parsedData[0] != null)
             {
                 int newSamples = parsedData[0].Length;
+                
+                // Calculate final sample count after up/down sampling
+                if (_upDownSampling.IsEnabled)
+                {
+                    // Apply up/down sampling multiplier to get final sample count
+                    newSamples = (int)Math.Round(newSamples * _upDownSampling.SampleRateMultiplier);
+                }
+                
                 TotalSamples += newSamples;
                 
                 // Update sample rate calculation
@@ -839,6 +915,13 @@ namespace PowerScope.Model
                         ringBuffer.Clear();
                 }
             }
+            
+            // Unsubscribe from up/down sampling events
+            if (_upDownSampling != null)
+            {
+                _upDownSampling.PropertyChanged -= OnUpDownSamplingPropertyChanged;
+            }
+            
             _residue = null;
             _disposed = true;
             GC.SuppressFinalize(this);
@@ -847,6 +930,68 @@ namespace PowerScope.Model
         void IDataStream.clearData()
         {
             clearData();
+        }
+
+        #region IUpDownSampling Implementation
+
+        public int UpDownSamplingFactor
+        {
+            get { return _upDownSampling.SamplingFactor; }
+            set { _upDownSampling.SamplingFactor = value; }
+        }
+
+        public double SampleRateMultiplier
+        {
+            get { return _upDownSampling.SampleRateMultiplier; }
+        }
+
+        public bool IsUpDownSamplingEnabled
+        {
+            get { return _upDownSampling.IsEnabled; }
+        }
+
+        public string UpDownSamplingDescription
+        {
+            get { return _upDownSampling.GetDescription(); }
+        }
+
+        #endregion
+
+        private double[] ProcessForUpSampling(double[] input, int targetSampleRate)
+        {
+            // Simple repetition method for up-sampling
+            double[] output = new double[input.Length * targetSampleRate];
+            for (int i = 0; i < input.Length; i++)
+            {
+                for (int j = 0; j < targetSampleRate; j++)
+                {
+                    output[i * targetSampleRate + j] = input[i];
+                }
+            }
+            return output;
+        }
+
+        private double[] ProcessForDownSampling(double[] input, int targetSampleRate)
+        {
+            // Simple averaging method for down-sampling
+            int stride = (int)Math.Round((double)SourceSetting.BaudRate / targetSampleRate);
+            double[] output = new double[input.Length / stride];
+            for (int i = 0; i < output.Length; i++)
+            {
+                double sum = 0;
+                for (int j = 0; j < stride; j++)
+                {
+                    sum += input[i * stride + j];
+                }
+                output[i] = sum / stride;
+            }
+            return output;
+        }
+
+        private double[] ProcessForNoChange(double[] input)
+        {
+            // No change to the data
+            return input;
         }
     }
 

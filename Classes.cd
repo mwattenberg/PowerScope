@@ -1,5 +1,8 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <ClassDiagram MajorVersion="1" MinorVersion="1">
+  <Comment CommentText="DataStreamBar creates the data stream based on the view model (Stream settings) and add it to the UI">
+    <Position X="16.216" Y="6.252" Height="0.75" Width="2.843" />
+  </Comment>
   <Class Name="PowerScope.MainWindow">
     <Position X="0.5" Y="12.25" Width="2.75" />
     <TypeIdentifier>
@@ -88,7 +91,7 @@
   <Class Name="PowerScope.Model.DemoDataStream">
     <Position X="30.25" Y="6.75" Width="1.5" />
     <TypeIdentifier>
-      <HashCode>BBSBgQAAACAMAABgOuAAAYCggCAAASAAAAGAAJCCF4E=</HashCode>
+      <HashCode>BBSFgUAAACAMAABgOuCAAYDggCAAESAAgAGAAJCCF4k=</HashCode>
       <FileName>Model\DemoDataStream.cs</FileName>
     </TypeIdentifier>
     <Lollipop Position="0.2" />
@@ -169,7 +172,7 @@
     <Lollipop Position="0.2" />
   </Class>
   <Class Name="PowerScope.View.UserControls.DataStreamBar">
-    <Position X="20" Y="6" Width="1.5" />
+    <Position X="20" Y="6" Width="4.75" />
     <TypeIdentifier>
       <HashCode>QAIEAAAAECIoAIAAIAAAQAAAgACAAAABEBAAAACAEAA=</HashCode>
       <FileName>View\UserControls\DataStreamBar.xaml.cs</FileName>
@@ -182,7 +185,7 @@
   <Class Name="PowerScope.Model.PlotSettings">
     <Position X="10.5" Y="19.75" Width="1.5" />
     <TypeIdentifier>
-      <HashCode>QAJQACAECHAAABAACQAGAAIgEASAAAAAAAAkABAECQA=</HashCode>
+      <HashCode>QAJQACAECGAAABAAKQAGAAIgkASAAAAAAAAkABAECQA=</HashCode>
       <FileName>Model\PlotSettings.cs</FileName>
     </TypeIdentifier>
     <Lollipop Position="0.2" />

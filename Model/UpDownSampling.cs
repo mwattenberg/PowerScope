@@ -162,7 +162,8 @@ namespace PowerScope.Model
                 if (_samplingFactor > 0) // Upsampling
                 {
                     // For upsampling, we need to keep a tail of previous data to ensure continuity
-                    int tailLength = SincKernelHalfLength; // Keep enough samples for smooth transition
+                    // Use kernel half length + 1 to ensure proper overlap for all kernel coefficients
+                    int tailLength = SincKernelHalfLength + 1; // Keep enough samples for smooth transition
                     _upsamplingStates = new ChannelUpsamplingState[numberOfChannels];
                     for (int i = 0; i < numberOfChannels; i++)
                     {
@@ -301,7 +302,7 @@ namespace PowerScope.Model
         /// </summary>
         private void GenerateSincKernel()
         {
-            int kernelLength = 2 * SincKernelHalfLength + 1;
+            int kernelLength = 2 * SincKernelHalfLength;
             _sincKernel = new double[kernelLength];
 
             // Use cutoff frequency based on the actual interpolation factor

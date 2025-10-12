@@ -47,7 +47,7 @@ namespace PowerScope.Model
         }
     }
 
-    public class SerialDataStream : IDataStream, IChannelConfigurable, IBufferResizable
+    public class SerialDataStream : IDataStream, IChannelConfigurable, IBufferResizable, IUpDownSampling
     {
         private readonly SerialPort _port;
         private byte[] _residue;
@@ -74,6 +74,9 @@ namespace PowerScope.Model
         private double[] _sincKernel;
         private const int SincKernelHalfLength = 32; // Half-length of the sinc kernel (total length will be 2*32+1 = 65)
         private bool _sincInterpolationEnabled = true;
+
+        // Up/Down sampling
+        private readonly UpDownSampling _upDownSampling;
 
         public SourceSetting SourceSetting { get; init; }
         public long TotalSamples { get; private set; }
@@ -130,6 +133,7 @@ namespace PowerScope.Model
         /// Sample rate of the serial data stream in samples per second (Hz)
         /// Calculated dynamically based on received data rate with exponential low pass filtering
         /// When sinc interpolation is enabled, this reflects the interpolated sample rate (5x higher)
+        /// When up/down sampling is enabled, this reflects the final sample rate after all processing
         /// </summary>
         public double SampleRate
         {
@@ -137,29 +141,43 @@ namespace PowerScope.Model
             {
                 lock (_sampleRateCalculationLock)
                 {
-                    return _calculatedSampleRate;
+                    double baseSampleRate = _calculatedSampleRate;
+                    
+                    // Apply up/down sampling multiplier if enabled
+                    if (_upDownSampling.IsEnabled)
+                    {
+                        return baseSampleRate * _upDownSampling.SampleRateMultiplier;
+                    }
+                    
+                    return baseSampleRate;
                 }
             }
         }
 
-        /// <summary>
-        /// Gets the underlying hardware sample rate (before interpolation)
-        /// This is useful for debugging and understanding the actual data acquisition rate
-        /// </summary>
-        public double HardwareSampleRate
+        #region IUpDownSampling Implementation
+
+        public int UpDownSamplingFactor
         {
-            get
-            {
-                lock (_sampleRateCalculationLock)
-                {
-                    if (_sincInterpolationEnabled && _calculatedSampleRate > 0)
-                    {
-                        return _calculatedSampleRate / InterpolationFactor;
-                    }
-                    return _calculatedSampleRate;
-                }
-            }
+            get { return _upDownSampling.SamplingFactor; }
+            set { _upDownSampling.SamplingFactor = value; }
         }
+
+        public double SampleRateMultiplier
+        {
+            get { return _upDownSampling.SampleRateMultiplier; }
+        }
+
+        public bool IsUpDownSamplingEnabled
+        {
+            get { return _upDownSampling.IsEnabled; }
+        }
+
+        public string UpDownSamplingDescription
+        {
+            get { return _upDownSampling.GetDescription(); }
+        }
+
+        #endregion
 
         /// <summary>
         /// Gets or sets the exponential low pass filter alpha value for sample rate smoothing
@@ -234,6 +252,11 @@ namespace PowerScope.Model
             SourceSetting = source;
             Parser = dataParser;
             ValidatePortExists(source.PortName);
+            
+            // Initialize up/down sampling
+            _upDownSampling = new UpDownSampling();
+            _upDownSampling.PropertyChanged += OnUpDownSamplingPropertyChanged;
+            
             _port = new SerialPort(source.PortName)
             {
                 ReadBufferSize = 4096,
@@ -275,6 +298,22 @@ namespace PowerScope.Model
 
             // Generate initial sinc kernel
             GenerateSincKernel();
+        }
+
+        private void OnUpDownSamplingPropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            // Forward up/down sampling property change notifications
+            if (e.PropertyName == nameof(UpDownSampling.SamplingFactor))
+            {
+                OnPropertyChanged(nameof(UpDownSamplingFactor));
+                OnPropertyChanged(nameof(SampleRateMultiplier));
+                OnPropertyChanged(nameof(IsUpDownSamplingEnabled));
+                OnPropertyChanged(nameof(UpDownSamplingDescription));
+                OnPropertyChanged(nameof(SampleRate));
+                
+                // Reinitialize for new sampling factor
+                _upDownSampling.InitializeChannels(ChannelCount);
+            }
         }
 
         #region Sinc Interpolation
@@ -639,6 +678,10 @@ namespace PowerScope.Model
 
             // Reset filters when starting streaming
             ResetChannelFilters();
+            
+            // Initialize up/down sampling for current channel configuration
+            _upDownSampling.InitializeChannels(ChannelCount);
+            _upDownSampling.Reset();
 
             if (_readSerialPortThread != null && _readSerialPortThread.IsAlive)
             {
@@ -711,8 +754,9 @@ namespace PowerScope.Model
                 _totalSamplesAtLastCalculation = 0;
             }
 
-            // Reset filters when clearing data
+            // Reset filters and up/down sampling when clearing data
             ResetChannelFilters();
+            _upDownSampling?.Reset();
         }
 
         private void ReadSerialData()
@@ -931,28 +975,52 @@ namespace PowerScope.Model
                         }
                     }
 
-                    // Apply sinc interpolation if enabled
-                    double[] finalSamples = processedSamples;
+                    // Apply sinc interpolation if enabled (first stage processing)
+                    double[] sincProcessedSamples = processedSamples;
                     if (_sincInterpolationEnabled)
                     {
-                        //try
-                        //{
-                        finalSamples = SincInterpolation(processedSamples);
-
-                        // Additional safety check for interpolated data
-                        for (int i = 0; i < finalSamples.Length; i++)
+                        try
                         {
-                            if (!double.IsFinite(finalSamples[i]))
+                            sincProcessedSamples = SincInterpolation(processedSamples);
+
+                            // Additional safety check for interpolated data
+                            for (int i = 0; i < sincProcessedSamples.Length; i++)
                             {
-                                finalSamples[i] = 0.0; // Replace NaN/Infinity with zero
+                                if (!double.IsFinite(sincProcessedSamples[i]))
+                                {
+                                    sincProcessedSamples[i] = 0.0; // Replace NaN/Infinity with zero
+                                }
                             }
                         }
-                        //}
-                        //catch (Exception)
-                        //{
-                        //    // If interpolation fails, fall back to original processed samples
-                        //    finalSamples = processedSamples;
-                        //}
+                        catch (Exception)
+                        {
+                            // If sinc interpolation fails, fall back to original processed samples
+                            sincProcessedSamples = processedSamples;
+                        }
+                    }
+
+                    // Apply up/down sampling if enabled (second stage processing)
+                    double[] finalSamples = sincProcessedSamples;
+                    if (_upDownSampling.IsEnabled)
+                    {
+                        try
+                        {
+                            finalSamples = _upDownSampling.ProcessChannelData(channel, sincProcessedSamples);
+                            
+                            // Safety check for up/down sampled data
+                            for (int i = 0; i < finalSamples.Length; i++)
+                            {
+                                if (!double.IsFinite(finalSamples[i]))
+                                {
+                                    finalSamples[i] = 0.0; // Replace NaN/Infinity with zero
+                                }
+                            }
+                        }
+                        catch (Exception)
+                        {
+                            // If up/down sampling fails, fall back to sinc processed samples
+                            finalSamples = sincProcessedSamples;
+                        }
                     }
 
                     // Add final data to ring buffer
@@ -963,10 +1031,17 @@ namespace PowerScope.Model
             if (channelsToProcess > 0 && parsedData[0] != null)
             {
                 int newSamples = parsedData[0].Length;
-                // If sinc interpolation is enabled, multiply by interpolation factor for sample count
+                
+                // Calculate final sample count after all processing stages
                 if (_sincInterpolationEnabled)
                 {
                     newSamples *= InterpolationFactor;
+                }
+                
+                if (_upDownSampling.IsEnabled)
+                {
+                    // Apply up/down sampling multiplier to get final sample count
+                    newSamples = (int)Math.Round(newSamples * _upDownSampling.SampleRateMultiplier);
                 }
 
                 TotalSamples += newSamples;
@@ -1048,6 +1123,13 @@ namespace PowerScope.Model
                         ringBuffer.Clear();
                 }
             }
+            
+            // Unsubscribe from up/down sampling events
+            if (_upDownSampling != null)
+            {
+                _upDownSampling.PropertyChanged -= OnUpDownSamplingPropertyChanged;
+            }
+            
             _residue = null;
             _disposed = true;
             GC.SuppressFinalize(this);
