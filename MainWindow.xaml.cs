@@ -281,21 +281,33 @@ namespace PowerScope
         {
             try
             {
-                // Create StreamSettings configured for File mode
-                var settings = new StreamSettings();
-                settings.StreamSource = StreamSource.File;
-                
-                // Show the stream configuration window starting with the File tab
-                var configWindow = new SerialConfigWindow(settings);
-                if (configWindow.ShowDialog() == true)
+                // Show file dialog immediately
+                OpenFileDialog openFileDialog = new OpenFileDialog
                 {
-                    // Create and connect the file data stream
-                    var fileStream = DataStreamBar.CreateDataStreamFromUserInput(settings);
+                    Filter = "CSV files (*.csv)|*.csv|Text files (*.txt)|*.txt|All files (*.*)|*.*",
+                    DefaultExt = "csv",
+                    Title = "Select Data File to Load"
+                };
+
+                if (openFileDialog.ShowDialog() == true)
+                {
+                    // Create FileDataStream directly
+                    var fileStream = new FileDataStream(openFileDialog.FileName, loopPlayback: true);
+                    
+                    // Connect and start streaming
                     fileStream.Connect();
                     fileStream.StartStreaming();
                     
                     // Add channels for the file stream
                     DataStreamBar.AddChannelsForStream(fileStream);
+                    
+                    // Create StreamSettings for the UI panel
+                    var settings = new StreamSettings
+                    {
+                        StreamSource = StreamSource.File,
+                        FilePath = openFileDialog.FileName,
+                        FileLoopPlayback = true
+                    };
                     
                     // Add UI panel for the stream
                     DataStreamBar.AddStreamInfoPanel(settings, fileStream);

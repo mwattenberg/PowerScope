@@ -231,14 +231,8 @@ namespace PowerScope.View.UserControls
                     return audioStream;
                     
                 case StreamSource.File:
-                    FileSettings fileSettings = new FileSettings(
-                        filePath: vm.FilePath,
-                        sampleRate: vm.FileSampleRate,
-                        loopPlayback: vm.FileLoopPlayback,
-                        hasHeader: vm.FileHasHeader,
-                        delimiter: vm.FileDelimiter
-                    );
-                    FileDataStream fileStream = new FileDataStream(fileSettings);
+                    // Use the simplified FileDataStream constructor
+                    FileDataStream fileStream = new FileDataStream(vm.FilePath, vm.FileLoopPlayback);
                     return fileStream;
                     
                 case StreamSource.SerialPort:
@@ -254,7 +248,7 @@ namespace PowerScope.View.UserControls
                         NumberTypeEnum.Uint16 => DataParser.BinaryFormat.uint16_t,
                         NumberTypeEnum.Int32 => DataParser.BinaryFormat.int32_t,
                         NumberTypeEnum.Uint32 => DataParser.BinaryFormat.uint32_t,
-                        NumberTypeEnum.Float => DataParser.BinaryFormat.float_t,
+                        NumberTypeEnum.Float32 => DataParser.BinaryFormat.float_t,
                         _ => DataParser.BinaryFormat.uint16_t // Default fallback
                     };
                     

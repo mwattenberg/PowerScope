@@ -193,13 +193,17 @@
                          Style="{StaticResource GainOffsetInputStyle}" 
                          Margin="2,0,1,2"
                          PreviewTextInput="SignedDecimalOnly_PreviewTextInput"
-                         KeyDown="GainOffset_KeyDown" ToolTip="Use + / - for fine adjustment"/> 
+                         KeyDown="GainOffset_KeyDown" 
+                         MouseWheel="GainOffset_MouseWheel"
+                         ToolTip="Mouse wheel adjustment: Normal (1%) | Ctrl (10%) | Alt (0.1%)"/> 
                 <TextBox x:Name="GainTextBox" Grid.Column="1" Grid.Row="1" 
                          Text="{Binding Gain, Converter={StaticResource ExponentialNotationConverter}, UpdateSourceTrigger=LostFocus}" 
                          Style="{StaticResource GainOffsetInputStyle}" 
                          Margin="1,0,2,2"
                          PreviewTextInput="SignedDecimalOnly_PreviewTextInput"
-                         KeyDown="GainOffset_KeyDown" ToolTip="Use + / - for fine adjustment"/>
+                         KeyDown="GainOffset_KeyDown" 
+                         MouseWheel="GainOffset_MouseWheel"
+                         ToolTip="Mouse wheel adjustment: Normal (1%) | Ctrl (10%) | Alt (0.1%)"/>
             </Grid>
         </Border>
         <!-- Filters button -->

@@ -34,13 +34,8 @@ namespace PowerScope.Model
         private readonly int _maxChannels;
         private ObservableCollection<Channel> _channels;
 
-        // Recording functionality - simple tracking using TotalSamples
-        private bool _isRecording = false;
-        private string _recordingFilePath = "";
-        private StreamWriter _recordingWriter = null;
-        private readonly object _recordingLock = new object();
-        private long _recordingSampleCount = 0;
-        private long _lastRecordedSampleCount = 0;
+        // Recording functionality is now encapsulated in PlotFileWriter
+        private readonly PlotFileWriter _fileWriter;
 
         //We need the DPI to scale the cursor correctly
         //The implementation is a bit hacky and it should have already been fixed
@@ -70,7 +65,10 @@ namespace PowerScope.Model
         /// <summary>
         /// The cursor instance owned by this PlotManager
         /// </summary>
-        public Cursor Cursor => _cursor;
+        public Cursor Cursor
+        {
+            get { return _cursor; }
+        }
 
         /// <summary>
         /// Whether cursors are currently active
@@ -104,26 +102,21 @@ namespace PowerScope.Model
         /// </summary>
         public bool IsRecording 
         { 
-            get => _isRecording;
-            private set
+            get 
             {
-                if (_isRecording != value)
-                {
-                    _isRecording = value;
-                    OnPropertyChanged(nameof(IsRecording));
-                }
+                return _fileWriter.IsRecording;
             }
         }
 
         /// <summary>
         /// Current recording file path
         /// </summary>
-        public string RecordingFilePath => _recordingFilePath;
+        public string RecordingFilePath => _fileWriter?.RecordingFilePath ?? string.Empty;
 
         /// <summary>
         /// Number of samples recorded so far
         /// </summary>
-        public long RecordingSampleCount => _recordingSampleCount;
+        public long RecordingSampleCount => _fileWriter?.RecordingSampleCount ?? 0;
 
         public PlotManager(WpfPlotGL wpfPlot, int maxChannels = 16)
         {                
@@ -150,6 +143,10 @@ namespace PowerScope.Model
             HasActiveCursors = false;
 
              _dpi = VisualTreeHelper.GetDpi(Plot); // Ensure proper DPI scaling for WPF
+
+            // Initialize file writer
+            _fileWriter = new PlotFileWriter();
+            _fileWriter.Channels = _channels;
         }
 
         /// <summary>
@@ -428,6 +425,12 @@ namespace PowerScope.Model
             // Update cursor channel data automatically
             _cursor.UpdateChannelData(_channels);
 
+            // Update writer channels
+            if (_fileWriter != null)
+            {
+                _fileWriter.Channels = _channels;
+            }
+
             // Update the display
             UpdateChannelDisplay();
         }
@@ -470,27 +473,10 @@ namespace PowerScope.Model
             if (IsRecording)
                 return false;
 
-            try
-            {
-                lock (_recordingLock)
-                {
-                    _recordingFilePath = filePath;
-                    _recordingWriter = new StreamWriter(filePath);
-                    
-                    // Write CSV header with channel labels and sample rate info
-                    WriteRecordingHeader();
-                    _recordingWriter.Flush();
-                    _recordingSampleCount = 0;
-                    IsRecording = true;
-                }
-                
-                return true;
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Failed to start recording: {ex.Message}");
-                return false;
-            }
+            // update sample rate on writer
+            _fileWriter.SampleRate = GetCurrentSampleRate();
+            _fileWriter.Channels = _channels;
+            return _fileWriter.StartRecording(filePath);
         }
 
         /// <summary>
@@ -501,119 +487,7 @@ namespace PowerScope.Model
             if (!IsRecording)
                 return;
                 
-            lock (_recordingLock)
-            {
-                try
-                {
-                    _recordingWriter?.Flush();
-                    _recordingWriter?.Close();
-                    _recordingWriter?.Dispose();
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"Error stopping recording: {ex.Message}");
-                }
-                finally
-                {
-                    _recordingWriter = null;
-                    IsRecording = false;
-                    _recordingFilePath = "";
-                }
-            }
-        }
-
-        private void WriteRecordingHeader()
-        {
-            if (_recordingWriter == null || _channels == null)
-                return;
-
-            var headerParts = new List<string>();
-            
-            // Add metadata as comments with version information
-            _recordingWriter.WriteLine($"# PowerScope Version: {StreamSettings.CURRENT_VERSION}");
-            double sampleRate = GetCurrentSampleRate();
-            _recordingWriter.WriteLine($"# Sample Rate (Hz): {sampleRate.ToString(System.Globalization.CultureInfo.InvariantCulture)}");
-            _recordingWriter.WriteLine($"# Recording Started: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-            _recordingWriter.WriteLine($"# Total Channels: {_channels.Count}");
-            _recordingWriter.WriteLine($"# Data Format: Raw values only, samples are sequential and equally spaced");
-            
-            // Write channel information for all channels
-            _recordingWriter.WriteLine("# Channel Information:");
-            foreach (var channel in _channels)
-            {
-                _recordingWriter.WriteLine($"# {channel.Label}: Stream={channel.StreamType}, Index={channel.LocalChannelIndex}");
-            }
-            _recordingWriter.WriteLine("#");
-            
-            // Write CSV header - just channel labels for all channels
-            foreach (var channel in _channels)
-            {
-                headerParts.Add(channel.Label);
-            }
-            
-            _recordingWriter.WriteLine(string.Join(",", headerParts));
-        }
-
-        private void WriteRecordingData()
-        {
-            if (!IsRecording || _recordingWriter == null || _channels == null || _channels.Count == 0)
-                return;
-                
-            lock (_recordingLock)
-            {
-                try
-                {
-                    // Get the current sample count from the first stream
-                    // (assuming all channels from the same stream have the same sample count)
-                    var firstStream = _channels[0].OwnerStream;
-                    if (firstStream == null)
-                        return;
-                        
-                    long currentSampleCount = firstStream.TotalSamples;
-                    long newSamplesCount = currentSampleCount - _lastRecordedSampleCount;
-                    
-                    // If no new samples, return early
-                    if (newSamplesCount <= 0)
-                        return;
-
-                    // Create buffers for each channel to hold the new samples
-                    var channelBuffers = new double[_channels.Count][];
-                    for (int i = 0; i < _channels.Count; i++)
-                    {
-                        channelBuffers[i] = new double[newSamplesCount];
-                    }
-
-                    // Get the new samples from each channel
-                    for (int channelIndex = 0; channelIndex < _channels.Count; channelIndex++)
-                    {
-                        var channel = _channels[channelIndex];
-                        channel.CopyLatestDataTo(channelBuffers[channelIndex], (int)newSamplesCount);
-                    }
-                    
-                    // Write all new samples - one row per sample
-                    for (int sampleIndex = 0; sampleIndex < newSamplesCount; sampleIndex++)
-                    {
-                        var dataParts = new List<string>();
-                        
-                        // Add data for all channels at this sample index
-                        for (int channelIndex = 0; channelIndex < _channels.Count; channelIndex++)
-                        {
-                            double value = channelBuffers[channelIndex][sampleIndex];
-                            dataParts.Add(value.ToString("F6", System.Globalization.CultureInfo.InvariantCulture));
-                        }
-                        
-                        _recordingWriter.WriteLine(string.Join(",", dataParts));
-                        _recordingSampleCount++;
-                    }
-                    
-                    // Update the last recorded sample count
-                    _lastRecordedSampleCount = currentSampleCount;
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"Error writing recording data: {ex.Message}");
-                }
-            }
+            _fileWriter.StopRecording();
         }
 
         private void OnSettingsChanged(object sender, PropertyChangedEventArgs e)
@@ -789,10 +663,9 @@ namespace PowerScope.Model
             CopyChannelDataToPlot();
             
             // Record data if recording is active
-            if (IsRecording)
+            if (_fileWriter != null && _fileWriter.IsRecording)
             {
-                WriteRecordingData();
-                _recordingWriter.Flush();
+                _fileWriter.WritePendingSamples();
             }
 
             if (Settings.YAutoScale)
@@ -1002,6 +875,9 @@ namespace PowerScope.Model
                 {
                     Settings.PropertyChanged -= OnSettingsChanged;
                 }
+
+                // Dispose writer
+                _fileWriter?.Dispose();
             }
         }
 

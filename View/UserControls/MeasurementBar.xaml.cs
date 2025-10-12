@@ -18,7 +18,6 @@ namespace PowerScope.View.UserControls
     /// </summary>
     public partial class MeasurementBar : UserControl, IDisposable
     {
-        private ChannelControlBar _channelControlBar;
         
         // Self-managed timer for measurement updates
         private readonly DispatcherTimer _measurementTimer;
@@ -28,9 +27,6 @@ namespace PowerScope.View.UserControls
         /// Whether measurement updates are currently running
         /// </summary>
         public bool IsRunning { get; private set; }
-
-        // PlotManager dependency - now for both plot access and cursor management
-        private PlotManager _plotManager;
         public PlotManager PlotManager
         {
             get { return _plotManager; }

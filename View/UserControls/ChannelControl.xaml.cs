@@ -1,6 +1,7 @@
 ﻿using System;
 using System.ComponentModel;
 using System.Globalization;
+using System.Linq;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
@@ -150,66 +151,159 @@ namespace PowerScope.View.UserControls
                 bindingExpression?.UpdateSource();
                 e.Handled = true;
             }
-
-            if (e.Key != Key.Add && e.Key != Key.Subtract)
-                return;
-
-                // Increment/decrement the first decimal place (0.1 increments)
-                double currentValue = 0.0;
-                bool isGainTextBox = textBox.Name == "GainTextBox";
-
-                // Get current value from the bound property (more reliable than parsing text)
-                if (isGainTextBox)
-                {
-                    if (e.Key == Key.Add)
-                    {
-                        if(Settings.Gain == 0.0)
-                            Settings.Gain = 0.01; // Avoid zero gain
-                        else
-                            Settings.Gain = Settings.Gain * 1.01;
-                    }
-                    else
-                    {
-                        if (Settings.Gain == 0.0)
-                            Settings.Gain = 0.01; // Avoid zero gain
-                        else
-                            Settings.Gain = Settings.Gain * 0.99;
-                    }
-                }
-                else // OffsetTextBox
-                {
-                    if (e.Key == Key.Add)
-                    {
-                        if (Settings.Offset == 0.0)
-                            Settings.Offset = 0.01; // Avoid zero gain
-                        else
-                            Settings.Offset = Settings.Offset * 1.01;
-                    }
-                    else
-                    {
-                        if (Settings.Offset == 0.0)
-                            Settings.Offset = 0.01; // Avoid zero gain
-                        else
-                            Settings.Offset = Settings.Offset * 0.99;
-                    }
-                }
-
-                e.Handled = true;
-           
         }
 
+        /// <summary>
+        /// Handles mouse wheel events for gain and offset textboxes
+        /// </summary>
+        private void GainOffset_MouseWheel(object sender, MouseWheelEventArgs e)
+        {
+            var textBox = sender as TextBox;
+            if (textBox == null || Settings == null) return;
+            
+            // Only respond to mouse wheel when the textbox has focus or mouse is over it
+            if (!textBox.IsFocused && !textBox.IsMouseOver)
+                return;
+
+            // Positive Delta means wheel up (increase), negative means wheel down (decrease)
+            bool increase;
+            
+            // Parse the current textbox value with culture invariance
+            if (double.TryParse(textBox.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out double currentValue))
+            {
+                if (currentValue > 0)
+                {
+                    increase = e.Delta > 0;
+                }
+                else
+                {
+                    increase = e.Delta < 0;
+                }
+            }
+            else
+            {
+                // If parsing fails, fall back to normal behavior
+                increase = e.Delta > 0;
+            }
+
+            // Check for modifier keys to determine increment size
+            bool ctrlPressed = Keyboard.IsKeyDown(Key.LeftCtrl) || Keyboard.IsKeyDown(Key.RightCtrl);
+            bool altPressed = Keyboard.IsKeyDown(Key.LeftAlt) || Keyboard.IsKeyDown(Key.RightAlt);
+            
+            AdjustValue(textBox, increase, ctrlPressed, altPressed);
+            e.Handled = true;
+        }
+
+        /// <summary>
+        /// Common method to adjust gain or offset values
+        /// </summary>
+        /// <param name="textBox">The textbox being adjusted</param>
+        /// <param name="increase">True to increase, false to decrease</param>
+        /// <param name="ctrlPressed">True if Ctrl is pressed (10% increments)</param>
+        /// <param name="altPressed">True if Alt is pressed (0.1% increments)</param>
+        private void AdjustValue(TextBox textBox, bool increase, bool ctrlPressed = false, bool altPressed = false)
+        {
+            if (textBox == null || Settings == null) return;
+
+            // Determine increment multiplier based on modifier keys
+            double incrementMultiplier;
+            if (ctrlPressed)
+                incrementMultiplier = 1.10; // 10% increment for Ctrl
+            else if (altPressed)
+                incrementMultiplier = 1.001; // 0.1% increment for Alt
+            else
+                incrementMultiplier = 1.01; // Default 1% increment
+
+            double decrementMultiplier = 2.0 - incrementMultiplier; // Mathematical inverse for decrements
+
+            bool isGainTextBox = textBox.Name == "GainTextBox";
+
+            if (isGainTextBox)
+            {
+                if (increase)
+                {
+                    if (Math.Abs(Settings.Gain) < 0.00001)
+                        Settings.Gain = -Math.Sign(Settings.Gain) * 0.001; // Avoid zero gain
+                    else
+                        Settings.Gain = Settings.Gain * incrementMultiplier;
+                }
+                else
+                {
+                    if (Settings.Gain == 0.0)
+                        Settings.Gain = 0.01; // Avoid zero gain
+                    else
+                        Settings.Gain = Settings.Gain * decrementMultiplier;
+                }
+            }
+            else // OffsetTextBox
+            {
+                if (increase)
+                {
+                    if (Settings.Offset == 0.0)
+                        Settings.Offset = 0.01;
+                    else
+                        Settings.Offset = Settings.Offset * incrementMultiplier;
+                }
+                else
+                {
+                    if (Settings.Offset == 0.0)
+                        Settings.Offset = 0.01;
+                    else
+                        Settings.Offset = Settings.Offset * decrementMultiplier;
+                }
+            }
+        }
 
         private void SignedDecimalOnly_PreviewTextInput(object sender, TextCompositionEventArgs e)
         {
             var textBox = sender as TextBox;
-            var newText = textBox.Text.Insert(textBox.SelectionStart, e.Text);
-            e.Handled = !IsSignedDecimal(newText);
-        }
+            if (textBox == null) return;
 
-        private static bool IsSignedDecimal(string text)
-        {
-            // Updated regex to support exponential notation, including partial input
-            return Regex.IsMatch(text, @"^-?[0-9]*(\.[0-9]*)?([eE][-+]?[0-9]*)?$") && text != "." && !text.EndsWith("..");
+            // Get current state
+            string inputChar = e.Text;
+            
+            // Allow digits always
+            if (char.IsDigit(inputChar, 0))
+            {
+                e.Handled = false;
+                return;
+            }
+
+            // Allow decimal point if not already present
+            if (inputChar == "." && !textBox.Text.Contains('.'))
+            {
+                e.Handled = false;
+                return;
+            }
+
+            // Allow minus sign only at the beginning and if not already present
+            if (inputChar == "-" && textBox.CaretIndex == 0 && !textBox.Text.Contains('-'))
+            {
+                e.Handled = false;
+                return;
+            }
+
+            // Allow 'e' or 'E' for exponential notation
+            if ((inputChar.ToLower() == "e") && !textBox.Text.ToLower().Contains('e') && 
+                textBox.Text.Length > 0 && textBox.Text.Any(char.IsDigit))
+            {
+                e.Handled = false;
+                return;
+            }
+
+            // Allow '+' or '-' after 'e' or 'E' for exponential notation
+            if ((inputChar == "+" || inputChar == "-") && textBox.CaretIndex > 0)
+            {
+                char prevChar = textBox.Text[textBox.CaretIndex - 1];
+                if (prevChar == 'e' || prevChar == 'E')
+                {
+                    e.Handled = false;
+                    return;
+                }
+            }
+
+            // Block all other characters
+            e.Handled = true;
         }
     }
 }

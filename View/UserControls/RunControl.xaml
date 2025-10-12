@@ -116,7 +116,8 @@
                     Background="LimeGreen" 
                     Tag="LimeGreen"
                     Style="{StaticResource HoverButtonStyle}"
-                    Click="RunButton_Click"/>
+                    Click="RunButton_Click"
+                    ToolTip="Starts / stops the plot updates. Data continues to be sampled in the background."/>
             
             <Button x:Name="ClearButton" 
                     Content="Clear 🧹" 
@@ -124,13 +125,15 @@
                     Tag="#FFD700"
                     Foreground="Black"
                     Style="{StaticResource HoverButtonStyle}"
-                    Click="ClearButton_Click"/>
+                    Click="ClearButton_Click"
+                    ToolTip="Resets all elements to zero"/>
             
             <Button x:Name="RecordButton" 
                     Background="Red" 
                     Tag="Red"
                     Style="{StaticResource RecordButtonStyle}"
-                    Click="RecordButton_Click">
+                    Click="RecordButton_Click"
+                    ToolTip="Writes the incoming data stream to a file">
                 <Button.Content>
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
                         <TextBlock Text="⬤ Record" Foreground="White" VerticalAlignment="Center"/>
@@ -144,7 +147,8 @@
                     Tag="#FF008CF9"
                     Style="{StaticResource HoverButtonStyle}"
                     Margin="0"
-                    Click="LoadButton_Click"/>
+                    Click="LoadButton_Click"
+                    ToolTip="Opens a *.csv file and adds it as a new data stream"/>
         </StackPanel>
     </Grid>
 </UserControl>
