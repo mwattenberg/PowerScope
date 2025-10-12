@@ -218,22 +218,24 @@ namespace PowerScope.View.UserControls
 
         public IDataStream CreateDataStreamFromUserInput(StreamSettings vm)
         {
+            IDataStream dataStream;
+            
             // Determine stream type based on StreamSource property
             switch (vm.StreamSource)
             {
                 case StreamSource.Demo:
                     DemoSettings demoSettings = new DemoSettings(vm.NumberOfChannels, vm.DemoSampleRate, vm.DemoSignalType);
-                    DemoDataStream demoStream = new DemoDataStream(demoSettings);
-                    return demoStream;
+                    dataStream = new DemoDataStream(demoSettings);
+                    break;
                     
                 case StreamSource.AudioInput:
-                    AudioDataStream audioStream = new AudioDataStream(vm.AudioDevice, vm.AudioSampleRate);
-                    return audioStream;
+                    dataStream = new AudioDataStream(vm.AudioDevice, vm.AudioSampleRate);
+                    break;
                     
                 case StreamSource.File:
                     // Use the simplified FileDataStream constructor
-                    FileDataStream fileStream = new FileDataStream(vm.FilePath, vm.FileLoopPlayback);
-                    return fileStream;
+                    dataStream = new FileDataStream(vm.FilePath, vm.FileLoopPlayback);
+                    break;
                     
                 case StreamSource.SerialPort:
                 default:
@@ -269,9 +271,14 @@ namespace PowerScope.View.UserControls
                             dataParser = new DataParser(binaryFormat, vm.NumberOfChannels);
                     }
                     
-                    SerialDataStream stream = new SerialDataStream(sourceSetting, dataParser);
-                    return stream;
+                    dataStream = new SerialDataStream(sourceSetting, dataParser);
+                    break;
             }
+            
+            // Apply up/down sampling settings to the data stream if it supports the feature
+            vm.ApplyUpDownSamplingToDataStream(dataStream);
+            
+            return dataStream;
         }
 
         private byte[] ParseFrameStartBytes(string frameStart)

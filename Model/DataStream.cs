@@ -79,4 +79,34 @@ namespace PowerScope.Model
         /// </summary>
         int BufferSize { get; set; }
     }
+
+    /// <summary>
+    /// Interface for data streams that support up/down sampling
+    /// </summary>
+    public interface IUpDownSampling : INotifyPropertyChanged
+    {
+        /// <summary>
+        /// Gets or sets the up/down sampling factor
+        /// Positive values = upsampling (interpolation)
+        /// Negative values = downsampling (decimation)
+        /// 0 = no sampling change (bypass)
+        /// Range: -9 to +9 (factors of 10^n)
+        /// </summary>
+        int UpDownSamplingFactor { get; set; }
+
+        /// <summary>
+        /// Gets the actual sample rate multiplier based on the up/down sampling factor
+        /// </summary>
+        double SampleRateMultiplier { get; }
+
+        /// <summary>
+        /// Gets whether up/down sampling is currently enabled (factor != 0)
+        /// </summary>
+        bool IsUpDownSamplingEnabled { get; }
+
+        /// <summary>
+        /// Gets a human-readable description of the current sampling configuration
+        /// </summary>
+        string UpDownSamplingDescription { get; }
+    }
 }

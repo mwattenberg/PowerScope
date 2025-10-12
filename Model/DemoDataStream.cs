@@ -6,7 +6,7 @@ using System.Collections.Generic;
 
 namespace PowerScope.Model
 {
-    public class DemoDataStream : IDataStream, IChannelConfigurable, IBufferResizable
+    public class DemoDataStream : IDataStream, IChannelConfigurable, IBufferResizable, IUpDownSampling
     {
         private bool _disposed = false;
         private bool _isConnected = false;
@@ -27,6 +27,9 @@ namespace PowerScope.Model
         private IDigitalFilter[] _channelFilters;
         private readonly object _channelConfigLock = new object();
 
+        // Up/Down sampling
+        private readonly UpDownSampling _upDownSampling;
+
         public int ChannelCount { get; }
 
         /// <summary>
@@ -34,8 +37,41 @@ namespace PowerScope.Model
         /// </summary>
         public double SampleRate 
         { 
-            get { return DemoSettings.SampleRate; } 
+            get 
+            { 
+                double baseSampleRate = DemoSettings.SampleRate;
+                if (_upDownSampling.IsEnabled)
+                {
+                    return baseSampleRate * _upDownSampling.SampleRateMultiplier;
+                }
+                return baseSampleRate;
+            } 
         }
+
+        #region IUpDownSampling Implementation
+
+        public int UpDownSamplingFactor
+        {
+            get { return _upDownSampling.SamplingFactor; }
+            set { _upDownSampling.SamplingFactor = value; }
+        }
+
+        public double SampleRateMultiplier
+        {
+            get { return _upDownSampling.SampleRateMultiplier; }
+        }
+
+        public bool IsUpDownSamplingEnabled
+        {
+            get { return _upDownSampling.IsEnabled; }
+        }
+
+        public string UpDownSamplingDescription
+        {
+            get { return _upDownSampling.GetDescription(); }
+        }
+
+        #endregion
 
         public event PropertyChangedEventHandler PropertyChanged;
 
@@ -93,6 +129,10 @@ namespace PowerScope.Model
             DemoSettings = demoSettings;
             ChannelCount = demoSettings.NumberOfChannels;
             
+            // Initialize up/down sampling
+            _upDownSampling = new UpDownSampling();
+            _upDownSampling.PropertyChanged += OnUpDownSamplingPropertyChanged;
+            
             // Initialize ring buffers for each channel
             int ringBufferSize = Math.Max(500000, demoSettings.SampleRate * 10); // 10 seconds of data
             InitializeRingBuffers(ringBufferSize);
@@ -102,6 +142,22 @@ namespace PowerScope.Model
             _channelFilters = new IDigitalFilter[ChannelCount];
             
             StatusMessage = "Disconnected";
+        }
+
+        private void OnUpDownSamplingPropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            // Forward up/down sampling property change notifications
+            if (e.PropertyName == nameof(UpDownSampling.SamplingFactor))
+            {
+                OnPropertyChanged(nameof(UpDownSamplingFactor));
+                OnPropertyChanged(nameof(SampleRateMultiplier));
+                OnPropertyChanged(nameof(IsUpDownSamplingEnabled));
+                OnPropertyChanged(nameof(UpDownSamplingDescription));
+                OnPropertyChanged(nameof(SampleRate));
+                
+                // Reinitialize for new sampling factor
+                _upDownSampling.InitializeChannels(ChannelCount);
+            }
         }
 
         private void InitializeRingBuffers(int bufferSize)
@@ -265,6 +321,10 @@ namespace PowerScope.Model
             // Reset filters when starting streaming
             ResetChannelFilters();
             
+            // Initialize up/down sampling for current channel configuration
+            _upDownSampling.InitializeChannels(ChannelCount);
+            _upDownSampling.Reset();
+            
             // Calculate timer interval to generate data at the specified sample rate
             // Generate data in chunks of ~100 samples at a time for smooth streaming
             int samplesPerChunk = Math.Max(1, DemoSettings.SampleRate / 100);
@@ -314,18 +374,49 @@ namespace PowerScope.Model
                     }
                 });
                 
+                // Apply up/down sampling (ProcessData handles factor=0 case internally)
+                double[][] finalData = newData;
+                try
+                {
+                    finalData = _upDownSampling.ProcessData(newData);
+                    
+                    // Safety check for processed data
+                    for (int channel = 0; channel < finalData.Length; channel++)
+                    {
+                        if (finalData[channel] != null)
+                        {
+                            for (int i = 0; i < finalData[channel].Length; i++)
+                            {
+                                if (!double.IsFinite(finalData[channel][i]))
+                                {
+                                    finalData[channel][i] = 0.0; // Replace NaN/Infinity with zero
+                                }
+                            }
+                        }
+                    }
+                }
+                catch (Exception)
+                {
+                    // If up/down sampling fails, fall back to original data
+                    finalData = newData;
+                }
+                
                 // Update time accumulator
                 _timeAccumulator += (double)samplesPerChunk / DemoSettings.SampleRate;
                 
                 // Add processed data to ring buffers
                 for (int channel = 0; channel < ChannelCount; channel++)
                 {
-                    ReceivedData[channel].AddRange(newData[channel]);
+                    if (finalData[channel] != null)
+                    {
+                        ReceivedData[channel].AddRange(finalData[channel]);
+                    }
                 }
                 
-                // Update statistics
-                TotalSamples += samplesPerChunk;
-                TotalBits += samplesPerChunk * ChannelCount * 16; // Assume 16 bits per sample
+                // Update statistics based on final data
+                int actualSamplesGenerated = finalData[0]?.Length ?? samplesPerChunk;
+                TotalSamples += actualSamplesGenerated;
+                TotalBits += actualSamplesGenerated * ChannelCount * 16; // Assume 16 bits per sample
             }
         }
 
@@ -442,7 +533,7 @@ namespace PowerScope.Model
         private double GenerateSinXOverXSignal(int channel, double time, double amplitude)
         {
             // Base frequency at 400Hz - just below Nyquist for 1000Hz sample rate
-            const double baseFrequency = 400.0; // 400 Hz
+            const double baseFrequency = 350.0; // 400 Hz
             
             // Add slight frequency offset per channel to make them distinguishable
             // Keep offsets small to stay well below Nyquist frequency
@@ -483,8 +574,9 @@ namespace PowerScope.Model
                 _timeAccumulator = 0;
             }
             
-            // Reset filters when clearing data
+            // Reset filters and up/down sampling when clearing data
             ResetChannelFilters();
+            _upDownSampling?.Reset();
         }
 
         public void Dispose()
@@ -503,6 +595,12 @@ namespace PowerScope.Model
                 {
                     ringBuffer?.Clear();
                 }
+            }
+            
+            // Unsubscribe from up/down sampling events
+            if (_upDownSampling != null)
+            {
+                _upDownSampling.PropertyChanged -= OnUpDownSamplingPropertyChanged;
             }
             
             _disposed = true;

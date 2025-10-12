@@ -538,6 +538,16 @@ namespace PowerScope.View.UserForms
             }
             
             DialogResult = true;
+            
+            // Set up callback to apply settings to data streams when they are created
+            ViewModel.DataStreamConfigurationCallback = (dataStream) =>
+            {
+                if (dataStream is IUpDownSampling upDownSamplingStream)
+                {
+                    upDownSamplingStream.UpDownSamplingFactor = ViewModel.UpDownSampling;
+                }
+            };
+            
             Close();
         }
 

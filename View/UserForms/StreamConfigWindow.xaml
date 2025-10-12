@@ -534,6 +534,26 @@
                 </TabControl>
             </DockPanel>
             
+            <!-- Up/Down Sampling Controls -->
+            <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Left" Margin="20,10,20,0">
+                <Label Content="Up / down sampling:" VerticalAlignment="Center" Width="130" 
+                       ToolTip="Sampling factor: positive values for upsampling, negative for downsampling, 0 for no change"/>
+                <StackPanel Orientation="Horizontal">
+                    <Button x:Name="Button_SamplingDown" Content="▼" Width="25" Height="25" 
+                            Click="Button_SamplingDown_Click" ToolTip="Decrease sampling factor"
+                            FontSize="10" Padding="0"/>
+                    <TextBox x:Name="TextBox_UpDownSampling" Width="50" Height="25" 
+                             Text="{Binding UpDownSampling, Mode=TwoWay}" 
+                             PreviewTextInput="SamplingFactor_PreviewTextInput"
+                             TextChanged="SamplingFactor_TextChanged"
+                             TextAlignment="Center" VerticalContentAlignment="Center"
+                             ToolTip="Range: -9 to +9. Positive = upsampling, Negative = downsampling"/>
+                    <Button x:Name="Button_SamplingUp" Content="▲" Width="25" Height="25" 
+                            Click="Button_SamplingUp_Click" ToolTip="Increase sampling factor"
+                            FontSize="10" Padding="0"/>
+                </StackPanel>
+            </StackPanel>
+            
             <!-- Buttons -->
             <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right" Margin="20,10,20,20">
                 <Button Content="Connect" Width="75" Margin="0,0,10,0" Click="Button_Connect_Click"/>

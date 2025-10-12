@@ -81,6 +81,9 @@ namespace PowerScope.Model
         private string _fileParseStatus;
         private long _fileTotalSamples;
 
+        // Callback for applying settings to data streams
+        public Action<IDataStream> DataStreamConfigurationCallback { get; set; }
+
         public StreamSettings()
         {
             // Set minimal defaults - let the UI configuration window set the actual values
@@ -477,7 +480,22 @@ namespace PowerScope.Model
             // - Demo properties (NumberOfChannels, DemoSampleRate, DemoSignalType)
             // - Serial properties (Port, Baud, DataBits, StopBits, Parity)
             // - Audio properties (AudioDevice, AudioDeviceIndex, AudioSampleRate)
-            // - Other properties (Endianness, Delimiter, FrameStart, EnableChecksum)
+            // - Other properties (Endianness, Delimiter, FrameStart, EnableChecksum, UpDownSampling)
+        }
+
+        /// <summary>
+        /// Apply up/down sampling settings to a data stream if it supports the feature
+        /// </summary>
+        /// <param name="dataStream">Data stream to configure</param>
+        public void ApplyUpDownSamplingToDataStream(IDataStream dataStream)
+        {
+            if (dataStream is IUpDownSampling upDownSamplingStream)
+            {
+                upDownSamplingStream.UpDownSamplingFactor = this.UpDownSampling;
+            }
+
+            // Call the configured callback if available
+            DataStreamConfigurationCallback?.Invoke(dataStream);
         }
 
         /// <summary>
