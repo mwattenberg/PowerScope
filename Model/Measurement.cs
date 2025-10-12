@@ -41,8 +41,11 @@ namespace PowerScope.Model
         private readonly CalculationFunction _calculationFunction;
         private readonly IDataStream _dataStream;
         private readonly int _channelIndex;
-        private readonly double[] _dataBuffer;
+        private double[] _dataBuffer;
         private readonly ChannelSettings _channelSettings;
+        
+        // Buffer configuration
+        private int _measurementWindowLength;
         
         // Single measurement result
         private double _result = 0.0;
@@ -81,6 +84,20 @@ namespace PowerScope.Model
         public event EventHandler RemoveRequested;
         public event PropertyChangedEventHandler PropertyChanged;
 
+        public int MeasurementWindowLength
+        {
+            get { return _measurementWindowLength; }
+            set
+            {
+                if (_measurementWindowLength != value)
+                {
+                    _measurementWindowLength = Math.Max(100000,value);  //Limit to reasonable max value
+                    _dataBuffer = new double[_measurementWindowLength];
+                    OnPropertyChanged(nameof(MeasurementWindowLength));
+                }
+            }
+        }
+
         /// <summary>
         /// Constructor with measurement type, data stream, channel, and channel settings
         /// </summary>
@@ -95,15 +112,13 @@ namespace PowerScope.Model
             _channelIndex = channelIndex;
             _channelSettings = channelSettings;
             
-            // For FFT measurements, ensure buffer is large enough for maximum FFT size
-            // For other measurements, use a reasonable default
-            int bufferSize;
+            // Set default buffer size based on measurement type
             if (measurementType == MeasurementType.FFT)
-                bufferSize = 16384; // Use maximum possible FFT size instead of current _fftSize
+                _measurementWindowLength = 16384; // Use maximum possible FFT size instead of current _fftSize
             else
-                bufferSize = 5000;
+                _measurementWindowLength = 5000;
 
-            _dataBuffer = new double[bufferSize];
+            _dataBuffer = new double[_measurementWindowLength];
             
             _calculationFunction = GetCalculationFunction(measurementType);
             
@@ -452,10 +467,10 @@ namespace PowerScope.Model
             // For FFT measurements, copy exactly the amount of data needed based on FFT size
             // For other measurements, use 5000 samples as requested (hardcoded for now)
             int samplesToCopy;
-            if (_measurementType == MeasurementType.FFT) 
-                samplesToCopy = _FFT_Size; 
-            else 
-                samplesToCopy = 5000; // Use hardcoded 5000 samples for non-FFT measurements
+            if (_measurementType == MeasurementType.FFT)
+                samplesToCopy = _FFT_Size;
+            else
+                samplesToCopy = MeasurementWindowLength;
                 
             int samplesCopied = _dataStream.CopyLatestTo(_channelIndex, _dataBuffer, samplesToCopy);
             

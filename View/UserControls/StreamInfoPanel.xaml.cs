@@ -6,6 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using ScottPlot.Plottables;
 using PowerScope.Model;
+using System.IO;
 
 namespace PowerScope.View.UserControls
 {
@@ -70,6 +71,10 @@ namespace PowerScope.View.UserControls
                 else if (_associatedStreamSettings.StreamSource == Model.StreamSource.AudioInput)
                 {
                     displayText = $"Audio: {_associatedStreamSettings.AudioDevice ?? "Default Device"}";
+                }
+                else if (_associatedStreamSettings.StreamSource == Model.StreamSource.File)
+                {
+                    displayText = $"{Path.GetFileName(_associatedStreamSettings.FilePath)}";
                 }
                 else
                 {

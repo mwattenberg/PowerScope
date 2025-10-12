@@ -53,6 +53,8 @@ namespace PowerScope.Model
         private AxisLine _plottableBeingDragged;
         private bool _cursorMouseHandlingEnabled;
 
+        public event PropertyChangedEventHandler PropertyChanged;
+
         public PlotSettings Settings { get; private set; }
         
         public WpfPlotGL Plot 
@@ -65,26 +67,8 @@ namespace PowerScope.Model
         /// <summary>
         /// The cursor instance owned by this PlotManager
         /// </summary>
-        public Cursor Cursor
-        {
-            get { return _cursor; }
-        }
-
-        /// <summary>
-        /// Whether cursors are currently active
-        /// </summary>
-        public bool HasActiveCursors { get; private set; }
-
-        /// <summary>
-        /// Current active cursor mode
-        /// </summary>
-        public CursorMode ActiveCursorMode { get; private set; }
-
-        /// <summary>
-        /// Gets a color from the ScottPlot Tsitsulin palette
-        /// </summary>
-        /// <param name="index">Index of the color to retrieve</param>
-        /// <returns>WPF Color from the palette</returns>
+        
+        //Global function to get color from the same palette
         public static Color GetColor(int index)
         {
             IPalette palette = new ScottPlot.Palettes.Tsitsulin();
@@ -96,27 +80,6 @@ namespace PowerScope.Model
         /// Whether plot updates are currently running
         /// </summary>
         public bool IsRunning { get; private set; }
-
-        /// <summary>
-        /// Whether recording is currently active
-        /// </summary>
-        public bool IsRecording 
-        { 
-            get 
-            {
-                return _fileWriter.IsRecording;
-            }
-        }
-
-        /// <summary>
-        /// Current recording file path
-        /// </summary>
-        public string RecordingFilePath => _fileWriter?.RecordingFilePath ?? string.Empty;
-
-        /// <summary>
-        /// Number of samples recorded so far
-        /// </summary>
-        public long RecordingSampleCount => _fileWriter?.RecordingSampleCount ?? 0;
 
         public PlotManager(WpfPlotGL wpfPlot, int maxChannels = 16)
         {                
@@ -148,6 +111,22 @@ namespace PowerScope.Model
             _fileWriter = new PlotFileWriter();
             _fileWriter.Channels = _channels;
         }
+
+        #region Cursors
+        public Cursor Cursor
+        {
+            get { return _cursor; }
+        }
+
+        /// <summary>
+        /// Whether cursors are currently active
+        /// </summary>
+        public bool HasActiveCursors { get; private set; }
+
+        /// <summary>
+        /// Current active cursor mode
+        /// </summary>
+        public CursorMode ActiveCursorMode { get; private set; }
 
         /// <summary>
         /// Enables vertical cursors - no parameter needed since PlotManager owns the cursor
@@ -212,7 +191,10 @@ namespace PowerScope.Model
             _verticalCursorA = _plot.Plot.Add.VerticalLine(x1);
             _verticalCursorA.IsDraggable = true;
             _verticalCursorA.Text = "A";
+            
             _verticalCursorA.Color = new ScottPlot.Color(highlightNormal.R, highlightNormal.G, highlightNormal.B);
+
+            
 
             _verticalCursorB = _plot.Plot.Add.VerticalLine(x2);
             _verticalCursorB.IsDraggable = true;
@@ -374,7 +356,10 @@ namespace PowerScope.Model
 
             double cursorASample = _verticalCursorA.X;
             double cursorBSample = _verticalCursorB.X;
-            double sampleRate = GetCurrentSampleRate();
+            //double sampleRate = GetCurrentSampleRate();
+            double sampleRate = _channels[0].OwnerStream.SampleRate;
+
+
 
             _cursor.UpdateVerticalCursors(cursorASample, cursorBSample, sampleRate);
             
@@ -396,6 +381,20 @@ namespace PowerScope.Model
             _cursor.UpdateHorizontalCursors(cursorAYValue, cursorBYValue);
         }
 
+        /// <summary>
+        /// Updates cursor channel values using the unified cursor view model
+        /// This centralizes cursor data retrieval and reduces coupling
+        /// </summary>
+        /// <param name="cursor">The cursor model to update</param>
+        public void UpdateCursorValues(Cursor cursor)
+        {
+            if (cursor == null)
+                return;
+
+            cursor.UpdateChannelValues(this);
+        }
+
+        #endregion cursors
         /// <summary>
         /// Sets the channels collection for the plot manager
         /// Also updates the cursor channel data automatically
@@ -435,31 +434,12 @@ namespace PowerScope.Model
             UpdateChannelDisplay();
         }
 
-        /// <summary>
-        /// Start plot updates
-        /// </summary>
-        public void StartUpdates()
+        #region Recording plot data
+        public bool IsRecording
         {
-            if (!IsRunning && !_disposed)
+            get
             {
-                // Update timer interval from settings
-                _updateTimer.Interval = TimeSpan.FromMilliseconds(Settings.TimerInterval);
-                _updateTimer.Start();
-                IsRunning = true;
-                OnPropertyChanged(nameof(IsRunning));
-            }
-        }
-
-        /// <summary>
-        /// Stop plot updates
-        /// </summary>
-        public void StopUpdates()
-        {
-            if (IsRunning)
-            {
-                _updateTimer.Stop();
-                IsRunning = false;
-                OnPropertyChanged(nameof(IsRunning));
+                return _fileWriter.IsRecording;
             }
         }
 
@@ -474,7 +454,8 @@ namespace PowerScope.Model
                 return false;
 
             // update sample rate on writer
-            _fileWriter.SampleRate = GetCurrentSampleRate();
+            //_fileWriter.SampleRate = GetCurrentSampleRate();
+            _fileWriter.SampleRate = _channels[0].OwnerStream.SampleRate;
             _fileWriter.Channels = _channels;
             return _fileWriter.StartRecording(filePath);
         }
@@ -489,6 +470,9 @@ namespace PowerScope.Model
                 
             _fileWriter.StopRecording();
         }
+        #endregion
+
+        #region Event support
 
         private void OnSettingsChanged(object sender, PropertyChangedEventArgs e)
         {
@@ -504,6 +488,7 @@ namespace PowerScope.Model
                             
                     case nameof(PlotSettings.Xmax):
                         RebuildSignalsForNewXRange();
+                        UpdateMeasurementWindowLength();
                         break;
                             
                     case nameof(PlotSettings.LineWidth):
@@ -523,6 +508,7 @@ namespace PowerScope.Model
                         
                     case nameof(PlotSettings.BufferSize):
                         UpdateDataStreamBufferSizes();
+                        
                         break;
                         
                     case nameof(PlotSettings.TriggerModeEnabled):
@@ -579,6 +565,63 @@ namespace PowerScope.Model
             });
         }
 
+        private void RebuildSignalsForNewXRange()
+        {
+            // Recreate data arrays with new size
+            for (int i = 0; i < _maxChannels; i++)
+            {
+                _data[i] = new double[Settings.Xmax];
+
+                if (_signals[i] != null)
+                {
+                    ScottPlot.Color colorOld = _signals[i].Color;
+                    _plot.Plot.Remove(_signals[i]);
+                    _signals[i] = _plot.Plot.Add.Signal(_data[i]);
+                    _signals[i].Color = colorOld;
+                    _signals[i].LineWidth = (float)Settings.LineWidth;
+                    _signals[i].MarkerShape = ScottPlot.MarkerShape.None;
+                    _signals[i].LineStyle.AntiAlias = Settings.AntiAliasing;
+                }
+            }
+
+            // Populate the new data arrays with current data from channels
+            // This ensures the plot shows data even when the update timer is stopped
+            CopyChannelDataToPlot();
+
+            _plot.Plot.Axes.SetLimitsX(0, Settings.Xmax);
+            _plot.Refresh();
+        }
+
+        private void UpdateMeasurementWindowLength()
+        {
+            if (_channels == null)
+                return;
+
+            foreach (Channel channel in _channels)
+            {
+                if (channel.Measurements != null)
+                {
+                    foreach (Measurement measurement in channel.Measurements)
+                    {
+                        try
+                        {
+                            measurement.MeasurementWindowLength = Settings.Xmax;
+                        }
+                        catch (Exception ex)
+                        {
+                            // Log error but don't crash the application
+                            System.Diagnostics.Debug.WriteLine($"Failed to update buffer size for measurement {measurement.TypeDisplayName} on channel {channel.Label}: {ex.Message}");
+                        }
+                    }
+                }
+            }
+        }
+
+
+        #endregion
+
+        #region Init, visuals, colors, user input
+
         public void InitializePlot()
         {
             _plot.Plot.Clear();
@@ -612,6 +655,40 @@ namespace PowerScope.Model
             _plot.Plot.Axes.Bottom.IsVisible = true;
         }
 
+        private void ApplyVisualSettings()
+        {
+            _plot.Plot.Grid.LineWidth = (float)Settings.LineWidth;
+
+            for (int i = 0; i < _signals.Length; i++)
+            {
+                if (_signals[i] != null)
+                {
+                    _signals[i].LineWidth = (float)Settings.LineWidth;
+                    _signals[i].LineStyle.AntiAlias = Settings.AntiAliasing;
+                }
+            }
+
+            _plot.Plot.Benchmark.IsVisible = Settings.ShowRenderTime;
+            _plot.Refresh();
+        }
+
+        private void ApplyChannelColors()
+        {
+            if (_channels == null)
+                return;
+
+            for (int i = 0; i < NumberOfChannels && i < _maxChannels; i++)
+            {
+                if (_signals[i] != null && i < _channels.Count)
+                {
+                    Color channelColor = _channels[i].Color;
+                    _signals[i].Color = new ScottPlot.Color(channelColor.R, channelColor.G, channelColor.B);
+                }
+            }
+
+            _plot.Refresh();
+        }
+
         private void UpdateChannelDisplay()
         {
             if (_channels == null)
@@ -636,11 +713,11 @@ namespace PowerScope.Model
             for (int i = 0; i < NumberOfChannels; i++)
             {
                 Channel channel = _channels[i];
-                
+
                 if (channel.IsEnabled)
                 {
                     _signals[i] = _plot.Plot.Add.Signal(_data[i]);
-                    
+
                     // Use channel color
                     Color channelColor = channel.Color;
                     _signals[i].Color = new ScottPlot.Color(channelColor.R, channelColor.G, channelColor.B);
@@ -651,6 +728,58 @@ namespace PowerScope.Model
             }
 
             _plot.Refresh();
+        }
+
+        public void SetupPlotUserInput()
+        {
+            // Clear existing input handlers
+            _plot.UserInputProcessor.UserActionResponses.Clear();
+            _plot.UserInputProcessor.IsEnabled = true;
+
+            // Left-click-drag pan
+            var panButton = ScottPlot.Interactivity.StandardMouseButtons.Left;
+            var panResponse = new ScottPlot.Interactivity.UserActionResponses.MouseDragPan(panButton);
+            _plot.UserInputProcessor.UserActionResponses.Add(panResponse);
+
+            // Middle-click-drag zoom rectangle
+            var zoomRectangleButton = ScottPlot.Interactivity.StandardMouseButtons.Middle;
+            var zoomRectangleResponse = new ScottPlot.Interactivity.UserActionResponses.MouseDragZoomRectangle(zoomRectangleButton);
+            _plot.UserInputProcessor.UserActionResponses.Add(zoomRectangleResponse);
+
+            // Right-click auto-scale
+            var autoscaleButton = ScottPlot.Interactivity.StandardMouseButtons.Right;
+            var autoscaleResponse = new ScottPlot.Interactivity.UserActionResponses.SingleClickAutoscale(autoscaleButton);
+            _plot.UserInputProcessor.UserActionResponses.Add(autoscaleResponse);
+
+            // Mouse wheel zoom with modifier keys
+            ScottPlot.Interactivity.UserActionResponses.MouseWheelZoom wheelZoomResponse = new ScottPlot.Interactivity.UserActionResponses.MouseWheelZoom(ScottPlot.Interactivity.StandardKeys.Shift, ScottPlot.Interactivity.StandardKeys.Control);
+            _plot.UserInputProcessor.UserActionResponses.Add(wheelZoomResponse);
+        }
+
+        #endregion
+
+        #region Core update loop
+        //This is the meat and potatoes of the PlotManager
+        public void StartUpdates()
+        {
+            if (!IsRunning && !_disposed)
+            {
+                // Update timer interval from settings
+                _updateTimer.Interval = TimeSpan.FromMilliseconds(Settings.TimerInterval);
+                _updateTimer.Start();
+                IsRunning = true;
+                OnPropertyChanged(nameof(IsRunning));
+            }
+        }
+
+        public void StopUpdates()
+        {
+            if (IsRunning)
+            {
+                _updateTimer.Stop();
+                IsRunning = false;
+                OnPropertyChanged(nameof(IsRunning));
+            }
         }
 
         private void UpdatePlot(object? sender, EventArgs e)
@@ -691,73 +820,16 @@ namespace PowerScope.Model
             }
         }
 
-        private void RebuildSignalsForNewXRange()
-        {
-            // Recreate data arrays with new size
-            for (int i = 0; i < _maxChannels; i++)
-            {
-                _data[i] = new double[Settings.Xmax];
-                
-                if (_signals[i] != null)
-                {
-                    ScottPlot.Color colorOld = _signals[i].Color;
-                    _plot.Plot.Remove(_signals[i]);
-                    _signals[i] = _plot.Plot.Add.Signal(_data[i]);
-                    _signals[i].Color = colorOld;
-                    _signals[i].LineWidth = (float)Settings.LineWidth;
-                    _signals[i].MarkerShape = ScottPlot.MarkerShape.None;
-                    _signals[i].LineStyle.AntiAlias = Settings.AntiAliasing;
-                }
-            }
-            
-            // Populate the new data arrays with current data from channels
-            // This ensures the plot shows data even when the update timer is stopped
-            CopyChannelDataToPlot();
-            
-            _plot.Plot.Axes.SetLimitsX(0, Settings.Xmax);
-            _plot.Refresh();
-        }
-
-        private void ApplyVisualSettings()
-        {
-            _plot.Plot.Grid.LineWidth = (float)Settings.LineWidth;
-            
-            for (int i = 0; i < _signals.Length; i++)
-            {
-                if (_signals[i] != null)
-                {
-                    _signals[i].LineWidth = (float)Settings.LineWidth;
-                    _signals[i].LineStyle.AntiAlias = Settings.AntiAliasing;
-                }
-            }
-            
-            _plot.Plot.Benchmark.IsVisible = Settings.ShowRenderTime;
-            _plot.Refresh();
-        }
-
-        private void ApplyChannelColors()
-        {
-            if (_channels == null) 
-                return;
-
-            for (int i = 0; i < NumberOfChannels && i < _maxChannels; i++)
-            {
-                if (_signals[i] != null && i < _channels.Count)
-                {
-                    Color channelColor = _channels[i].Color;
-                    _signals[i].Color = new ScottPlot.Color(channelColor.R, channelColor.G, channelColor.B);
-                }
-            }
-            
-            _plot.Refresh();
-        }
-
+        #endregion
+    
         /// <summary>
         /// Updates buffer sizes for all data streams that support it
         /// Called when PlotSettings.BufferSize changes
         /// </summary>
         private void UpdateDataStreamBufferSizes()
         {
+            //We have to jump through some hoops here
+            //because multiple channels can share the same data stream
             // Get unique data streams from channels
             var uniqueStreams = new HashSet<IDataStream>();
             foreach (Channel channel in _channels)
@@ -776,113 +848,16 @@ namespace PowerScope.Model
         }
 
         /// <summary>
+        /// Updates buffer sizes for all measurements across all channels
+        /// Called when PlotSettings.BufferSize changes
+        /// </summary>
+
+        /// <summary>
         /// Clears all data from connected data streams and updates the plot display
         /// Works regardless of whether the update timer is running or stopped
         /// </summary>
-        public void Clear()
-        {
-            if (_channels == null)
-                return;
 
-            // Get unique data streams from channels
-            var uniqueStreams = new HashSet<IDataStream>();
-            foreach (Channel channel in _channels)
-            {
-                uniqueStreams.Add(channel.OwnerStream);
-            }
-
-            // Clear data from all streams
-            foreach (IDataStream stream in uniqueStreams)
-            {
-                try
-                {
-                    stream.clearData();
-                }
-                catch (Exception ex)
-                {
-                    // Log error but don't crash the application
-                    System.Diagnostics.Debug.WriteLine($"Failed to clear data for {stream.StreamType}: {ex.Message}");
-                }
-            }
-
-            // Clear plot data arrays and update display immediately
-            for (int i = 0; i < _maxChannels; i++)
-            {
-                if (_data[i] != null)
-                {
-                    Array.Clear(_data[i], 0, _data[i].Length);
-                }
-            }
-
-            // Force plot refresh to show cleared data immediately, regardless of timer state
-            _plot.Refresh();
-        }
-
-        public void SetupPlotUserInput()
-        {
-            // Clear existing input handlers
-            _plot.UserInputProcessor.UserActionResponses.Clear();
-            _plot.UserInputProcessor.IsEnabled = true;
-            
-            // Left-click-drag pan
-            var panButton = ScottPlot.Interactivity.StandardMouseButtons.Left;
-            var panResponse = new ScottPlot.Interactivity.UserActionResponses.MouseDragPan(panButton);
-            _plot.UserInputProcessor.UserActionResponses.Add(panResponse);
-
-            // Middle-click-drag zoom rectangle
-            var zoomRectangleButton = ScottPlot.Interactivity.StandardMouseButtons.Middle;
-            var zoomRectangleResponse = new ScottPlot.Interactivity.UserActionResponses.MouseDragZoomRectangle(zoomRectangleButton);
-            _plot.UserInputProcessor.UserActionResponses.Add(zoomRectangleResponse);
-
-            // Right-click auto-scale
-            var autoscaleButton = ScottPlot.Interactivity.StandardMouseButtons.Right;
-            var autoscaleResponse = new ScottPlot.Interactivity.UserActionResponses.SingleClickAutoscale(autoscaleButton);
-            _plot.UserInputProcessor.UserActionResponses.Add(autoscaleResponse);
-
-            // Mouse wheel zoom with modifier keys
-            ScottPlot.Interactivity.UserActionResponses.MouseWheelZoom wheelZoomResponse = new ScottPlot.Interactivity.UserActionResponses.MouseWheelZoom(ScottPlot.Interactivity.StandardKeys.Shift, ScottPlot.Interactivity.StandardKeys.Control);
-            _plot.UserInputProcessor.UserActionResponses.Add(wheelZoomResponse);
-        }
-
-        public void Dispose()
-        {
-            if (!_disposed)
-            {
-                _disposed = true;
-                
-                // Stop recording if active
-                StopRecording();
-                
-                // Disable cursors and clean up
-                DisableCursors();
-                
-                // Dispose cursor
-                _cursor?.Dispose();
-                
-                StopUpdates();
-                
-                // Unsubscribe from channels
-                if (_channels != null)
-                {
-                    _channels.CollectionChanged -= OnChannelsCollectionChanged;
-                    foreach (Channel channel in _channels)
-                    {
-                        channel.PropertyChanged -= OnChannelPropertyChanged;
-                    }
-                }
-                
-                if (Settings != null)
-                {
-                    Settings.PropertyChanged -= OnSettingsChanged;
-                }
-
-                // Dispose writer
-                _fileWriter?.Dispose();
-            }
-        }
-
-        public event PropertyChangedEventHandler PropertyChanged;
-
+ 
         protected virtual void OnPropertyChanged(string propertyName)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
@@ -925,34 +900,85 @@ namespace PowerScope.Model
             return null;
         }
 
-        /// <summary>
-        /// Gets the current sample rate from the first available channel
-        /// </summary>
-        /// <returns>Sample rate in Hz, or 0 if no channels available</returns>
-        /// This could be problematic if channels have different sample rates but we assume they are the same for now
-        public double GetCurrentSampleRate()
+        #region closing and killing
+        public void Dispose()
         {
-            if (_channels == null || _channels.Count == 0)
-                return 0;
+            if (!_disposed)
+            {
+                _disposed = true;
 
-            Channel firstChannel = _channels[0];
-            if (firstChannel?.OwnerStream == null)
-                return 0;
+                // Stop recording if active
+                StopRecording();
 
-            return firstChannel.OwnerStream.SampleRate;
+                // Disable cursors and clean up
+                DisableCursors();
+
+                // Dispose cursor
+                _cursor?.Dispose();
+
+                StopUpdates();
+
+                // Unsubscribe from channels
+                if (_channels != null)
+                {
+                    _channels.CollectionChanged -= OnChannelsCollectionChanged;
+                    foreach (Channel channel in _channels)
+                    {
+                        channel.PropertyChanged -= OnChannelPropertyChanged;
+                    }
+                }
+
+                if (Settings != null)
+                {
+                    Settings.PropertyChanged -= OnSettingsChanged;
+                }
+
+                // Dispose writer
+                _fileWriter?.Dispose();
+            }
         }
 
-        /// <summary>
-        /// Updates cursor channel values using the unified cursor view model
-        /// This centralizes cursor data retrieval and reduces coupling
-        /// </summary>
-        /// <param name="cursor">The cursor model to update</param>
-        public void UpdateCursorValues(Cursor cursor)
+        public void Clear()
         {
-            if (cursor == null)
+            if (_channels == null)
                 return;
 
-            cursor.UpdateChannelValues(this);
+            // Get unique data streams from channels
+            var uniqueStreams = new HashSet<IDataStream>();
+            foreach (Channel channel in _channels)
+            {
+                uniqueStreams.Add(channel.OwnerStream);
+            }
+
+            // Clear data from all streams
+            foreach (IDataStream stream in uniqueStreams)
+            {
+                try
+                {
+                    stream.clearData();
+                }
+                catch (Exception ex)
+                {
+                    // Log error but don't crash the application
+                    System.Diagnostics.Debug.WriteLine($"Failed to clear data for {stream.StreamType}: {ex.Message}");
+                }
+            }
+
+            // Clear plot data arrays and update display immediately
+            for (int i = 0; i < _maxChannels; i++)
+            {
+                if (_data[i] != null)
+                {
+                    Array.Clear(_data[i], 0, _data[i].Length);
+                }
+            }
+
+            // Force plot refresh to show cleared data immediately, regardless of timer state
+            _plot.Refresh();
         }
+
+        #endregion
+
+
     }
 }
