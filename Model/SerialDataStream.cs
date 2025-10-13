@@ -199,7 +199,7 @@ namespace PowerScope.Model
             ValidatePortExists(source.PortName);
             
             // Initialize up/down sampling
-            _upDownSampling = new UpDownSampling();
+            //_upDownSampling = new UpDownSampling();
             _upDownSampling.PropertyChanged += OnUpDownSamplingPropertyChanged;
             
             _port = new SerialPort(source.PortName)

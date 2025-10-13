@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Collections.Generic;
+using System.Text.RegularExpressions;
 
 namespace PowerScope.Model
 {
@@ -130,7 +131,7 @@ namespace PowerScope.Model
             ChannelCount = demoSettings.NumberOfChannels;
             
             // Initialize up/down sampling
-            _upDownSampling = new UpDownSampling();
+            _upDownSampling = new UpDownSampling(1);
             _upDownSampling.PropertyChanged += OnUpDownSamplingPropertyChanged;
             
             // Initialize ring buffers for each channel
@@ -351,6 +352,7 @@ namespace PowerScope.Model
 
             int samplesPerChunk = (int)state;
             double[][] newData = new double[ChannelCount][];
+            double[][] finalData = new double[ChannelCount][];
             
             lock (_dataLock)
             {
@@ -360,9 +362,10 @@ namespace PowerScope.Model
                     newData[channel] = new double[samplesPerChunk];
                 }
                 
-                // Generate and process data for all channels in parallel
+                // Generate, process, and apply up/down sampling for all channels in parallel
                 Parallel.For(0, ChannelCount, channel =>
                 {
+                    // Generate raw samples for this channel
                     for (int sample = 0; sample < samplesPerChunk; sample++)
                     {
                         double time = _timeAccumulator + (double)sample / DemoSettings.SampleRate;
@@ -372,36 +375,35 @@ namespace PowerScope.Model
                         double processedSample = ApplyChannelProcessing(channel, rawSample);
                         newData[channel][sample] = processedSample;
                     }
-                });
-                
-                // Apply up/down sampling (ProcessData handles factor=0 case internally)
-                double[][] finalData = newData;
-                try
-                {
-                    finalData = _upDownSampling.ProcessData(newData);
                     
-                    // Safety check for processed data
-                    for (int channel = 0; channel < finalData.Length; channel++)
+                    // Apply up/down sampling per channel if enabled
+                    double[] channelFinalData = newData[channel];
+                    if (_upDownSampling.IsEnabled)
                     {
-                        if (finalData[channel] != null)
+                        try
                         {
-                            for (int i = 0; i < finalData[channel].Length; i++)
+                            channelFinalData = _upDownSampling.ProcessChannelData(channel, newData[channel]);
+                            
+                            // Safety check for up/down sampled data
+                            for (int i = 0; i < channelFinalData.Length; i++)
                             {
-                                if (!double.IsFinite(finalData[channel][i]))
+                                if (!double.IsFinite(channelFinalData[i]))
                                 {
-                                    finalData[channel][i] = 0.0; // Replace NaN/Infinity with zero
+                                    channelFinalData[i] = 0.0; // Replace NaN/Infinity with zero
                                 }
                             }
                         }
+                        catch (Exception)
+                        {
+                            // If up/down sampling fails, fall back to processed samples
+                            channelFinalData = newData[channel];
+                        }
                     }
-                }
-                catch (Exception)
-                {
-                    // If up/down sampling fails, fall back to original data
-                    finalData = newData;
-                }
+                    
+                    finalData[channel] = channelFinalData;
+                });
                 
-                // Update time accumulator
+                // Update time accumulator based on original sample rate
                 _timeAccumulator += (double)samplesPerChunk / DemoSettings.SampleRate;
                 
                 // Add processed data to ring buffers
@@ -413,7 +415,7 @@ namespace PowerScope.Model
                     }
                 }
                 
-                // Update statistics based on final data
+                // Update statistics based on final data (after up/down sampling)
                 int actualSamplesGenerated = finalData[0]?.Length ?? samplesPerChunk;
                 TotalSamples += actualSamplesGenerated;
                 TotalBits += actualSamplesGenerated * ChannelCount * 16; // Assume 16 bits per sample
@@ -454,7 +456,7 @@ namespace PowerScope.Model
 
         /// <summary>
         /// Generates a chirp signal that sweeps from 10Hz to 10kHz over 3 seconds
-        /// </summary>
+        /// /// </summary>
         /// <param name="channel">Channel index (adds slight frequency offset per channel)</param>
         /// <param name="time">Current time in seconds</param>
         /// <param name="amplitude">Signal amplitude</param>
