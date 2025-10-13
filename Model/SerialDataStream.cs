@@ -4,6 +4,7 @@ using System.Linq;
 using System.Diagnostics;
 using System.Threading;
 using System.ComponentModel;
+using System.Threading.Tasks;
 
 namespace PowerScope.Model
 {
@@ -199,7 +200,7 @@ namespace PowerScope.Model
             ValidatePortExists(source.PortName);
             
             // Initialize up/down sampling
-            //_upDownSampling = new UpDownSampling();
+            _upDownSampling = new UpDownSampling(1);
             _upDownSampling.PropertyChanged += OnUpDownSamplingPropertyChanged;
             
             _port = new SerialPort(source.PortName)
@@ -785,67 +786,74 @@ namespace PowerScope.Model
             if (channelsToProcess > Parser.NumberOfChannels)
                 channelsToProcess = Parser.NumberOfChannels;
             
-            for (int channel = 0; channel < channelsToProcess; channel++)
+            // Pre-allocate arrays for parallel processing
+            double[][] finalData = new double[channelsToProcess][];
+            
+            // Process all channels in parallel - same pattern as DemoDataStream
+            Parallel.For(0, channelsToProcess, channel =>
             {
                 if (parsedData[channel] != null && parsedData[channel].Length > 0)
                 {
                     // Apply channel processing (gain, offset, filtering) to each sample
-                    double[] processedSamples = new double[parsedData[channel].Length];
+                    double[] channelProcessedSamples = new double[parsedData[channel].Length];
                     for (int sample = 0; sample < parsedData[channel].Length; sample++)
                     {
-                        processedSamples[sample] = ApplyChannelProcessing(channel, parsedData[channel][sample]);
+                        double processedSample = ApplyChannelProcessing(channel, parsedData[channel][sample]);
                         
                         // Safety check for invalid values
-                        if (!double.IsFinite(processedSamples[sample]))
+                        if (!double.IsFinite(processedSample))
                         {
-                            processedSamples[sample] = 0.0; // Replace NaN/Infinity with zero
+                            processedSample = 0.0; // Replace NaN/Infinity with zero
                         }
+                        
+                        channelProcessedSamples[sample] = processedSample;
                     }
                     
-                    // Apply up/down sampling if enabled
-                    double[] finalSamples = processedSamples;
+                    // Apply up/down sampling per channel if enabled
+                    double[] channelFinalData = channelProcessedSamples;
                     if (_upDownSampling.IsEnabled)
                     {
                         try
                         {
-                            finalSamples = _upDownSampling.ProcessChannelData(channel, processedSamples);
+                            channelFinalData = _upDownSampling.ProcessChannelData(channel, channelProcessedSamples);
                             
                             // Safety check for up/down sampled data
-                            for (int i = 0; i < finalSamples.Length; i++)
+                            for (int i = 0; i < channelFinalData.Length; i++)
                             {
-                                if (!double.IsFinite(finalSamples[i]))
+                                if (!double.IsFinite(channelFinalData[i]))
                                 {
-                                    finalSamples[i] = 0.0; // Replace NaN/Infinity with zero
+                                    channelFinalData[i] = 0.0; // Replace NaN/Infinity with zero
                                 }
                             }
                         }
                         catch (Exception)
                         {
                             // If up/down sampling fails, fall back to processed samples
-                            finalSamples = processedSamples;
+                            channelFinalData = channelProcessedSamples;
                         }
                     }
                     
-                    // Add final data to ring buffer
-                    ReceivedData[channel].AddRange(finalSamples);
+                    finalData[channel] = channelFinalData;
+                }
+            });
+            
+            // Add processed data to ring buffers
+            for (int channel = 0; channel < channelsToProcess; channel++)
+            {
+                if (finalData[channel] != null)
+                {
+                    ReceivedData[channel].AddRange(finalData[channel]);
                 }
             }
             
             if (channelsToProcess > 0 && parsedData[0] != null)
             {
-                int newSamples = parsedData[0].Length;
-                
-                // Calculate final sample count after up/down sampling
-                if (_upDownSampling.IsEnabled)
-                {
-                    // Apply up/down sampling multiplier to get final sample count
-                    newSamples = (int)Math.Round(newSamples * _upDownSampling.SampleRateMultiplier);
-                }
-                
-                TotalSamples += newSamples;
+                // Calculate final sample count based on final data (after up/down sampling)
+                int actualSamplesGenerated = finalData[0]?.Length ?? parsedData[0].Length;
+                TotalSamples += actualSamplesGenerated;
                 
                 // Update sample rate calculation
-                UpdateSampleRateCalculation(newSamples);
+                UpdateSampleRateCalculation(actualSamplesGenerated);
             }
         }
 
