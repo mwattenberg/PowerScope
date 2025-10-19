@@ -20,14 +20,14 @@ namespace PowerScope.Model
         [Description("15")]
         Fps15 = 15,
         
-        [Description("7.5")]
-        Fps7_5 = 75, // Store as 75, convert to 7.5
+        [Description("5")]
+        Fps5 = 5,
         
-        [Description("3.75")]
-        Fps3_75 = 375, // Store as 375, convert to 3.75
+        [Description("2")]
+        Fps2 = 2,
         
-        [Description("1.875")]
-        Fps1_875 = 1875 // Store as 1875, convert to 1.875
+        [Description("1")]
+        Fps1 = 1
     }
 
     /// <summary>
@@ -46,9 +46,9 @@ namespace PowerScope.Model
                 PlotFpsOption.Fps60 => 60.0,
                 PlotFpsOption.Fps30 => 30.0,
                 PlotFpsOption.Fps15 => 15.0,
-                PlotFpsOption.Fps7_5 => 7.5,
-                PlotFpsOption.Fps3_75 => 3.75,
-                PlotFpsOption.Fps1_875 => 1.875,
+                PlotFpsOption.Fps5 => 5.0,
+                PlotFpsOption.Fps2 => 2.0,
+                PlotFpsOption.Fps1 => 1.0,
                 _ => 30.0 // Default fallback
             };
         }

@@ -1,4 +1,4 @@
-﻿<Window x:Class="PowerScope.View.UserForms.SerialConfigWindow"
+<Window x:Class="PowerScope.View.UserForms.SerialConfigWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:xctk="http://schemas.xceed.com/wpf/xaml/toolkit"
@@ -362,24 +362,12 @@
                                             <ComboBoxItem Content="Uint8" Tag="Uint8" />
                                             <ComboBoxItem Content="Int8" Tag="Int8" />
                                             <ComboBoxItem Content="Uint16" Tag="Uint16" />
-                                            <ComboBoxItem Content="Int16" Tag="Int16" />
+                                            <ComboBoxItem Content="Int16" Tag="Int16" IsSelected="True" />
                                             <ComboBoxItem Content="Uint32" Tag="Uint32" />
                                             <ComboBoxItem Content="Int32" Tag="Int32" />
                                             <ComboBoxItem Content="Float" Tag="Float" />
                                         </ComboBox>
                                     </StackPanel>
-                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
-                                        <Label Content="Endianness:" VerticalAlignment="Center" ToolTip="Choose the byte order for binary data." Width="80"/>
-                                        <ComboBox x:Name="ComboBox_Endianness" Width="200" SelectedValue="{Binding Endianness, Mode=TwoWay}" SelectedValuePath="Content">
-                                            <ComboBoxItem Content="Little Endian" IsSelected="True"/>
-                                            <ComboBoxItem Content="Big Endian"/>
-                                        </ComboBox>
-                                    </StackPanel>
-                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
-                                        <Label Content="Enable checksum:" VerticalAlignment="Center" ToolTip="Enable checksum for error detection." Width="80"/>
-                                        <CheckBox x:Name="CheckBox_EnableChecksum" Content="Enable Checksum" VerticalAlignment="Center" Margin="80,0,0,0" IsChecked="{Binding EnableChecksum, Mode=TwoWay}"/>
-                                    </StackPanel>
-                                    <!--<CheckBox x:Name="CheckBox_EnableChecksum" Content="Enable Checksum" VerticalAlignment="Center" Margin="80,0,0,0" IsChecked="{Binding EnableChecksum, Mode=TwoWay}" />-->
                                 </StackPanel>
                                 <!-- ASCII conditional controls -->
                                 <StackPanel x:Name="Panel_ASCII" Visibility="Collapsed" Margin="0,0,0,5">
@@ -395,6 +383,56 @@
                             </StackPanel>
                         </ScrollViewer>
                     </TabItem>
+
+                    <!-- FTDI MPSSE Tab (moved to second position) -->
+                    <TabItem Header="FTDI MPSSE" x:Name="TabItem_FTDI">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel Margin="10" VerticalAlignment="Top">
+                                <!-- Device Selection -->
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                                    <Label Content="Device:" VerticalAlignment="Center" ToolTip="Select the FTDI device to use." Width="80"/>
+                                    <ComboBox x:Name="ComboBox_FTDIDevice" Width="200" SelectedItem="{Binding FtdiSelectedDevice, Mode=TwoWay}" />
+                                </StackPanel>
+                                
+                                <!-- MPSSE Config Selection -->
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                                    <Label Content="Config:" VerticalAlignment="Center" ToolTip="Select the MPSSE configuration mode." Width="80"/>
+                                    <ComboBox x:Name="ComboBox_MPSSEConfig" Width="200">
+                                        <ComboBoxItem Content="SPI" IsSelected="True"/>
+                                    </ComboBox>
+                                </StackPanel>
+                                
+                                <!-- Channels -->
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                                    <Label Content="Channels:" VerticalAlignment="Center" ToolTip="Set the number of data channels (numbers only)." Width="80"/>
+                                    <TextBox x:Name="TextBox_FTDIChannels" Width="200" Text="{Binding NumberOfChannels, Mode=TwoWay}"
+                                             PreviewTextInput="NumbersOnly_PreviewTextInput" 
+                                             ToolTip="Enter number of channels (numbers only, e.g., 1, 2, 8)" />
+                                </StackPanel>
+                                
+                                <!-- Raw binary controls (always visible, no data format selection) -->
+                                <StackPanel x:Name="Panel_FTDIRawBinary" Margin="0,0,0,5">
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                                        <Label Content="Frame start:" VerticalAlignment="Center" ToolTip="Optional but recommended. Specify the frame start sequence to distinguish between frames." Width="80"/>
+                                        <TextBox x:Name="TextBox_FTDIFrameStart" Width="200" Text="{Binding FrameStart, Mode=TwoWay}" />
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                                        <Label Content="Number Type:" VerticalAlignment="Center" ToolTip="Select the type of numbers in the data stream." Width="80"/>
+                                        <ComboBox x:Name="ComboBox_FTDINumberType" Width="200">
+                                            <ComboBoxItem Content="Uint8" Tag="Uint8" />
+                                            <ComboBoxItem Content="Int8" Tag="Int8" />
+                                            <ComboBoxItem Content="Uint16" Tag="Uint16" />
+                                            <ComboBoxItem Content="Int16" Tag="Int16" IsSelected="True" />
+                                            <ComboBoxItem Content="Uint32" Tag="Uint32" />
+                                            <ComboBoxItem Content="Int32" Tag="Int32" />
+                                            <ComboBoxItem Content="Float" Tag="Float" />
+                                        </ComboBox>
+                                    </StackPanel>
+                                </StackPanel>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </TabItem>
+
                     <TabItem Header="USB">
                         <StackPanel Margin="10" VerticalAlignment="Top">
                             <Label Content="Future releases will support direct connection to USB device via WinUSB."/>
@@ -402,6 +440,7 @@
                             <!-- Add USB controls as needed -->
                         </StackPanel>
                     </TabItem>
+                    
                     <!-- Audio Tab -->
                     <TabItem Header="Audio" x:Name="TabItem_Audio">
                         <StackPanel Margin="10">

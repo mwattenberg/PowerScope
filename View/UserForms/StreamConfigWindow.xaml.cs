@@ -38,10 +38,13 @@ namespace PowerScope.View.UserForms
             
             Loaded += SerialConfigWindow_Loaded;
             Loaded += SerialConfigWindow_Loaded_AudioDevices;
+            Loaded += SerialConfigWindow_Loaded_FTDIDevices;
             ComboBox_DataFormat.SelectionChanged += DataFormatCombo_SelectionChanged;
             ComboBox_AudioDevices.SelectionChanged += ComboBox_AudioDevices_SelectionChanged;
+            ComboBox_FTDIDevice.SelectionChanged += ComboBox_FTDIDevice_SelectionChanged;
             SetRawBinaryPanelVisibility();
             SetASCIIPanelVisibility();
+            SetFTDIRawBinaryPanelVisibility();
             
             // Wire up demo signal type selection change to update the info text
             ComboBox_DemoSignalType.SelectionChanged += ComboBox_DemoSignalType_SelectionChanged;
@@ -72,6 +75,7 @@ namespace PowerScope.View.UserForms
                 StreamSource.Demo => TabItem_Demo,
                 StreamSource.File => TabItem_File,
                 StreamSource.USB => null, // USB tab exists but is not implemented yet
+                StreamSource.FTDI => TabItem_FTDI,
                 _ => TabItem_Serial // Default fallback to Serial tab
             };
 
@@ -132,6 +136,146 @@ namespace PowerScope.View.UserForms
             UpdateSampleRatesForCurrentDevice();
         }
 
+        private void SerialConfigWindow_Loaded_FTDIDevices(object sender, RoutedEventArgs e)
+        {
+            LoadFTDIDevices();
+        }
+
+        /// <summary>
+        /// Loads FTDI devices into the combo box with crash prevention measures.
+        /// 
+        /// CRASH PREVENTION NOTES:
+        /// - FTDI device enumeration can crash if devices are already opened by FTDI_SerialDataStream
+        /// - Multiple enumerations can cause conflicts with active FTDI connections
+        /// - The FTDI D2XX driver doesn't handle concurrent access well
+        /// - Device enumeration should only be done once during window initialization
+        /// 
+        /// This method now includes safeguards to:
+        /// 1. Skip re-enumeration if valid devices are already loaded
+        /// 2. Handle exceptions gracefully without crashing the application
+        /// 3. Provide informative error messages about potential conflicts
+        /// </summary>
+        private void LoadFTDIDevices()
+        {
+            // Skip loading if ComboBox already has items and a valid selection exists
+            // This prevents unnecessary enumeration that could interfere with active connections
+            if (ComboBox_FTDIDevice.Items.Count > 0 && 
+                ComboBox_FTDIDevice.SelectedItem is ComboBoxItem existingItem && 
+                existingItem.IsEnabled &&
+                !string.IsNullOrWhiteSpace(ViewModel?.FtdiSelectedDevice) &&
+                !ViewModel.FtdiSelectedDevice.Contains("No FTDI devices found") &&
+                !ViewModel.FtdiSelectedDevice.Contains("Error loading"))
+            {
+                // Valid devices already loaded, skip re-enumeration
+                return;
+            }
+
+            ComboBox_FTDIDevice.Items.Clear();
+            
+            try
+            {
+                // Get available FTDI devices using the enhanced method from FTDI_SerialDataStream
+                string[] devices = PowerScope.Model.FTDI_SerialDataStream.GetAvailableDevices();
+                
+                if (devices.Length > 0)
+                {
+                    // Get detailed device information for tooltips
+                    var deviceDetails = PowerScope.Model.FTDI_SerialDataStream.GetAvailableDeviceDetails();
+                    
+                    for (int i = 0; i < devices.Length; i++)
+                    {
+                        // Create a ComboBoxItem with tooltip information
+                        var item = new ComboBoxItem
+                        {
+                            Content = devices[i],
+                            Tag = i, // Store the device index for later reference
+                        };
+                        
+                        // Add detailed tooltip if we have device details
+                        if (i < deviceDetails.Length)
+                        {
+                            var detail = deviceDetails[i];
+                            string tooltip = $"Serial Number: {detail.SerialNumber}\n" +
+                                           $"Description: {detail.Description}\n" +
+                                           $"Device Type: {detail.Type}\n" +
+                                           $"Device ID: 0x{detail.ID:X8}\n" +
+                                           $"Location ID: 0x{detail.LocId:X8}\n" +
+                                           $"Status: {(detail.Flags == 0 ? "Available" : $"Flags: 0x{detail.Flags:X}")}";
+                            item.ToolTip = tooltip;
+                        }
+                        
+                        ComboBox_FTDIDevice.Items.Add(item);
+                    }
+                    
+                    // Set the selected device in ViewModel if not already set or if the current selection is invalid
+                    if (string.IsNullOrWhiteSpace(ViewModel.FtdiSelectedDevice) || 
+                        !devices.Contains(ViewModel.FtdiSelectedDevice))
+                    {
+                        ComboBox_FTDIDevice.SelectedIndex = 0; // Select the first device by default
+                        ViewModel.FtdiSelectedDevice = devices[0];
+                        ViewModel.FtdiDeviceIndex = 0;
+                    }
+                    else
+                    {
+                        // Find and select the matching device
+                        for (int i = 0; i < devices.Length; i++)
+                        {
+                            if (devices[i] == ViewModel.FtdiSelectedDevice)
+                            {
+                                ComboBox_FTDIDevice.SelectedIndex = i;
+                                break;
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    // No devices found - show informative message
+                    var dllStatus = PowerScope.Model.FTDI_SerialDataStream.VerifyFTDIDLL();
+                    string noDeviceMessage;
+                    
+                    if (!dllStatus.IsAvailable)
+                    {
+                        noDeviceMessage = "FTDI DLL not available";
+                    }
+                    else
+                    {
+                        noDeviceMessage = "No FTDI devices found";
+                    }
+                    
+                    var noDeviceItem = new ComboBoxItem
+                    {
+                        Content = noDeviceMessage,
+                        IsEnabled = false,
+                        ToolTip = dllStatus.IsAvailable ? 
+                            "No FTDI devices are currently connected to the system." :
+                            $"FTDI DLL Status: {dllStatus.Message}"
+                    };
+                    
+                    ComboBox_FTDIDevice.Items.Add(noDeviceItem);
+                    ComboBox_FTDIDevice.SelectedIndex = 0;
+                    ViewModel.FtdiSelectedDevice = noDeviceMessage;
+                }
+            }
+            catch (Exception ex)
+            {
+                string errorMessage = $"Error loading FTDI devices: {ex.Message}";
+                var errorItem = new ComboBoxItem
+                {
+                    Content = errorMessage,
+                    IsEnabled = false,
+                    ToolTip = $"Exception Details: {ex}\n\nThis may occur if FTDI devices are already in use by another application or if there are driver conflicts."
+                };
+                
+                ComboBox_FTDIDevice.Items.Add(errorItem);
+                ComboBox_FTDIDevice.SelectedIndex = 0;
+                ViewModel.FtdiSelectedDevice = errorMessage;
+                
+                // Log the exception for debugging
+                System.Diagnostics.Debug.WriteLine($"FTDI device enumeration failed: {ex}");
+            }
+        }
+
         private void LoadAudioDevices()
         {
             audioDevices.Clear();
@@ -186,6 +330,57 @@ namespace PowerScope.View.UserForms
         private void ComboBox_AudioDevices_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             UpdateSampleRatesForCurrentDevice();
+        }
+
+        private void ComboBox_FTDIDevice_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (ViewModel == null) return;
+            
+            try
+            {
+                if (ComboBox_FTDIDevice.SelectedItem is ComboBoxItem selectedItem)
+                {
+                    string deviceString = selectedItem.Content?.ToString();
+                    
+                    if (!string.IsNullOrEmpty(deviceString) && selectedItem.IsEnabled)
+                    {
+                        ViewModel.FtdiSelectedDevice = deviceString;
+                        
+                        // Get the device index from the Tag
+                        if (selectedItem.Tag is int deviceIndex)
+                        {
+                            ViewModel.FtdiDeviceIndex = (uint)deviceIndex;
+                        }
+                        else
+                        {
+                            // Fallback to using the ComboBox selected index
+                            ViewModel.FtdiDeviceIndex = (uint)Math.Max(0, ComboBox_FTDIDevice.SelectedIndex);
+                        }
+                    }
+                }
+                else if (ComboBox_FTDIDevice.SelectedItem is string selectedDevice)
+                {
+                    // Handle legacy string-based selection (for backward compatibility)
+                    ViewModel.FtdiSelectedDevice = selectedDevice;
+                    ViewModel.FtdiDeviceIndex = (uint)Math.Max(0, ComboBox_FTDIDevice.SelectedIndex);
+                }
+            }
+            catch (Exception ex)
+            {
+                // Log the error but don't crash the application
+                System.Diagnostics.Debug.WriteLine($"Error in FTDI device selection: {ex.Message}");
+                
+                // Set safe defaults
+                if (!string.IsNullOrEmpty(ViewModel.FtdiSelectedDevice))
+                {
+                    // Keep the existing selection if we have one
+                    return;
+                }
+                
+                // Otherwise set to a safe default
+                ViewModel.FtdiSelectedDevice = "Error in device selection";
+                ViewModel.FtdiDeviceIndex = 0;
+            }
         }
 
         private void UpdateSampleRatesForCurrentDevice()
@@ -532,6 +727,20 @@ namespace PowerScope.View.UserForms
                     MessageBox.Show("USB streams are not yet implemented.", "Not Implemented", MessageBoxButton.OK, MessageBoxImage.Information);
                     return;
                     
+                case StreamSource.FTDI:
+                    // Validate FTDI settings
+                    if (string.IsNullOrWhiteSpace(ViewModel.FtdiSelectedDevice) || ViewModel.FtdiSelectedDevice.Contains("No FTDI devices found") || ViewModel.FtdiSelectedDevice.Contains("Error loading devices"))
+                    {
+                        MessageBox.Show("Please select a valid FTDI device.", "Invalid Input", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        return;
+                    }
+                    if (ViewModel.NumberOfChannels <= 0)
+                    {
+                        MessageBox.Show("Please specify a valid number of channels.", "Invalid Input", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        return;
+                    }
+                    break;
+                    
                 default:
                     MessageBox.Show("Please select a valid stream type.", "Invalid Input", MessageBoxButton.OK, MessageBoxImage.Warning);
                     return;
@@ -601,6 +810,15 @@ namespace PowerScope.View.UserForms
                 Panel_ASCII.Visibility = ViewModel.DataFormat == DataFormatType.ASCII ? Visibility.Visible : Visibility.Collapsed;
         }
 
+        private void SetFTDIRawBinaryPanelVisibility()
+        {
+            // FTDI always assumes raw binary format, so panel is always visible
+            if (Panel_FTDIRawBinary != null)
+            {
+                Panel_FTDIRawBinary.Visibility = Visibility.Visible;
+            }
+        }
+
         private void TabControl_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (ViewModel == null || !(sender is TabControl tabControl))
@@ -612,6 +830,20 @@ namespace PowerScope.View.UserForms
                 if (selectedTab.Name == "TabItem_Serial")
                 {
                     ViewModel.StreamSource = StreamSource.SerialPort;
+                }
+                else if (selectedTab.Name == "TabItem_FTDI")
+                {
+                    ViewModel.StreamSource = StreamSource.FTDI;
+                    
+                    // IMPORTANT: Do NOT refresh FTDI device list when tab is selected
+                    // 
+                    // Previous code called LoadFTDIDevices() here, which caused crashes because:
+                    // 1. FTDI device enumeration conflicts with active FTDI_SerialDataStream connections
+                    // 2. The FTDI D2XX driver doesn't handle concurrent device access well
+                    // 3. Re-enumeration while devices are in use can cause driver-level conflicts
+                    // 
+                    // The device list is populated once during window initialization (SerialConfigWindow_Loaded_FTDIDevices)
+                    // This is sufficient for normal operation and prevents crashes.
                 }
                 else if (selectedTab.Name == "TabItem_Audio")
                 {

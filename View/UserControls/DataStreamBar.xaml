@@ -1,4 +1,4 @@
-﻿<UserControl x:Class="PowerScope.View.UserControls.DataStreamBar"
+<UserControl x:Class="PowerScope.View.UserControls.DataStreamBar"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
@@ -8,8 +8,10 @@
              d:DesignHeight="600" d:DesignWidth="120">
     <Grid Background="{DynamicResource PlotSettings_BackgroundBrush}" MinWidth="120">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>      <!-- Add stream button -->
-            <RowDefinition Height="*"/>         <!-- ItemsControl area grows/shrinks -->
+            <RowDefinition Height="Auto"/>
+            <!-- Add stream button -->
+            <RowDefinition Height="*"/>
+            <!-- ItemsControl area grows/shrinks -->
         </Grid.RowDefinitions>
 
         <!-- Borderless, full-width Add Stream button -->
@@ -18,12 +20,13 @@
                 x:Name="Button_AddStream"
                 Height="32"
                 BorderThickness="0"
-                Background="{DynamicResource PlotSettings_TextBoxBackgroundBrush}"
-                Foreground="{DynamicResource PlotSettings_ButtonForegroundBrush}"
+                Foreground="White"
+                FontWeight="Bold"
                 HorizontalAlignment="Stretch"
                 VerticalAlignment="Top"
                 Grid.Row="0"
-                Margin="0,0,0,10"/>
+                Margin="0,0,0,10" 
+                Background="LimeGreen"/>
 
         <!-- List of streams -->
         <StackPanel x:Name="Panel_Streams" Grid.Row="1"/>

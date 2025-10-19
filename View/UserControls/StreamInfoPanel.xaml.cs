@@ -76,6 +76,10 @@ namespace PowerScope.View.UserControls
                 {
                     displayText = $"{Path.GetFileName(_associatedStreamSettings.FilePath)}";
                 }
+                else if (_associatedStreamSettings.StreamSource == Model.StreamSource.FTDI)
+                {
+                    displayText = $"FTDI: {_associatedStreamSettings.FtdiSelectedDevice ?? "Unknown Device"}";
+                }
                 else
                 {
                     displayText = "Unknown";

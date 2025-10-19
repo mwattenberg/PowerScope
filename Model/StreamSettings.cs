@@ -41,7 +41,8 @@ namespace PowerScope.Model
         AudioInput,
         Demo,
         File,
-        USB
+        USB,
+        FTDI
     }
 
     public class StreamSettings : INotifyPropertyChanged
@@ -64,7 +65,6 @@ namespace PowerScope.Model
         private StreamSource _streamSource;
         private int _numberOfChannels;
         private NumberTypeEnum _numberType; // enum property
-        private string _endianness; // "LittleEndian", "BigEndian"
         private string _delimiter; // "Comma", "Space", "Tab", or custom
         private string _frameStart; // for CustomFrame
         private int _demoSampleRate; // for Demo mode
@@ -81,6 +81,11 @@ namespace PowerScope.Model
         private string _fileParseStatus;
         private long _fileTotalSamples;
 
+        // FTDI-related properties
+        private uint _ftdiDeviceIndex;
+        private uint _ftdiClockFrequency;
+        private string _ftdiSelectedDevice;
+
         // Callback for applying settings to data streams
         public Action<IDataStream> DataStreamConfigurationCallback { get; set; }
 
@@ -93,7 +98,6 @@ namespace PowerScope.Model
             NumberOfChannels = 1; // Start with minimal default
             DataFormat = DataFormatType.RawBinary; // Keep as default format
             NumberType = NumberTypeEnum.Uint16; // Set reasonable default
-            Endianness = "LittleEndian"; // Set reasonable default
             Delimiter = "Comma"; // Set reasonable default for ASCII
             FrameStart = "AA AA"; // Keep default frame start bytes
             
@@ -112,6 +116,11 @@ namespace PowerScope.Model
             FileChannelLabels = new List<string>();
             FileParseStatus = "No file selected";
             FileTotalSamples = 0;
+            
+            // FTDI defaults
+            FtdiDeviceIndex = 0; // Default to first device
+            FtdiClockFrequency = 1000000; // Default to 1MHz
+            FtdiSelectedDevice = null;
             
             // StreamSource will be set by the configuration dialog based on selected tab
             StreamSource = StreamSource.SerialPort; // Default to serial port;
@@ -258,19 +267,6 @@ namespace PowerScope.Model
             { 
                 _numberType = value; 
                 OnPropertyChanged(nameof(NumberType)); 
-            }
-        }
-        
-        public string Endianness
-        {
-            get 
-            { 
-                return _endianness; 
-            }
-            set 
-            { 
-                _endianness = value; 
-                OnPropertyChanged(nameof(Endianness)); 
             }
         }
         
@@ -426,6 +422,37 @@ namespace PowerScope.Model
             }
         }
 
+        // FTDI properties
+        public uint FtdiDeviceIndex
+        {
+            get { return _ftdiDeviceIndex; }
+            set
+            {
+                _ftdiDeviceIndex = value;
+                OnPropertyChanged(nameof(FtdiDeviceIndex));
+            }
+        }
+
+        public uint FtdiClockFrequency
+        {
+            get { return _ftdiClockFrequency; }
+            set
+            {
+                _ftdiClockFrequency = value;
+                OnPropertyChanged(nameof(FtdiClockFrequency));
+            }
+        }
+
+        public string FtdiSelectedDevice
+        {
+            get { return _ftdiSelectedDevice; }
+            set
+            {
+                _ftdiSelectedDevice = value;
+                OnPropertyChanged(nameof(FtdiSelectedDevice));
+            }
+        }
+
         public event PropertyChangedEventHandler PropertyChanged;
 
         protected virtual void OnPropertyChanged(string propertyName)
@@ -480,7 +507,7 @@ namespace PowerScope.Model
             // - Demo properties (NumberOfChannels, DemoSampleRate, DemoSignalType)
             // - Serial properties (Port, Baud, DataBits, StopBits, Parity)
             // - Audio properties (AudioDevice, AudioDeviceIndex, AudioSampleRate)
-            // - Other properties (Endianness, Delimiter, FrameStart, EnableChecksum, UpDownSampling)
+            // - Other properties (Delimiter, FrameStart, EnableChecksum, UpDownSampling)
         }
 
         /// <summary>

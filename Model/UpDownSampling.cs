@@ -220,7 +220,7 @@ namespace PowerScope.Model
             int writeBase = state.UpTail.Length;
             for (int n = 0; n < input.Length; n++)
             {
-                up[writeBase + n * M] = input[n];
+                up[writeBase + n * M] = input[n] * M;
             }
 
             // FIR filtering over the upsampled stream

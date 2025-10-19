@@ -260,8 +260,8 @@ namespace PowerScope.Model
             if (settings == null)
                 return rawSample;
 
-            // Apply gain and offset
-            double processed = settings.Gain * (rawSample + settings.Offset);
+            // Apply offset and gain
+            double processed = (rawSample + settings.Offset) * settings.Gain;
 
             // Apply filter if configured
             if (filter != null)

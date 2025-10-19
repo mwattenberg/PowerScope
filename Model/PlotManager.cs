@@ -71,6 +71,12 @@ namespace PowerScope.Model
         //Global function to get color from the same palette
         public static Color GetColor(int index)
         {
+            // Special case for index 4 - return LimeGreen
+            if (index == 3)
+            {
+                return System.Windows.Media.Colors.LimeGreen;
+            }
+            
             IPalette palette = new ScottPlot.Palettes.Tsitsulin();
             ScottPlot.Color scottPlotColor = palette.GetColor(index);
             return Color.FromArgb(scottPlotColor.A, scottPlotColor.R, scottPlotColor.G, scottPlotColor.B);
