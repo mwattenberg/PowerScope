@@ -14,7 +14,7 @@
         </Style>
 
         <Style TargetType="MenuItem" BasedOn="{StaticResource SystemFontStyle}">
-            <Setter Property="Background" Value="{DynamicResource PlotSettings_TitleBarBrush}"/>
+            <Setter Property="Background" Value="{DynamicResource PlotSettings_BackgroundBrush}"/>
             <Setter Property="Foreground" Value="{DynamicResource PlotSettings_LabelForegroundBrush}"/>
             <Setter Property="Padding" Value="10,5"/>
             <Setter Property="Template">
@@ -25,7 +25,7 @@
                                 <ContentPresenter ContentSource="Header" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Border>
                             <Popup Name="SubMenuPopup" IsOpen="{TemplateBinding IsSubmenuOpen}" Placement="Bottom" StaysOpen="False" AllowsTransparency="True">
-                                <Border Background="{DynamicResource PlotSettings_TitleBarBrush}" BorderBrush="{DynamicResource PlotSettings_BorderBrush}" BorderThickness="1">
+                                <Border Background="{DynamicResource PlotSettings_BackgroundBrush}" BorderBrush="{DynamicResource PlotSettings_BorderBrush}" BorderThickness="1">
                                     <ItemsPresenter/>
                                 </Border>
                             </Popup>
@@ -57,7 +57,7 @@
             BorderThickness="1"
             CornerRadius="0"
             Panel.ZIndex="1000">
-        <Menu Height="26" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
+        <Menu Height="26" VerticalAlignment="Stretch" HorizontalAlignment="Stretch" Menu.Background ="{DynamicResource PlotSettings_BackgroundBrush}">
             <MenuItem Header="File">
                 <MenuItem Header="Load Settings                    Ctrl+O" Click="MenuItem_LoadSettings_Click"/>
                 <MenuItem Header="Save Settings                     Ctrl+S" Click="MenuItem_SaveSettings_Click"/>

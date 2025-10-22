@@ -45,6 +45,13 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Remove="FtdiSharp\**" />
+    <EmbeddedResource Remove="FtdiSharp\**" />
+    <None Remove="FtdiSharp\**" />
+    <Page Remove="FtdiSharp\**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Compile Remove="Model\CursorChannelViewModel.cs" />
     <Compile Remove="Model\SerialDataStreamSinc.cs" />
     <Compile Remove="View\UserControls\DraggableAxisLines.cs" />

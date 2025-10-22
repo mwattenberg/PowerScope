@@ -31,7 +31,7 @@
                         ToolTip="Close"/>
             </Grid>
             <!-- Centered version textbox -->
-            <TextBox Grid.Row="1" Text="PowerScope 1.0 Alpha 3" 
+            <TextBox Grid.Row="1" Text="PowerScope 1.0 Alpha 4" 
                      HorizontalAlignment="Center"
                      Margin="0,6,0,4" 
                      BorderThickness="0" Background="Transparent" 
@@ -44,7 +44,7 @@
                 </Hyperlink>
             </TextBlock>
             <!-- Acknowledgements and license area -->
-            <Grid Grid.Row="3" Margin="12">
+            <Grid Grid.Row="4" Margin="12">
                 <Border Background="Transparent" BorderThickness="0">
                     <StackPanel>
                         <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource PlotSettings_LabelForegroundBrush}" Margin="0,0,0,8">
@@ -61,8 +61,14 @@
                             <Hyperlink NavigateUri="https://github.com/Aelian-Software/Aelian.FFT" RequestNavigate="Hyperlink_RequestNavigate">Aelian FFT</Hyperlink>
                         </TextBlock>
 
+                        
+                        
                         <TextBlock TextWrapping="Wrap" Margin="8,0,0,2">
                             <Hyperlink NavigateUri="https://github.com/naudio/NAudio" RequestNavigate="Hyperlink_RequestNavigate">NAudio</Hyperlink>
+                        </TextBlock>
+
+                        <TextBlock TextWrapping="Wrap" Margin="8,0,0,2">
+                            <Hyperlink NavigateUri="https://github.com/swharden/FtdiSharp" RequestNavigate="Hyperlink_RequestNavigate">FtdiSharp</Hyperlink>
                         </TextBlock>
 
                         <!-- Optional spacing -->

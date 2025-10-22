@@ -6,6 +6,37 @@
              xmlns:local="clr-namespace:PowerScope.View.UserControls"
              mc:Ignorable="d" 
              d:DesignHeight="600" d:DesignWidth="120">
+    
+    <UserControl.Resources>
+        <!-- Button style matching MeasurementBar buttons -->
+        <Style x:Key="AddStreamButtonStyle" TargetType="Button">
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="4"/>
+            <Setter Property="Background" Value="{StaticResource PlotSettings_TextBoxBackgroundBrush}"/>
+            <Setter Property="Foreground" Value="{StaticResource PlotSettings_ButtonForegroundBrush}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="2">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="{StaticResource PlotSettings_ButtonHoverBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter Property="Background" Value="{StaticResource PlotSettings_ButtonPressedBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+    
     <Grid Background="{DynamicResource PlotSettings_BackgroundBrush}" MinWidth="120">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -19,14 +50,12 @@
                 Click="Button_AddStream_Click"
                 x:Name="Button_AddStream"
                 Height="32"
-                BorderThickness="0"
-                Foreground="White"
                 FontWeight="Bold"
                 HorizontalAlignment="Stretch"
-                VerticalAlignment="Top"
+                VerticalAlignment="Top" 
                 Grid.Row="0"
-                Margin="0,0,0,10" 
-                Background="LimeGreen"/>
+                Margin="0,0,0,10"
+                Style="{StaticResource AddStreamButtonStyle}"/>
 
         <!-- List of streams -->
         <StackPanel x:Name="Panel_Streams" Grid.Row="1"/>

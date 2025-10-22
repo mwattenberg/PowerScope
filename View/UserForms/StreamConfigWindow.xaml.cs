@@ -199,8 +199,9 @@ namespace PowerScope.View.UserForms
                                            $"Description: {detail.Description}\n" +
                                            $"Device Type: {detail.Type}\n" +
                                            $"Device ID: 0x{detail.ID:X8}\n" +
-                                           $"Location ID: 0x{detail.LocId:X8}\n" +
-                                           $"Status: {(detail.Flags == 0 ? "Available" : $"Flags: 0x{detail.Flags:X}")}";
+                                           $"Location ID: 0x{detail.LocationID:X8}\n" +
+                                           $"Index: {detail.Index}\n" +
+                                           $"Status: {(detail.IsOpen ? "In Use" : "Available")}";
                             item.ToolTip = tooltip;
                         }
                         
@@ -231,12 +232,12 @@ namespace PowerScope.View.UserForms
                 else
                 {
                     // No devices found - show informative message
-                    var dllStatus = PowerScope.Model.FTDI_SerialDataStream.VerifyFTDIDLL();
+                    var dllStatus = PowerScope.Model.FTDI_SerialDataStream.VerifyFtdiSharp();
                     string noDeviceMessage;
                     
                     if (!dllStatus.IsAvailable)
                     {
-                        noDeviceMessage = "FTDI DLL not available";
+                        noDeviceMessage = "FtdiSharp not available";
                     }
                     else
                     {
@@ -249,7 +250,7 @@ namespace PowerScope.View.UserForms
                         IsEnabled = false,
                         ToolTip = dllStatus.IsAvailable ? 
                             "No FTDI devices are currently connected to the system." :
-                            $"FTDI DLL Status: {dllStatus.Message}"
+                            $"FtdiSharp Status: {dllStatus.Message}"
                     };
                     
                     ComboBox_FTDIDevice.Items.Add(noDeviceItem);

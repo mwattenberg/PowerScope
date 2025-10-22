@@ -2,122 +2,33 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
-using System.IO;
 using System.Linq;
-using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
+using FtdiSharp;
+using FtdiSharp.Protocols;
 
 namespace PowerScope.Model
 {
     /// <summary>
-    /// Exception thrown when an FTDI device operation fails
-    /// </summary>
-    public class FTDIException : Exception
-    {
-        public uint ErrorCode { get; }
-
-        public FTDIException(uint errorCode, string operation) 
-            : base($"FTDI operation '{operation}' failed with error code: {errorCode}")
-        {
-            ErrorCode = errorCode;
-        }
-
-        public FTDIException(uint errorCode, string operation, Exception innerException) 
-            : base($"FTDI operation '{operation}' failed with error code: {errorCode}", innerException)
-        {
-            ErrorCode = errorCode;
-        }
-    }
-
-    /// <summary>
-    /// Data stream implementation for FTDI MPSSE SPI interface
-    /// Provides high-speed data acquisition using FTDI's Multi-Protocol Synchronous Serial Engine (MPSSE)
+    /// FTDI data stream implementation using FtdiSharp library
+    /// Provides high-speed data acquisition with improved reliability and maintainability
     /// </summary>
     public class FTDI_SerialDataStream : IDataStream, IChannelConfigurable, IBufferResizable, IUpDownSampling
     {
-        #region FTDI D2XX DLL Imports (x64)
-        
-        // Use x64 FTDI DLL - assuming 64-bit system
-        private const string FtdiDllName = "ftd2xx64.dll";
-        
-        [DllImport(FtdiDllName)]
-        private static extern uint FT_Open(uint deviceNumber, ref IntPtr ftHandle);
-        
-        [DllImport(FtdiDllName)]
-        private static extern uint FT_Close(IntPtr ftHandle);
-        
-        [DllImport(FtdiDllName)]
-        private static extern uint FT_SetBitMode(IntPtr ftHandle, byte mask, byte mode);
-        
-        [DllImport(FtdiDllName)]
-        private static extern uint FT_SetUSBParameters(IntPtr ftHandle, uint inTransferSize, uint outTransferSize);
-        
-        [DllImport(FtdiDllName)]
-        private static extern uint FT_SetLatencyTimer(IntPtr ftHandle, byte latency);
-        
-        [DllImport(FtdiDllName)]
-        private static extern uint FT_Write(IntPtr ftHandle, byte[] buffer, uint bytesToWrite, ref uint bytesWritten);
-        
-        [DllImport(FtdiDllName)]
-        private static extern uint FT_Read(IntPtr ftHandle, byte[] buffer, uint bytesToRead, ref uint bytesRead);
-        
-        [DllImport(FtdiDllName)]
-        private static extern uint FT_Purge(IntPtr ftHandle, uint mask);
-        
-        [DllImport(FtdiDllName)]
-        private static extern uint FT_GetQueueStatus(IntPtr ftHandle, ref uint rxBytes);
-
-        [DllImport(FtdiDllName)]
-        private static extern uint FT_GetDeviceInfoList([Out] FT_DEVICE_LIST_INFO_NODE[] pDest, ref uint numDevices);
-
-        [DllImport(FtdiDllName)]
-        private static extern uint FT_ListDevices(uint argument1, IntPtr argument2, uint flags);
-
-        [DllImport(FtdiDllName)]
-        private static extern uint FT_CreateDeviceInfoList(ref uint numDevices);
-
-        #endregion
-
-        #region FTDI Constants
-
-        private const uint FT_OK = 0;
-        private const byte FT_BITMODE_RESET = 0x00;
-        private const byte FT_BITMODE_MPSSE = 0x02;
-        private const uint FT_PURGE_RX = 1;
-        private const uint FT_PURGE_TX = 2;
-
-        // MPSSE Commands
-        private const byte MPSSE_WRITE_NEG = 0x01;  // Write on negative clock edge
-        private const byte MPSSE_BITMODE = 0x02;     // Bit mode
-        private const byte MPSSE_READ_NEG = 0x04;    // Read on negative clock edge
-        private const byte MPSSE_LSB_FIRST = 0x08;   // LSB first
-        private const byte MPSSE_DO_WRITE = 0x10;    // Write TDI/DO
-        private const byte MPSSE_DO_READ = 0x20;     // Read TDO/DI
-        private const byte MPSSE_WRITE_TMS = 0x40;   // Write TMS/CS
-
-        // Common MPSSE commands
-        private const byte MPSSE_CMD_SET_DATA_BITS_LOW = 0x80;
-        private const byte MPSSE_CMD_SET_DATA_BITS_HIGH = 0x82;
-        private const byte MPSSE_CMD_GET_DATA_BITS_LOW = 0x81;
-        private const byte MPSSE_CMD_GET_DATA_BITS_HIGH = 0x83;
-        private const byte MPSSE_CMD_SET_CLOCK_DIVISOR = 0x86;
-        private const byte MPSSE_CMD_DISABLE_CLOCK_DIVIDE_BY_5 = 0x8A;
-        private const byte MPSSE_CMD_ENABLE_3_PHASE_CLOCK = 0x8C;
-
-        #endregion
-
         #region Private Fields
 
-        private IntPtr _ftHandle = IntPtr.Zero;
-        private Thread _readThread;
+        private FtdiDevice? _ftdiDevice;
+        private SPI? _spi;
+        private Thread? _readThread;
         private bool _disposed = false;
         private bool _isConnected;
         private bool _isStreaming;
-        private string _statusMessage;
+        private string _statusMessage = string.Empty;
 
         // FTDI Configuration
         private uint _deviceIndex;
+        private string? _deviceSerialNumber;
         private uint _spiClockFrequency;
         private int _channelCount;
 
@@ -133,14 +44,12 @@ namespace PowerScope.Model
         private readonly UpDownSampling _upDownSampling;
 
         // Data buffers and processing
-        private RingBuffer<double>[] _receivedData;
-        private readonly byte[] _readBuffer;
-        private readonly byte[] _workingBuffer;
+        private RingBuffer<double>[]? _receivedData;
         private DataParser _parser;
 
         // Channel-specific processing
         private ChannelSettings[] _channelSettings;
-        private IDigitalFilter[] _channelFilters;
+        private IDigitalFilter?[] _channelFilters;
         private readonly object _channelConfigLock = new object();
 
         #endregion
@@ -217,7 +126,7 @@ namespace PowerScope.Model
         #region Constructor
 
         /// <summary>
-        /// Initializes a new instance of FTDI_SerialDataStream
+        /// Initializes a new instance of FTDI_SerialDataStream using FtdiSharp
         /// </summary>
         /// <param name="deviceIndex">FTDI device index (0 for first device)</param>
         /// <param name="clockFrequency">SPI clock frequency in Hz</param>
@@ -234,27 +143,26 @@ namespace PowerScope.Model
             _upDownSampling = new UpDownSampling(1);
             _upDownSampling.PropertyChanged += OnUpDownSamplingPropertyChanged;
 
-            // Initialize buffers
-            _readBuffer = new byte[16384]; // 16KB read buffer
-            _workingBuffer = new byte[32768]; // 32KB working buffer
-
             // Initialize with default buffer size
             int defaultBufferSize = 500000;
             InitializeRingBuffers(defaultBufferSize);
 
             // Initialize channel processing arrays
             _channelSettings = new ChannelSettings[channelCount];
-            _channelFilters = new IDigitalFilter[channelCount];
+            _channelFilters = new IDigitalFilter?[channelCount];
 
-            // Verify FTDI DLL availability during initialization
-            var dllStatus = VerifyFTDIDLL();
-            if (dllStatus.IsAvailable)
+            // Get device serial number for the specified index
+            _deviceSerialNumber = GetDeviceSerialNumberByIndex(deviceIndex);
+
+            // Verify FtdiSharp availability during initialization
+            var verification = VerifyFtdiSharp();
+            if (verification.IsAvailable)
             {
-                StatusMessage = $"FTDI DLL loaded successfully - {dllStatus.Message}";
+                StatusMessage = $"FtdiSharp ready - {verification.Message}";
             }
             else
             {
-                StatusMessage = $"FTDI DLL verification failed - {dllStatus.Message}";
+                StatusMessage = $"FtdiSharp unavailable - {verification.Message}";
             }
 
             // Initialize connection state
@@ -269,72 +177,24 @@ namespace PowerScope.Model
         /// <summary>
         /// Gets a list of available FTDI devices with their serial numbers and descriptions
         /// </summary>
-        /// <returns>Array of device descriptions with serial numbers, empty array if DLL not available</returns>
+        /// <returns>Array of device descriptions with serial numbers</returns>
         public static string[] GetAvailableDevices()
         {
             try
             {
-                // First verify the DLL is available
-                var dllStatus = VerifyFTDIDLL();
-                if (!dllStatus.IsAvailable)
-                {
-                    // Return empty array but log the reason
-                    System.Diagnostics.Debug.WriteLine($"FTDI GetAvailableDevices failed: {dllStatus.Message}");
-                    return new string[0];
-                }
-
-                // Try to get device count
-                uint numDevices = 0;
-                uint status = FT_CreateDeviceInfoList(ref numDevices);
+                var devices = FtdiDevices.Scan();
+                var deviceStrings = new string[devices.Length];
                 
-                if (status != FT_OK)
+                for (int i = 0; i < devices.Length; i++)
                 {
-                    System.Diagnostics.Debug.WriteLine($"FTDI CreateDeviceInfoList failed with status: {status} ({GetFTDIStatusDescription(status)})");
-                    return new string[0];
-                }
-
-                if (numDevices == 0)
-                {
-                    return new string[0];
-                }
-
-                // Allocate array for device info
-                var deviceInfoArray = new FT_DEVICE_LIST_INFO_NODE[numDevices];
-                
-                // Get device information list
-                status = FT_GetDeviceInfoList(deviceInfoArray, ref numDevices);
-                
-                if (status != FT_OK)
-                {
-                    System.Diagnostics.Debug.WriteLine($"FTDI GetDeviceInfoList failed with status: {status} ({GetFTDIStatusDescription(status)})");
-                    return new string[0];
-                }
-
-                // Build array of device strings with serial numbers
-                string[] devices = new string[numDevices];
-                for (int i = 0; i < numDevices; i++)
-                {
-                    var deviceInfo = deviceInfoArray[i];
-                    
-                    // Use the new helper method for consistent formatting
-                    devices[i] = CreateDeviceDisplayName(deviceInfo, i);
+                    deviceStrings[i] = CreateDeviceDisplayName(devices[i]);
                 }
                 
-                return devices;
-            }
-            catch (DllNotFoundException ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"FTDI DLL not found: {ex.Message}");
-                return new string[0];
-            }
-            catch (BadImageFormatException ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"FTDI DLL architecture mismatch: {ex.Message}");
-                return new string[0];
+                return deviceStrings;
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"FTDI GetAvailableDevices error: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"FtdiSharp GetAvailableDevices error: {ex.Message}");
                 return new string[0];
             }
         }
@@ -342,46 +202,17 @@ namespace PowerScope.Model
         /// <summary>
         /// Gets detailed information about available FTDI devices
         /// </summary>
-        /// <returns>Array of FT_DEVICE_LIST_INFO_NODE structures with device details</returns>
-        public static FT_DEVICE_LIST_INFO_NODE[] GetAvailableDeviceDetails()
+        /// <returns>Array of FtdiDevice objects with device details</returns>
+        public static FtdiDevice[] GetAvailableDeviceDetails()
         {
             try
             {
-                // First verify the DLL is available
-                var dllStatus = VerifyFTDIDLL();
-                if (!dllStatus.IsAvailable)
-                {
-                    System.Diagnostics.Debug.WriteLine($"FTDI GetAvailableDeviceDetails failed: {dllStatus.Message}");
-                    return new FT_DEVICE_LIST_INFO_NODE[0];
-                }
-
-                // Try to get device count
-                uint numDevices = 0;
-                uint status = FT_CreateDeviceInfoList(ref numDevices);
-                
-                if (status != FT_OK || numDevices == 0)
-                {
-                    return new FT_DEVICE_LIST_INFO_NODE[0];
-                }
-
-                // Allocate array for device info
-                var deviceInfoArray = new FT_DEVICE_LIST_INFO_NODE[numDevices];
-                
-                // Get device information list
-                status = FT_GetDeviceInfoList(deviceInfoArray, ref numDevices);
-                
-                if (status != FT_OK)
-                {
-                    System.Diagnostics.Debug.WriteLine($"FTDI GetDeviceInfoList failed with status: {status} ({GetFTDIStatusDescription(status)})");
-                    return new FT_DEVICE_LIST_INFO_NODE[0];
-                }
-
-                return deviceInfoArray;
+                return FtdiDevices.Scan();
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"FTDI GetAvailableDeviceDetails error: {ex.Message}");
-                return new FT_DEVICE_LIST_INFO_NODE[0];
+                System.Diagnostics.Debug.WriteLine($"FtdiSharp GetAvailableDeviceDetails error: {ex.Message}");
+                return new FtdiDevice[0];
             }
         }
 
@@ -390,32 +221,16 @@ namespace PowerScope.Model
         /// </summary>
         /// <param name="deviceString">Device string in format "SerialNumber - Description"</param>
         /// <returns>Serial number or null if not found</returns>
-        public static string ExtractSerialNumber(string deviceString)
+        public static string? ExtractSerialNumber(string deviceString)
         {
             if (string.IsNullOrEmpty(deviceString))
                 return null;
 
-            // New format: "SerialNumber - Description"
+            // Format: "SerialNumber - Description"
             int separatorIndex = deviceString.IndexOf(" - ");
             if (separatorIndex > 0)
             {
                 return deviceString.Substring(0, separatorIndex).Trim();
-            }
-
-            // Fallback: try old format "Serial: XXXXXXXX - Description"  
-            const string serialPrefix = "Serial: ";
-            int startIndex = deviceString.IndexOf(serialPrefix);
-            if (startIndex == -1)
-                return null;
-
-            startIndex += serialPrefix.Length;
-            int endIndex = deviceString.IndexOf(" - ", startIndex);
-            if (endIndex == -1)
-                endIndex = deviceString.Length;
-
-            if (startIndex < endIndex)
-            {
-                return deviceString.Substring(startIndex, endIndex - startIndex).Trim();
             }
 
             return null;
@@ -426,11 +241,11 @@ namespace PowerScope.Model
         /// </summary>
         /// <param name="deviceIndex">Zero-based device index</param>
         /// <returns>Device information or null if not found</returns>
-        public static FT_DEVICE_LIST_INFO_NODE? GetDeviceInfo(uint deviceIndex)
+        public static FtdiDevice? GetDeviceInfo(uint deviceIndex)
         {
             try
             {
-                var devices = GetAvailableDeviceDetails();
+                var devices = FtdiDevices.Scan();
                 if (deviceIndex < devices.Length)
                 {
                     return devices[deviceIndex];
@@ -438,166 +253,78 @@ namespace PowerScope.Model
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"FTDI GetDeviceInfo error: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"FtdiSharp GetDeviceInfo error: {ex.Message}");
             }
             
             return null;
         }
 
-        private bool OpenDevice()
+        /// <summary>
+        /// Creates a user-friendly display name for FTDI devices
+        /// </summary>
+        /// <param name="device">FtdiDevice object</param>
+        /// <returns>Formatted display string</returns>
+        public static string CreateDeviceDisplayName(FtdiDevice device)
         {
-            uint status = FT_Open(_deviceIndex, ref _ftHandle);
-            if (status != FT_OK)
+            string serialNumber = device.SerialNumber ?? "Unknown";
+            string description = device.Description ?? "FTDI Device";
+            
+            // Clean up the description by removing redundant information
+            string cleanDescription = description;
+            if (cleanDescription.Contains("(") && cleanDescription.Contains(")"))
             {
-                StatusMessage = $"Failed to open FTDI device {_deviceIndex}. Error: {status}";
-                return false;
+                // Remove serial number from description if it's already there
+                int parenIndex = cleanDescription.LastIndexOf('(');
+                if (parenIndex > 0)
+                {
+                    string beforeParen = cleanDescription.Substring(0, parenIndex).Trim();
+                    if (!string.IsNullOrEmpty(beforeParen))
+                    {
+                        cleanDescription = beforeParen;
+                    }
+                }
             }
             
-            StatusMessage = "FTDI device opened successfully";
-            return true;
+            // Format: "SerialNumber - CleanDescription"
+            return $"{serialNumber} - {cleanDescription}";
         }
 
-        private bool ConfigureMPSSE()
+        /// <summary>
+        /// Gets a shortened device identifier for logging or status display
+        /// </summary>
+        /// <param name="deviceString">Full device string from GetAvailableDevices()</param>
+        /// <returns>Short identifier</returns>
+        public static string GetDeviceShortName(string deviceString)
         {
-            if (_ftHandle == IntPtr.Zero)
-            {
-                StatusMessage = "Device not opened";
-                return false;
-            }
+            if (string.IsNullOrEmpty(deviceString))
+                return "Unknown";
+                
+            // Extract just the serial number for short identification
+            string? serialNumber = ExtractSerialNumber(deviceString);
+            return string.IsNullOrEmpty(serialNumber) ? "Unknown" : serialNumber;
+        }
 
+        /// <summary>
+        /// Gets device serial number by index for backward compatibility
+        /// </summary>
+        /// <param name="deviceIndex">Zero-based device index</param>
+        /// <returns>Device serial number or null if not found</returns>
+        private static string? GetDeviceSerialNumberByIndex(uint deviceIndex)
+        {
             try
             {
-                // Reset the device
-                uint status = FT_SetBitMode(_ftHandle, 0x00, FT_BITMODE_RESET);
-                if (status != FT_OK)
+                var devices = FtdiDevices.Scan();
+                if (deviceIndex < devices.Length)
                 {
-                    StatusMessage = $"Failed to reset device. Error: {status}";
-                    return false;
+                    return devices[deviceIndex].SerialNumber;
                 }
-                Thread.Sleep(50);
-
-                // Set MPSSE mode
-                status = FT_SetBitMode(_ftHandle, 0x00, FT_BITMODE_MPSSE);
-                if (status != FT_OK)
-                {
-                    StatusMessage = $"Failed to set MPSSE mode. Error: {status}";
-                    return false;
-                }
-                Thread.Sleep(50);
-
-                // Configure USB transfer sizes
-                status = FT_SetUSBParameters(_ftHandle, 65536, 65536);
-                if (status != FT_OK)
-                {
-                    StatusMessage = $"Failed to set USB parameters. Error: {status}";
-                    return false;
-                }
-
-                // Set latency timer to 1ms
-                status = FT_SetLatencyTimer(_ftHandle, 1);
-                if (status != FT_OK)
-                {
-                    StatusMessage = $"Failed to set latency timer. Error: {status}";
-                    return false;
-                }
-
-                // Purge buffers
-                status = FT_Purge(_ftHandle, FT_PURGE_RX | FT_PURGE_TX);
-                if (status != FT_OK)
-                {
-                    StatusMessage = $"Failed to purge buffers. Error: {status}";
-                    return false;
-                }
-
-                StatusMessage = "MPSSE mode configured successfully";
-                return true;
             }
             catch (Exception ex)
             {
-                StatusMessage = $"Exception during MPSSE configuration: {ex.Message}";
-                return false;
+                System.Diagnostics.Debug.WriteLine($"FtdiSharp GetDeviceSerialNumberByIndex error: {ex.Message}");
             }
-        }
-
-        private bool ConfigureSPI()
-        {
-            if (_ftHandle == IntPtr.Zero)
-            {
-                StatusMessage = "Device not opened";
-                return false;
-            }
-
-            try
-            {
-                byte[] buffer = new byte[20];
-                int idx = 0;
-
-                // Disable clock divide-by-5 for higher frequencies
-                buffer[idx++] = MPSSE_CMD_DISABLE_CLOCK_DIVIDE_BY_5;
-
-                // Disable adaptive clocking
-                buffer[idx++] = 0x97;
-
-                // Enable 3-phase clocking for better reliability
-                buffer[idx++] = MPSSE_CMD_ENABLE_3_PHASE_CLOCK;
-
-                // Set clock divisor
-                // Clock = 60MHz / ((1 + divisor) * 2)
-                uint divisor = (30000000 / _spiClockFrequency) - 1;
-                buffer[idx++] = MPSSE_CMD_SET_CLOCK_DIVISOR;
-                buffer[idx++] = (byte)(divisor & 0xFF);
-                buffer[idx++] = (byte)((divisor >> 8) & 0xFF);
-
-                // Configure GPIO pins (lower byte)
-                // Set initial states: SCK=0, MOSI=0, CS=1 (active low)
-                // Direction: SCK=out, MOSI=out, MISO=in, CS=out
-                // AD0=SCK, AD1=MOSI, AD2=MISO, AD3=CS
-                byte initialState = 0x08;  // CS high (bit 3)
-                byte direction = 0x0B;     // SCK, MOSI, CS as outputs (bits 0,1,3)
-                
-                buffer[idx++] = MPSSE_CMD_SET_DATA_BITS_LOW;
-                buffer[idx++] = initialState;
-                buffer[idx++] = direction;
-
-                // Configure upper GPIO pins (if needed)
-                buffer[idx++] = MPSSE_CMD_SET_DATA_BITS_HIGH;
-                buffer[idx++] = 0x00;
-                buffer[idx++] = 0x00;
-
-                uint bytesWritten = 0;
-                uint status = FT_Write(_ftHandle, buffer, (uint)idx, ref bytesWritten);
-                
-                if (status != FT_OK || bytesWritten != idx)
-                {
-                    StatusMessage = $"Failed to configure SPI. Error: {status}";
-                    return false;
-                }
-
-                StatusMessage = $"SPI configured successfully at {_spiClockFrequency}Hz";
-                return true;
-            }
-            catch (Exception ex)
-            {
-                StatusMessage = $"Exception during SPI configuration: {ex.Message}";
-                return false;
-            }
-        }
-
-        private void CloseDevice()
-        {
-            if (_ftHandle != IntPtr.Zero)
-            {
-                try
-                {
-                    FT_Close(_ftHandle);
-                    _ftHandle = IntPtr.Zero;
-                    StatusMessage = "FTDI device closed";
-                }
-                catch (Exception ex)
-                {
-                    StatusMessage = $"Error closing FTDI device: {ex.Message}";
-                }
-            }
+            
+            return null;
         }
 
         #endregion
@@ -608,36 +335,70 @@ namespace PowerScope.Model
         {
             try
             {
-                if (OpenDevice() && ConfigureMPSSE() && ConfigureSPI())
+                // Find the device by serial number or index
+                var devices = FtdiDevices.Scan();
+                
+                if (!string.IsNullOrEmpty(_deviceSerialNumber))
                 {
-                    IsConnected = true;
-                    StatusMessage = "Connected";
+                    var foundDevice = devices.FirstOrDefault(d => d.SerialNumber == _deviceSerialNumber);
+                    if (!string.IsNullOrEmpty(foundDevice.SerialNumber))
+                    {
+                        _ftdiDevice = foundDevice;
+                    }
                 }
-                else
+                else if (_deviceIndex < devices.Length)
                 {
+                    _ftdiDevice = devices[_deviceIndex];
+                }
+                
+                if (_ftdiDevice == null || string.IsNullOrEmpty(_ftdiDevice.Value.SerialNumber))
+                {
+                    StatusMessage = $"FTDI device not found (index: {_deviceIndex}, serial: {_deviceSerialNumber})";
                     IsConnected = false;
-                    CloseDevice();
+                    return;
                 }
+
+                // Create SPI protocol handler with FtdiSharp
+                _spi = new SPI(_ftdiDevice.Value);
+                
+                IsConnected = true;
+                StatusMessage = $"Connected to {_ftdiDevice.Value.SerialNumber}";
             }
             catch (Exception ex)
             {
                 IsConnected = false;
                 StatusMessage = $"Connection failed: {ex.Message}";
-                CloseDevice();
+                try
+                {
+                    _spi?.Dispose();
+                    _spi = null;
+                }
+                catch { }
             }
         }
 
         public void Disconnect()
         {
             StopStreaming();
-            CloseDevice();
+            
+            try
+            {
+                _spi?.Dispose();
+                _spi = null;
+                _ftdiDevice = null;
+            }
+            catch (Exception ex)
+            {
+                StatusMessage = $"Error during disconnect: {ex.Message}";
+            }
+            
             IsConnected = false;
             StatusMessage = "Disconnected";
         }
 
         public void StartStreaming()
         {
-            if (!_isConnected || _isStreaming)
+            if (!_isConnected || _isStreaming || _spi == null)
                 return;
 
             IsStreaming = true;
@@ -681,7 +442,7 @@ namespace PowerScope.Model
 
         public int CopyLatestTo(int channel, double[] destination, int n)
         {
-            if (channel < 0 || channel >= _receivedData.Length)
+            if (channel < 0 || channel >= (_receivedData?.Length ?? 0))
                 return 0;
             
             if (!_isConnected && !_isStreaming)
@@ -689,7 +450,7 @@ namespace PowerScope.Model
                 
             try
             {
-                return _receivedData[channel].CopyLatestTo(destination, n);
+                return _receivedData![channel].CopyLatestTo(destination, n);
             }
             catch (Exception)
             {
@@ -727,50 +488,22 @@ namespace PowerScope.Model
 
         private void ReadFTDIData()
         {
-            int minBytesThreshold = 64;
-            int maxReadSize = _readBuffer.Length;
+            const int readSize = 1024; // Adjust based on your needs
             int consecutiveErrorCount = 0;
             const int maxConsecutiveErrors = 5;
 
-            while (_isStreaming && _ftHandle != IntPtr.Zero)
+            while (_isStreaming && _spi != null)
             {
                 try
                 {
-                    // Check how many bytes are available
-                    uint bytesAvailable = 0;
-                    uint status = FT_GetQueueStatus(_ftHandle, ref bytesAvailable);
+                    // Use FtdiSharp SPI to read data
+                    byte[] readData = _spi.ReadBytes(readSize);
                     
-                    if (status != FT_OK)
+                    if (readData.Length > 0)
                     {
-                        HandleRuntimeDisconnection($"Queue status error: {status}");
-                        break;
-                    }
-
-                    if (bytesAvailable >= minBytesThreshold)
-                    {
-                        uint bytesToRead = Math.Min(bytesAvailable, (uint)maxReadSize);
-                        uint bytesRead = 0;
-                        
-                        status = FT_Read(_ftHandle, _readBuffer, bytesToRead, ref bytesRead);
-                        
-                        if (status != FT_OK)
-                        {
-                            consecutiveErrorCount++;
-                            if (consecutiveErrorCount >= maxConsecutiveErrors)
-                            {
-                                HandleRuntimeDisconnection($"Read error: {status}");
-                                break;
-                            }
-                            Thread.Sleep(10);
-                            continue;
-                        }
-
-                        if (bytesRead > 0)
-                        {
-                            TotalBits += bytesRead * 8;
-                            ProcessReceivedData(_readBuffer, (int)bytesRead);
-                            consecutiveErrorCount = 0;
-                        }
+                        TotalBits += readData.Length * 8;
+                        ProcessReceivedData(readData);
+                        consecutiveErrorCount = 0;
                     }
                     else
                     {
@@ -782,7 +515,7 @@ namespace PowerScope.Model
                     consecutiveErrorCount++;
                     if (consecutiveErrorCount >= maxConsecutiveErrors)
                     {
-                        HandleRuntimeDisconnection($"Unexpected error: {ex.Message}");
+                        HandleRuntimeDisconnection($"Read error: {ex.Message}");
                         break;
                     }
                     Thread.Sleep(50);
@@ -790,15 +523,12 @@ namespace PowerScope.Model
             }
         }
 
-        private void ProcessReceivedData(byte[] readBuffer, int bytesRead)
+        private void ProcessReceivedData(byte[] readBuffer)
         {
             try
             {
-                // Copy data to working buffer
-                Array.Copy(readBuffer, 0, _workingBuffer, 0, bytesRead);
-                
                 // Parse the data using the configured parser
-                ParsedData parsedData = _parser.ParseData(_workingBuffer.AsSpan(0, bytesRead));
+                ParsedData parsedData = _parser.ParseData(readBuffer.AsSpan());
                 
                 if (parsedData.Data != null)
                 {
@@ -808,7 +538,7 @@ namespace PowerScope.Model
             catch (Exception ex)
             {
                 // Log parsing error but continue processing
-                System.Diagnostics.Debug.WriteLine($"FTDI data parsing error: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Data parsing error: {ex.Message}");
             }
         }
 
@@ -869,7 +599,7 @@ namespace PowerScope.Model
             // Add processed data to ring buffers
             for (int channel = 0; channel < channelsToProcess; channel++)
             {
-                if (finalData[channel] != null)
+                if (finalData[channel] != null && _receivedData != null)
                 {
                     _receivedData[channel].AddRange(finalData[channel]);
                 }
@@ -886,8 +616,8 @@ namespace PowerScope.Model
 
         private double ApplyChannelProcessing(int channel, double rawSample)
         {
-            ChannelSettings settings;
-            IDigitalFilter filter;
+            ChannelSettings? settings;
+            IDigitalFilter? filter;
             
             lock (_channelConfigLock)
             {
@@ -952,7 +682,12 @@ namespace PowerScope.Model
             {
                 StatusMessage = $"Disconnected: {reason}";
                 IsStreaming = false;
-                CloseDevice();
+                try
+                {
+                    _spi?.Dispose();
+                    _spi = null;
+                }
+                catch { }
                 IsConnected = false;
             }
             catch (Exception ex)
@@ -1090,7 +825,7 @@ namespace PowerScope.Model
             get { return _upDownSampling.GetDescription(); }
         }
 
-        private void OnUpDownSamplingPropertyChanged(object sender, PropertyChangedEventArgs e)
+        private void OnUpDownSamplingPropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
             if (e.PropertyName == nameof(UpDownSampling.SamplingFactor))
             {
@@ -1108,7 +843,7 @@ namespace PowerScope.Model
 
         #region INotifyPropertyChanged Implementation
 
-        public event PropertyChangedEventHandler PropertyChanged;
+        public event PropertyChangedEventHandler? PropertyChanged;
 
         protected virtual void OnPropertyChanged(string propertyName)
         {
@@ -1127,7 +862,11 @@ namespace PowerScope.Model
             if (_isStreaming)
                 StopStreaming();
 
-            CloseDevice();
+            try
+            {
+                _spi?.Dispose();
+            }
+            catch { }
 
             if (_receivedData != null)
             {
@@ -1148,155 +887,48 @@ namespace PowerScope.Model
 
         #endregion
 
-        #region DLL Verification Methods
+        #region FtdiSharp Verification Methods
 
         /// <summary>
-        /// Result of FTDI DLL verification
-        /// </summary>
-        public class FTDIVerificationResult
-        {
-            public bool IsAvailable { get; set; }
-            public string Message { get; set; } = string.Empty;
-            public uint DeviceCount { get; set; }
-            public string DllPath { get; set; } = string.Empty;
-            public string Architecture { get; set; } = string.Empty;
-        }
-
-        /// <summary>
-        /// Verifies that the FTDI x64 DLL is available and can be loaded
+        /// Verifies that FtdiSharp is available and functional
         /// </summary>
         /// <returns>Verification result with detailed information</returns>
-        public static FTDIVerificationResult VerifyFTDIDLL()
+        public static (bool IsAvailable, string Message, int DeviceCount) VerifyFtdiSharp()
         {
-            var result = new FTDIVerificationResult
-            {
-                Architecture = Environment.Is64BitProcess ? "x64" : "x86"
-            };
-
             try
             {
-                // Check if DLL file exists in application directory
-                string appDir = AppDomain.CurrentDomain.BaseDirectory;
-                string dllPath = Path.Combine(appDir, FtdiDllName);
-                
-                if (!File.Exists(dllPath))
-                {
-                    // Also check system directory as fallback
-                    string systemPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), FtdiDllName);
-                    if (!File.Exists(systemPath))
-                    {
-                        result.IsAvailable = false;
-                        result.Message = $"{FtdiDllName} not found in application directory ({appDir}) or system directory";
-                        return result;
-                    }
-                    result.DllPath = systemPath;
-                }
-                else
-                {
-                    result.DllPath = dllPath;
-                }
-
-                // Test DLL loading by calling a simple function
-                uint numDevices = 0;
-                uint status = FT_CreateDeviceInfoList(ref numDevices);
-                
-                result.IsAvailable = true;
-                result.DeviceCount = numDevices;
-                result.Message = $"Success. Status={status} ({GetFTDIStatusDescription(status)}), Devices={numDevices}, DLL={result.DllPath}";
-                
-                return result;
-            }
-            catch (DllNotFoundException ex)
-            {
-                result.IsAvailable = false;
-                result.Message = $"DLL not found: {ex.Message}. Expected: {FtdiDllName}";
-                return result;
-            }
-            catch (EntryPointNotFoundException ex)
-            {
-                result.IsAvailable = false;
-                result.Message = $"DLL function not found: {ex.Message}. Wrong DLL version?";
-                return result;
-            }
-            catch (BadImageFormatException ex)
-            {
-                result.IsAvailable = false;
-                result.Message = $"Architecture mismatch: {ex.Message}. Process is {result.Architecture}, ensure {FtdiDllName} matches";
-                return result;
+                var devices = FtdiDevices.Scan();
+                return (true, $"Found {devices.Length} FTDI devices", devices.Length);
             }
             catch (Exception ex)
             {
-                result.IsAvailable = false;
-                result.Message = $"Unexpected error: {ex.Message}";
-                return result;
+                return (false, $"FtdiSharp error: {ex.Message}", 0);
             }
         }
 
         /// <summary>
-        /// Gets detailed information about the loaded FTDI DLL
+        /// Gets detailed information about the FtdiSharp library
         /// </summary>
-        /// <returns>Dictionary with DLL information</returns>
-        public static Dictionary<string, string> GetFTDIDLLInfo()
+        /// <returns>Dictionary with library information</returns>
+        public static Dictionary<string, string> GetFtdiSharpInfo()
         {
             var info = new Dictionary<string, string>();
             
             try
             {
-                var verification = VerifyFTDIDLL();
-                info["DLL Available"] = verification.IsAvailable.ToString();
-                info["Architecture"] = verification.Architecture;
-                info["Expected DLL"] = FtdiDllName;
+                var verification = VerifyFtdiSharp();
+                info["Library Available"] = verification.IsAvailable.ToString();
+                info["Library Type"] = "FtdiSharp";
                 info["Verification Message"] = verification.Message;
                 
                 if (verification.IsAvailable)
                 {
                     info["Device Count"] = verification.DeviceCount.ToString();
-                    info["DLL Path"] = verification.DllPath;
                     
-                    // Get file information if available
-                    if (File.Exists(verification.DllPath))
-                    {
-                        var fileInfo = new FileInfo(verification.DllPath);
-                        info["File Size"] = $"{fileInfo.Length:N0} bytes";
-                        info["File Date"] = fileInfo.LastWriteTime.ToString();
-                        
-                        try
-                        {
-                            var versionInfo = FileVersionInfo.GetVersionInfo(verification.DllPath);
-                            info["File Version"] = versionInfo.FileVersion ?? "Unknown";
-                            info["Product Version"] = versionInfo.ProductVersion ?? "Unknown";
-                            info["File Description"] = versionInfo.FileDescription ?? "Unknown";
-                            info["Company"] = versionInfo.CompanyName ?? "Unknown";
-                        }
-                        catch (Exception ex)
-                        {
-                            info["Version Info Error"] = ex.Message;
-                        }
-                    }
-                }
-
-                // Get the loaded module information if DLL is loaded
-                try
-                {
-                    var currentProcess = Process.GetCurrentProcess();
-                    var ftdiModule = currentProcess.Modules.Cast<ProcessModule>()
-                        .FirstOrDefault(m => m.ModuleName.ToLowerInvariant().Contains("ftd2xx"));
-                    
-                    if (ftdiModule != null)
-                    {
-                        info["Module Loaded"] = "Yes";
-                        info["Module Path"] = ftdiModule.FileName;
-                        info["Base Address"] = $"0x{ftdiModule.BaseAddress.ToInt64():X}";
-                        info["Module Size"] = $"{ftdiModule.ModuleMemorySize:N0} bytes";
-                    }
-                    else
-                    {
-                        info["Module Loaded"] = "No";
-                    }
-                }
-                catch (Exception ex)
-                {
-                    info["Module Info Error"] = ex.Message;
+                    // Get assembly information
+                    var assembly = typeof(FtdiDevice).Assembly;
+                    info["Assembly Version"] = assembly.GetName().Version?.ToString() ?? "Unknown";
+                    info["Assembly Location"] = assembly.Location;
                 }
             }
             catch (Exception ex)
@@ -1308,7 +940,7 @@ namespace PowerScope.Model
         }
 
         /// <summary>
-        /// Gets architecture and DLL deployment information
+        /// Gets architecture and deployment information
         /// </summary>
         public static Dictionary<string, string> GetArchitectureInfo()
         {
@@ -1316,156 +948,29 @@ namespace PowerScope.Model
             
             info["Process Architecture"] = Environment.Is64BitProcess ? "x64" : "x86";
             info["OS Architecture"] = Environment.Is64BitOperatingSystem ? "x64" : "x86";
-            info["Expected FTDI DLL"] = FtdiDllName;
-            info[".NET Runtime"] = RuntimeInformation.RuntimeIdentifier;
-            info["Framework Description"] = RuntimeInformation.FrameworkDescription;
-            
-            // Check what FTDI DLLs exist in the application directory
-            string appDir = AppDomain.CurrentDomain.BaseDirectory;
-            bool has32BitDll = File.Exists(Path.Combine(appDir, "ftd2xx.dll"));
-            bool has64BitDll = File.Exists(Path.Combine(appDir, "ftd2xx64.dll"));
-            
-            info["ftd2xx.dll Present"] = has32BitDll.ToString();
-            info["ftd2xx64.dll Present"] = has64BitDll.ToString();
-            
-            if (has32BitDll)
-            {
-                try
-                {
-                    var fileInfo = new FileInfo(Path.Combine(appDir, "ftd2xx.dll"));
-                    info["ftd2xx.dll Size"] = $"{fileInfo.Length:N0} bytes";
-                    info["ftd2xx.dll Date"] = fileInfo.LastWriteTime.ToString();
-                }
-                catch { }
-            }
-            
-            if (has64BitDll)
-            {
-                try
-                {
-                    var fileInfo = new FileInfo(Path.Combine(appDir, "ftd2xx64.dll"));
-                    info["ftd2xx64.dll Size"] = $"{fileInfo.Length:N0} bytes";
-                    info["ftd2xx64.dll Date"] = fileInfo.LastWriteTime.ToString();
-                }
-                catch { }
-            }
-            
-            // Deployment recommendations
-            if (!has64BitDll && Environment.Is64BitProcess)
-            {
-                info["Deployment Issue"] = "Missing ftd2xx64.dll for x64 process";
-                info["Recommendation"] = "Copy ftd2xx64.dll to application directory or install FTDI drivers";
-            }
-            else if (has32BitDll && !has64BitDll && Environment.Is64BitProcess)
-            {
-                info["Architecture Warning"] = "Only 32-bit DLL found, but process is 64-bit";
-            }
+            info["Library"] = "FtdiSharp";
+            info[".NET Runtime"] = System.Runtime.InteropServices.RuntimeInformation.RuntimeIdentifier;
+            info["Framework Description"] = System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription;
             
             return info;
         }
 
         /// <summary>
-        /// Gets a human-readable description of FTDI status codes
-        /// </summary>
-        private static string GetFTDIStatusDescription(uint status)
-        {
-            return status switch
-            {
-                0 => "FT_OK - Success",
-                1 => "FT_INVALID_HANDLE - Invalid handle",
-                2 => "FT_DEVICE_NOT_FOUND - Device not found",
-                3 => "FT_DEVICE_NOT_OPENED - Device not opened",
-                4 => "FT_IO_ERROR - I/O error",
-                5 => "FT_INSUFFICIENT_RESOURCES - Insufficient resources",
-                6 => "FT_INVALID_PARAMETER - Invalid parameter",
-                7 => "FT_INVALID_BAUD_RATE - Invalid baud rate",
-                8 => "FT_DEVICE_NOT_OPENED_FOR_ERASE - Device not opened for erase",
-                9 => "FT_DEVICE_NOT_OPENED_FOR_WRITE - Device not opened for write",
-                10 => "FT_FAILED_TO_WRITE_DEVICE - Failed to write device",
-                11 => "FT_EEPROM_READ_FAILED - EEPROM read failed",
-                12 => "FT_EEPROM_WRITE_FAILED - EEPROM write failed",
-                13 => "FT_EEPROM_ERASE_FAILED - EEPROM erase failed",
-                14 => "FT_EEPROM_NOT_PRESENT - EEPROM not present",
-                15 => "FT_EEPROM_NOT_PROGRAMMED - EEPROM not programmed",
-                16 => "FT_INVALID_ARGS - Invalid arguments",
-                17 => "FT_NOT_SUPPORTED - Not supported",
-                18 => "FT_OTHER_ERROR - Other error",
-                19 => "FT_DEVICE_LIST_NOT_READY - Device list not ready",
-                _ => $"Unknown status code: {status}"
-            };
-        }
-
-        #endregion
-
-        #region ComboBox Display Methods
-
-        /// <summary>
-        /// Creates a user-friendly display name for FTDI devices
-        /// </summary>
-        /// <param name="deviceInfo">Device information structure</param>
-        /// <param name="index">Device index for fallback naming</param>
-        /// <returns>Formatted display string</returns>
-        public static string CreateDeviceDisplayName(FT_DEVICE_LIST_INFO_NODE deviceInfo, int index)
-        {
-            string serialNumber = deviceInfo.SerialNumber ?? $"Device{index}";
-            string description = deviceInfo.Description ?? "FTDI Device";
-            
-            // Clean up the description by removing redundant information
-            string cleanDescription = description;
-            if (cleanDescription.Contains("(") && cleanDescription.Contains(")"))
-            {
-                // Remove serial number from description if it's already there
-                int parenIndex = cleanDescription.LastIndexOf('(');
-                if (parenIndex > 0)
-                {
-                    string beforeParen = cleanDescription.Substring(0, parenIndex).Trim();
-                    if (!string.IsNullOrEmpty(beforeParen))
-                    {
-                        cleanDescription = beforeParen;
-                    }
-                }
-            }
-            
-            // Format: "SerialNumber - CleanDescription"
-            return $"{serialNumber} - {cleanDescription}";
-        }
-
-        /// <summary>
-        /// Gets a shortened device identifier for logging or status display
-        /// </summary>
-        /// <param name="deviceString">Full device string from GetAvailableDevices()</param>
-        /// <returns>Short identifier</returns>
-        public static string GetDeviceShortName(string deviceString)
-        {
-            if (string.IsNullOrEmpty(deviceString))
-                return "Unknown";
-                
-            // Extract just the serial number for short identification
-            string serialNumber = ExtractSerialNumber(deviceString);
-            return string.IsNullOrEmpty(serialNumber) ? "Unknown" : serialNumber;
-        }
-
-        #endregion
-
-        #region Test Methods
-
-        /// <summary>
-        /// Test method to demonstrate FTDI device enumeration functionality
-        /// This method is for development/testing purposes
+        /// Test method to demonstrate FtdiSharp device enumeration functionality
         /// </summary>
         public static void TestDeviceEnumeration()
         {
             try
             {
-                System.Diagnostics.Debug.WriteLine("=== FTDI Device Enumeration Test ===");
+                System.Diagnostics.Debug.WriteLine("=== FtdiSharp Device Enumeration Test ===");
                 
-                // Test DLL verification
-                var dllStatus = VerifyFTDIDLL();
-                System.Diagnostics.Debug.WriteLine($"DLL Status: {dllStatus.IsAvailable} - {dllStatus.Message}");
+                // Test FtdiSharp verification
+                var verification = VerifyFtdiSharp();
+                System.Diagnostics.Debug.WriteLine($"FtdiSharp Status: {verification.IsAvailable} - {verification.Message}");
                 
-                if (!dllStatus.IsAvailable)
+                if (!verification.IsAvailable)
                 {
-                    System.Diagnostics.Debug.WriteLine("Skipping device enumeration - DLL not available");
+                    System.Diagnostics.Debug.WriteLine("Skipping device enumeration - FtdiSharp not available");
                     return;
                 }
                 
@@ -1478,7 +983,7 @@ namespace PowerScope.Model
                     System.Diagnostics.Debug.WriteLine($"  [{i}] {devices[i]}");
                     
                     // Test serial number extraction
-                    string serialNumber = ExtractSerialNumber(devices[i]);
+                    string? serialNumber = ExtractSerialNumber(devices[i]);
                     System.Diagnostics.Debug.WriteLine($"      Serial: {serialNumber ?? "N/A"}");
                     
                     // Test short name generation
@@ -1496,17 +1001,13 @@ namespace PowerScope.Model
                     System.Diagnostics.Debug.WriteLine($"  Device {i}:");
                     System.Diagnostics.Debug.WriteLine($"    Serial: {detail.SerialNumber}");
                     System.Diagnostics.Debug.WriteLine($"    Description: {detail.Description}");
-                    System.Diagnostics.Debug.WriteLine($"    Type: {detail.Type}");
-                    System.Diagnostics.Debug.WriteLine($"    ID: 0x{detail.ID:X8}");
-                    System.Diagnostics.Debug.WriteLine($"    Location: 0x{detail.LocId:X8}");
-                    System.Diagnostics.Debug.WriteLine($"    Flags: 0x{detail.Flags:X}");
                 }
                 
-                System.Diagnostics.Debug.WriteLine("=== End FTDI Device Enumeration Test ===");
+                System.Diagnostics.Debug.WriteLine("=== End FtdiSharp Device Enumeration Test ===");
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"FTDI Test Exception: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"FtdiSharp Test Exception: {ex.Message}");
                 System.Diagnostics.Debug.WriteLine($"Stack trace: {ex.StackTrace}");
             }
         }
