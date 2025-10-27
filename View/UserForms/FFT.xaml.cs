@@ -16,6 +16,25 @@ using System.Windows.Threading;
 namespace PowerScope.View.UserForms
 {
     /// <summary>
+    /// Sort column enumeration for FFT peaks
+    /// </summary>
+    public enum SortColumn
+    {
+        Frequency,
+        Amplitude,
+        AmplitudeDb
+    }
+
+    /// <summary>
+    /// Sort direction enumeration
+    /// </summary>
+    public enum SortDirection
+    {
+        Ascending,
+        Descending
+    }
+
+    /// <summary>
     /// Interaction logic for FFT.xaml
     /// FFT Spectrum window for displaying frequency domain analysis
     /// </summary>
@@ -23,6 +42,10 @@ namespace PowerScope.View.UserForms
     {
         //maybe this is a bit hacky but it works
         private DispatcherTimer _autoScaleTimer;
+
+        // Sorting state - synced from Model on load
+        private SortColumn _currentSortColumn = SortColumn.Amplitude;
+        private SortDirection _currentSortDirection = SortDirection.Descending;
 
         public FFT()
         {
@@ -38,6 +61,17 @@ namespace PowerScope.View.UserForms
         {
             InitializeFFTPlot();
             StartAutoScaleTimer();
+            
+            // Initialize sort state from the measurement model to sync with persisted preferences
+            if (DataContext is PowerScope.Model.Measurement measurement)
+            {
+                var (column, direction) = measurement.GetFFTPeakSortState();
+                _currentSortColumn = column;
+                _currentSortDirection = direction;
+            }
+            
+            // Initialize sort indicators to show current sort state
+            UpdateSortIndicators();
         }
 
         /// <summary>
@@ -145,6 +179,93 @@ namespace PowerScope.View.UserForms
             if (e.ButtonState == MouseButtonState.Pressed)
             {
                 this.DragMove();
+            }
+        }
+
+        /// <summary>
+        /// Handle frequency column header click for sorting
+        /// </summary>
+        private void FrequencyHeader_Click(object sender, RoutedEventArgs e)
+        {
+            HandleColumnHeaderClick(SortColumn.Frequency);
+        }
+
+        /// <summary>
+        /// Handle amplitude column header click for sorting
+        /// </summary>
+        private void AmplitudeHeader_Click(object sender, RoutedEventArgs e)
+        {
+            HandleColumnHeaderClick(SortColumn.Amplitude);
+        }
+
+        /// <summary>
+        /// Handle amplitude (dB) column header click for sorting
+        /// </summary>
+        private void AmplitudeDbHeader_Click(object sender, RoutedEventArgs e)
+        {
+            HandleColumnHeaderClick(SortColumn.AmplitudeDb);
+        }
+
+        /// <summary>
+        /// Handle column header click - toggles sort direction or changes sort column
+        /// </summary>
+        private void HandleColumnHeaderClick(SortColumn column)
+        {
+            // If clicking the same column, toggle direction; otherwise, set new column with descending as default
+            if (_currentSortColumn == column)
+            {
+                _currentSortDirection = _currentSortDirection == SortDirection.Ascending 
+                    ? SortDirection.Descending 
+                    : SortDirection.Ascending;
+            }
+            else
+            {
+                _currentSortColumn = column;
+                _currentSortDirection = SortDirection.Descending; // Default to descending for new column
+            }
+
+            // Apply sorting to the data
+            ApplySorting();
+
+            // Update visual indicators
+            UpdateSortIndicators();
+        }
+
+        /// <summary>
+        /// Apply sorting to the FFT peaks data
+        /// </summary>
+        private void ApplySorting()
+        {
+            if (DataContext is PowerScope.Model.Measurement measurement)
+            {
+                measurement.SortFFTPeaks(_currentSortColumn, _currentSortDirection);
+            }
+        }
+
+        /// <summary>
+        /// Update visual sort indicators on column headers
+        /// </summary>
+        private void UpdateSortIndicators()
+        {
+            // Clear all indicators first
+            FrequencySortIndicator.Text = "";
+            AmplitudeSortIndicator.Text = "";
+            AmplitudeDbSortIndicator.Text = "";
+
+            // Set indicator for current sort column
+            string indicator = _currentSortDirection == SortDirection.Ascending ? "▲" : "▼";
+
+            switch (_currentSortColumn)
+            {
+                case SortColumn.Frequency:
+                    FrequencySortIndicator.Text = indicator;
+                    break;
+                case SortColumn.Amplitude:
+                    AmplitudeSortIndicator.Text = indicator;
+                    break;
+                case SortColumn.AmplitudeDb:
+                    AmplitudeDbSortIndicator.Text = indicator;
+                    break;
             }
         }
     }

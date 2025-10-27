@@ -464,7 +464,7 @@ namespace PowerScope.Model
         private double GenerateChirpSignal(int channel, double time, double amplitude)
         {
             // Chirp parameters
-            const double chirpDuration = 3.0; // 3 seconds
+            const double chirpDuration = 6.0; // 6 seconds
             const double startFrequency = 10.0; // 10 Hz
             const double endFrequency = 10000.0; // 10 kHz
             
@@ -480,7 +480,7 @@ namespace PowerScope.Model
             double instantaneousFreq = adjustedStartFreq + (adjustedEndFreq - adjustedStartFreq) * (cycleTime / chirpDuration);
             
             // Calculate the phase for the chirp signal
-            // For a linear chirp: ?(t) = 2? * [f0 * t + (f1 - f0) * t² / (2 * T)]
+            // For a linear chirp: ?(t) = 2? * [f0 * t + (f1 - f0) * tï¿½ / (2 * T)]
             double phase = 2 * Math.PI * (adjustedStartFreq * cycleTime + 
                           (adjustedEndFreq - adjustedStartFreq) * cycleTime * cycleTime / (2 * chirpDuration));
             
@@ -504,7 +504,7 @@ namespace PowerScope.Model
             double mainTone = amplitude * Math.Sin(2 * Math.PI * mainFrequency * time);
             
             // Calculate side tone frequencies based on channel
-            // Channel 0: ±250Hz offset (750Hz and 1250Hz)
+            // Channel 0: ï¿½250Hz offset (750Hz and 1250Hz)
             // Higher channels: Progressively smaller offsets approaching 1kHz
             double baseOffset = 250.0; // Base offset of 250Hz for channel 0
             double offsetReduction = Math.Min(channel * 40.0, 250.0); // Reduce offset by 40Hz per channel, max 200Hz reduction

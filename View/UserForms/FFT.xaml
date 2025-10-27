@@ -1,4 +1,4 @@
-﻿<Window x:Class="PowerScope.View.UserForms.FFT"
+<Window x:Class="PowerScope.View.UserForms.FFT"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -183,6 +183,39 @@
             <Setter Property="VerticalAlignment" Value="Center"/>
             <Setter Property="HorizontalAlignment" Value="Left"/>
         </Style>
+        
+        <!-- Column header button style -->
+        <Style x:Key="ColumnHeaderButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{DynamicResource PlotSettings_LabelForegroundBrush}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="Margin" Value="2,3"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" 
+                                BorderThickness="{TemplateBinding BorderThickness}">
+                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalAlignment}" 
+                                              VerticalAlignment="{TemplateBinding VerticalAlignment}"
+                                              Margin="{TemplateBinding Margin}"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="{DynamicResource PlotSettings_ButtonHoverBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter Property="Background" Value="{DynamicResource PlotSettings_ButtonPressedBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
     
     <!-- Main container with border and drop shadow -->
@@ -213,7 +246,7 @@
                 <!-- Close button -->
                 <Button Grid.Column="1" 
                         Style="{StaticResource CloseButtonStyle}"
-                        Content="✕" 
+                        Content="X" 
                         Click="CloseButton_Click"
                         ToolTip="Close"/>
             </Grid>
@@ -228,7 +261,7 @@
                 <!-- FFT Plot Area (Left column - dynamic width) -->
                 <ScottPlot:WpfPlotGL x:Name="WpfPlotFFT" Grid.Column="0" Margin="15"/>
                 
-                <!-- Control Panel (Right column - fixed 150px width) -->
+                <!-- Control Panel (Right column - fixed 220px width) -->
                 <Grid Grid.Column="1" Margin="5">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
@@ -362,12 +395,97 @@
                         </ComboBoxItem>
                     </ComboBox>
                     
-                    <!-- Row 4: Reserved for future controls -->
-                    <Border Grid.Column="0" Grid.Row="4" Grid.ColumnSpan="2" 
-                            Background="{DynamicResource PlotSettings_TitleBarBrush}" 
-                            BorderBrush="{DynamicResource PlotSettings_BorderBrush}" 
-                            BorderThickness="1" Margin="2"
-                            Opacity="0.3"/>
+                    <!-- Row 4: Frequency Analysis Grid using ItemsControl and DataTemplate -->
+                    <ScrollViewer Grid.Column="0" Grid.Row="4" Grid.ColumnSpan="2" 
+                                  Margin="2" 
+                                  VerticalScrollBarVisibility="Auto" 
+                                  HorizontalScrollBarVisibility="Disabled">
+                        <Grid Background="{DynamicResource PlotSettings_BackgroundBrush}">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+                            
+                            <!-- Header Row -->
+                            <Grid Grid.Row="0" Background="{DynamicResource PlotSettings_BackgroundBrush}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                
+                                <Border Grid.Column="0" BorderBrush="{DynamicResource PlotSettings_BorderBrush}" BorderThickness="0,0,1,1">
+                                    <Button x:Name="FrequencyHeaderButton" 
+                                            Style="{StaticResource ColumnHeaderButtonStyle}"
+                                            Click="FrequencyHeader_Click"
+                                            ToolTip="Click to sort by frequency">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="Frequency" VerticalAlignment="Center"/>
+                                            <TextBlock x:Name="FrequencySortIndicator" Text="" Margin="3,0,0,0" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Button>
+                                </Border>
+                                <Border Grid.Column="1" BorderBrush="{DynamicResource PlotSettings_BorderBrush}" BorderThickness="0,0,1,1">
+                                    <Button x:Name="AmplitudeHeaderButton" 
+                                            Style="{StaticResource ColumnHeaderButtonStyle}"
+                                            Click="AmplitudeHeader_Click"
+                                            ToolTip="Click to sort by amplitude">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="Amplitude" VerticalAlignment="Center"/>
+                                            <TextBlock x:Name="AmplitudeSortIndicator" Text="?" Margin="3,0,0,0" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Button>
+                                </Border>
+                                <Border Grid.Column="2" BorderBrush="{DynamicResource PlotSettings_BorderBrush}" BorderThickness="0,0,0,1">
+                                    <Button x:Name="AmplitudeDbHeaderButton" 
+                                            Style="{StaticResource ColumnHeaderButtonStyle}"
+                                            Click="AmplitudeDbHeader_Click"
+                                            ToolTip="Click to sort by amplitude (dB)">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="Amplitude (dB)" VerticalAlignment="Center"/>
+                                            <TextBlock x:Name="AmplitudeDbSortIndicator" Text="" Margin="3,0,0,0" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Button>
+                                </Border>
+                            </Grid>
+                            
+                            <!-- Dynamic Data Rows using ItemsControl -->
+                            <ItemsControl Grid.Row="1" ItemsSource="{Binding FFTPeaks}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            
+                                            <Border Grid.Column="0" BorderBrush="{DynamicResource PlotSettings_BorderBrush}" BorderThickness="0,0,1,1">
+                                                <TextBlock Text="{Binding FrequencyText}" FontSize="10" Margin="2,1" 
+                                                           Foreground="{DynamicResource PlotSettings_LabelForegroundBrush}" 
+                                                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Border>
+                                            <Border Grid.Column="1" BorderBrush="{DynamicResource PlotSettings_BorderBrush}" BorderThickness="0,0,1,1">
+                                                <TextBlock Text="{Binding AmplitudeText}" FontSize="10" Margin="2,1" 
+                                                           Foreground="{DynamicResource PlotSettings_LabelForegroundBrush}" 
+                                                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Border>
+                                            <Border Grid.Column="2" BorderBrush="{DynamicResource PlotSettings_BorderBrush}" BorderThickness="0,0,0,1">
+                                                <TextBlock Text="{Binding AmplitudeDbText}" FontSize="10" Margin="2,1" 
+                                                           Foreground="{DynamicResource PlotSettings_LabelForegroundBrush}" 
+                                                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Border>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <StackPanel Orientation="Vertical"/>
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                            </ItemsControl>
+                        </Grid>
+                    </ScrollViewer>
                 </Grid>
             </Grid>
         </Grid>

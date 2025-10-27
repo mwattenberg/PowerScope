@@ -965,42 +965,42 @@ namespace PowerScope.Model
 
         #endregion
 
-        private double[] ProcessForUpSampling(double[] input, int targetSampleRate)
-        {
-            // Simple repetition method for up-sampling
-            double[] output = new double[input.Length * targetSampleRate];
-            for (int i = 0; i < input.Length; i++)
-            {
-                for (int j = 0; j < targetSampleRate; j++)
-                {
-                    output[i * targetSampleRate + j] = input[i];
-                }
-            }
-            return output;
-        }
+        //private double[] ProcessForUpSampling(double[] input, int targetSampleRate)
+        //{
+        //    // Simple repetition method for up-sampling
+        //    double[] output = new double[input.Length * targetSampleRate];
+        //    for (int i = 0; i < input.Length; i++)
+        //    {
+        //        for (int j = 0; j < targetSampleRate; j++)
+        //        {
+        //            output[i * targetSampleRate + j] = input[i];
+        //        }
+        //    }
+        //    return output;
+        //}
 
-        private double[] ProcessForDownSampling(double[] input, int targetSampleRate)
-        {
-            // Simple averaging method for down-sampling
-            int stride = (int)Math.Round((double)SourceSetting.BaudRate / targetSampleRate);
-            double[] output = new double[input.Length / stride];
-            for (int i = 0; i < output.Length; i++)
-            {
-                double sum = 0;
-                for (int j = 0; j < stride; j++)
-                {
-                    sum += input[i * stride + j];
-                }
-                output[i] = sum / stride;
-            }
-            return output;
-        }
+        //private double[] ProcessForDownSampling(double[] input, int targetSampleRate)
+        //{
+        //    // Simple averaging method for down-sampling
+        //    int stride = (int)Math.Round((double)SourceSetting.BaudRate / targetSampleRate);
+        //    double[] output = new double[input.Length / stride];
+        //    for (int i = 0; i < output.Length; i++)
+        //    {
+        //        double sum = 0;
+        //        for (int j = 0; j < stride; j++)
+        //        {
+        //            sum += input[i * stride + j];
+        //        }
+        //        output[i] = sum / stride;
+        //    }
+        //    return output;
+        //}
 
-        private double[] ProcessForNoChange(double[] input)
-        {
-            // No change to the data
-            return input;
-        }
+        //private double[] ProcessForNoChange(double[] input)
+        //{
+        //    // No change to the data
+        //    return input;
+        //}
     }
 
     public class SourceSetting

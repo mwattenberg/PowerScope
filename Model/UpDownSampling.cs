@@ -156,7 +156,7 @@ namespace PowerScope.Model
                 GenerateSincKernel();
         }
 
-        // Build a Hamming-windowed sinc low-pass kernel with cutoff tied to the effective factor M.
+        // Build a Hanning-windowed sinc low-pass kernel with cutoff tied to the effective factor M.
         // For upsampling by M: cutoff ≈ 0.5/M. For downsampling by M: cutoff ≈ 0.5/M.
         // We use 0.9 safety factor to reduce alias/ripple.
         private void GenerateSincKernel()
@@ -183,9 +183,11 @@ namespace PowerScope.Model
                     sinc = Math.Sin(x) / (Math.PI * n);
                 }
 
-                // Hamming window
-                double w = 0.54 - 0.46 * Math.Cos(2.0 * Math.PI * i / (len - 1));
+
+                //double w = 0.5 * (1.0 - Math.Cos(2.0 * Math.PI * i / (len - 1))); // Hanning
+                double w = 0.42 - 0.5 * Math.Cos(2.0 * Math.PI * i / (len - 1)) + 0.08 * Math.Cos(4.0 * Math.PI * i / (len - 1)); //Blackman
                 h[i] = sinc * w;
+                //h[i] = sinc;
             }
 
             // Normalize to unity DC gain

@@ -80,6 +80,76 @@ namespace PowerScope.Model
         private readonly List<(double frequency, double magnitude)> _fftPeaks = new List<(double, double)>();
         private const int MaxPeaksToTrack = 10;
 
+        // FFT Peak sorting state - stored in Model for persistence across data updates
+        private View.UserForms.SortColumn _fftSortColumn = View.UserForms.SortColumn.Amplitude;
+        private View.UserForms.SortDirection _fftSortDirection = View.UserForms.SortDirection.Descending;
+
+        /// <summary>
+        /// Gets the current FFT peaks data for display in the frequency analysis grid
+        /// Returns the top frequencies with their magnitudes as bindable FFTPeakData objects
+        /// </summary>
+        public System.Collections.ObjectModel.ObservableCollection<FFTPeakData> FFTPeaks { get; } = new System.Collections.ObjectModel.ObservableCollection<FFTPeakData>();
+
+        /// <summary>
+        /// Sort the FFT peaks collection based on the specified column and direction
+        /// Called from the FFT window when user clicks column headers
+        /// Now stores the sort preference for consistent application on data updates
+        /// </summary>
+        public void SortFFTPeaks(View.UserForms.SortColumn column, View.UserForms.SortDirection direction)
+        {
+            // Store the sort preference for future updates
+            _fftSortColumn = column;
+            _fftSortDirection = direction;
+            
+            // Apply the sorting immediately
+            ApplyFFTPeakSorting();
+        }
+
+        /// <summary>
+        /// Apply the current sorting preference to FFT peaks
+        /// Called both when user changes sort and when new data arrives
+        /// </summary>
+        private void ApplyFFTPeakSorting()
+        {
+            if (_fftPeaks.Count == 0) return;
+
+            // Sort the internal peaks list based on stored preferences
+            switch (_fftSortColumn)
+            {
+                case View.UserForms.SortColumn.Frequency:
+                    _fftPeaks.Sort((a, b) => _fftSortDirection == View.UserForms.SortDirection.Ascending 
+                        ? a.frequency.CompareTo(b.frequency) 
+                        : b.frequency.CompareTo(a.frequency));
+                    break;
+
+                case View.UserForms.SortColumn.Amplitude:
+                case View.UserForms.SortColumn.AmplitudeDb: // Both sort by magnitude since dB is just a transform
+                    _fftPeaks.Sort((a, b) => _fftSortDirection == View.UserForms.SortDirection.Ascending 
+                        ? a.magnitude.CompareTo(b.magnitude) 
+                        : b.magnitude.CompareTo(a.magnitude));
+                    break;
+            }
+
+            // Update the observable collection on UI thread
+            Application.Current?.Dispatcher.BeginInvoke(new Action(() =>
+            {
+                FFTPeaks.Clear();
+                foreach (var peak in _fftPeaks.Take(10))
+                {
+                    FFTPeaks.Add(new FFTPeakData(peak.frequency, peak.magnitude));
+                }
+            }));
+        }
+
+        /// <summary>
+        /// Get the current FFT peak sorting preferences
+        /// Used by FFT window to initialize sort indicators
+        /// </summary>
+        public (View.UserForms.SortColumn column, View.UserForms.SortDirection direction) GetFFTPeakSortState()
+        {
+            return (_fftSortColumn, _fftSortDirection);
+        }
+
         // Events
         public event EventHandler RemoveRequested;
         public event PropertyChangedEventHandler PropertyChanged;
@@ -826,6 +896,9 @@ namespace PowerScope.Model
             // Clear peaks list for new calculation
             _fftPeaks.Clear();
 
+            // First pass: Calculate all magnitudes and store them temporarily
+            double[] magnitudes = new double[spectrumLength];
+            
             // Calculate magnitudes and optionally build spectrum arrays
             for (int i = 0; i < spectrumLength; i++)
             {
@@ -841,13 +914,8 @@ namespace PowerScope.Model
                     magnitude = magnitude / 2.0;
                 }
 
+                magnitudes[i] = magnitude;
                 double frequency = i * frequencyResolution;
-
-                // Track peaks for detail display (skip DC component)
-                if (i > 0 && magnitude > 0.001) // Threshold to avoid noise
-                {
-                    _fftPeaks.Add((frequency, magnitude));
-                }
 
                 if (magnitude > maxMagnitude)
                 {
@@ -874,12 +942,53 @@ namespace PowerScope.Model
                 }
             }
 
+            // Second pass: Find peaks with windowing (±5 bins)
+            const int peakWindow = 5;
+            const double peakThreshold = 0.001; // Threshold to avoid noise
+            
+            for (int i = 1; i < spectrumLength - 1; i++) // Skip DC (i=0) and last bin
+            {
+                double currentMagnitude = magnitudes[i];
+                
+                // Skip if below threshold
+                if (currentMagnitude <= peakThreshold)
+                    continue;
+                
+                // Check if this is a local maximum within the ±5 bin window
+                bool isLocalMaximum = true;
+                int windowStart = Math.Max(1, i - peakWindow); // Don't include DC component
+                int windowEnd = Math.Min(spectrumLength - 1, i + peakWindow);
+                
+                for (int j = windowStart; j <= windowEnd; j++)
+                {
+                    if (j != i && magnitudes[j] > currentMagnitude)
+                    {
+                        isLocalMaximum = false;
+                        break;
+                    }
+                }
+                
+                // If this is a local maximum, add it to peaks
+                if (isLocalMaximum)
+                {
+                    double frequency = i * frequencyResolution;
+                    _fftPeaks.Add((frequency, currentMagnitude));
+                }
+            }
+
             // Keep only the top peaks and limit the list size
             if (_fftPeaks.Count > MaxPeaksToTrack)
             {
                 _fftPeaks.Sort((a, b) => b.magnitude.CompareTo(a.magnitude));
                 _fftPeaks.RemoveRange(MaxPeaksToTrack, _fftPeaks.Count - MaxPeaksToTrack);
             }
+
+            // Update the observable collection for data binding (UI thread safe)
+            // Apply the current user-selected sorting preference
+            Application.Current?.Dispatcher.BeginInvoke(new Action(() =>
+            {
+                ApplyFFTPeakSorting();
+            }));
                 
             double peakFrequency = peakBin * frequencyResolution;
             return peakFrequency;

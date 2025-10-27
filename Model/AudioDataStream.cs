@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Threading;
@@ -8,7 +8,7 @@ using NAudio.Wave;
 
 namespace PowerScope.Model
 {
-    public class AudioDataStream : IDataStream, IChannelConfigurable, IBufferResizable, IDisposable
+    public class AudioDataStream : IDataStream, IChannelConfigurable, IBufferResizable, IUpDownSampling, IDisposable
     {
         private bool _disposed = false;
         private bool _isConnected = false;
@@ -33,6 +33,9 @@ namespace PowerScope.Model
         private IDigitalFilter[] _channelFilters;
         private readonly object _channelConfigLock = new object();
         
+        // Up/Down sampling
+        private readonly UpDownSampling _upDownSampling;
+        
         // Audio processing parameters
         private const int DefaultSampleRate = 44100;
         private const int RingBufferDurationSeconds = 10;
@@ -53,10 +56,22 @@ namespace PowerScope.Model
         /// <summary>
         /// Sample rate of the data stream in samples per second (Hz)
         /// Implements IDataStream.SampleRate
+        /// When up/down sampling is enabled, this reflects the final sample rate after processing
         /// </summary>
         double IDataStream.SampleRate 
         { 
-            get { return _sampleRate; } 
+            get 
+            { 
+                double baseSampleRate = _sampleRate;
+                
+                // Apply up/down sampling multiplier if enabled
+                if (_upDownSampling.IsEnabled)
+                {
+                    return baseSampleRate * _upDownSampling.SampleRateMultiplier;
+                }
+                
+                return baseSampleRate;
+            } 
         }
 
         /// <summary>
@@ -137,9 +152,30 @@ namespace PowerScope.Model
             }
             
             _sampleRate = sampleRate;
+            
+            // Initialize up/down sampling
+            _upDownSampling = new UpDownSampling(0); // Start with no sampling change
+            _upDownSampling.PropertyChanged += OnUpDownSamplingPropertyChanged;
+            
             StatusMessage = "Disconnected";
             TotalSamples = 0;
             TotalBits = 0;
+        }
+
+        private void OnUpDownSamplingPropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            // Forward up/down sampling property change notifications
+            if (e.PropertyName == nameof(UpDownSampling.SamplingFactor))
+            {
+                OnPropertyChanged(nameof(UpDownSamplingFactor));
+                OnPropertyChanged(nameof(SampleRateMultiplier));
+                OnPropertyChanged(nameof(IsUpDownSamplingEnabled));
+                OnPropertyChanged(nameof(UpDownSamplingDescription));
+                OnPropertyChanged(nameof(SampleRate));
+                
+                // Reinitialize for new sampling factor
+                _upDownSampling.InitializeChannels(ChannelCount);
+            }
         }
 
         #region IChannelConfigurable Implementation
@@ -268,6 +304,10 @@ namespace PowerScope.Model
                 // Reset filters when starting streaming
                 ResetChannelFilters();
                 
+                // Initialize up/down sampling for current channel configuration
+                _upDownSampling.InitializeChannels(ChannelCount);
+                _upDownSampling.Reset();
+                
                 _audioCapture.StartRecording();
                 IsStreaming = true;
                 StatusMessage = $"Streaming from {_audioDevice.FriendlyName}";
@@ -335,6 +375,9 @@ namespace PowerScope.Model
             
             // Reset filters when clearing data
             ResetChannelFilters();
+            
+            // Reset up/down sampling when clearing data
+            _upDownSampling?.Reset();
         }
 
         #endregion
@@ -346,15 +389,7 @@ namespace PowerScope.Model
             if (!IsStreaming || e.Buffer == null || e.BytesRecorded == 0)
                 return;
 
-            //try
-            //{
-                ProcessAudioData(e.Buffer, e.BytesRecorded);
-            //}
-            //catch (Exception ex)
-            //{
-            //    // Log error but don't stop streaming
-            //    StatusMessage = $"Audio processing error: {ex.Message}";
-            //}
+            ProcessAudioData(e.Buffer, e.BytesRecorded);
         }
 
         private void OnRecordingStopped(object sender, StoppedEventArgs e)
@@ -410,18 +445,58 @@ namespace PowerScope.Model
                         break;
                 }
 
-                // Apply channel processing and add to ring buffers
+                // Apply channel processing and up/down sampling, then add to ring buffers
+                // Use simple sequential processing since audio typically has fewer channels than serial data
+                double[][] finalData = new double[_channelCount][];
+                
                 for (int ch = 0; ch < _channelCount; ch++)
                 {
+                    // Apply channel processing (gain, offset, filtering) to each sample
+                    double[] channelProcessedSamples = new double[samplesRecorded];
                     for (int s = 0; s < samplesRecorded; s++)
                     {
-                        channelData[ch][s] = ApplyChannelProcessing(ch, channelData[ch][s]);
+                        double processedSample = ApplyChannelProcessing(ch, channelData[ch][s]);
+                        
+                        // Safety check for invalid values
+                        if (!double.IsFinite(processedSample))
+                        {
+                            processedSample = 0.0; // Replace NaN/Infinity with zero
+                        }
+                        
+                        channelProcessedSamples[s] = processedSample;
                     }
-                    ReceivedData[ch].AddRange(channelData[ch]);
+                    
+                    // Apply up/down sampling per channel if enabled
+                    double[] channelFinalData = channelProcessedSamples;
+                    if (_upDownSampling.IsEnabled)
+                    {
+                        try
+                        {
+                            channelFinalData = _upDownSampling.ProcessChannelData(ch, channelProcessedSamples);
+                            
+                            // Safety check for up/down sampled data
+                            for (int i = 0; i < channelFinalData.Length; i++)
+                            {
+                                if (!double.IsFinite(channelFinalData[i]))
+                                {
+                                    channelFinalData[i] = 0.0; // Replace NaN/Infinity with zero
+                                }
+                            }
+                        }
+                        catch (Exception)
+                        {
+                            // If up/down sampling fails, fall back to processed samples
+                            channelFinalData = channelProcessedSamples;
+                        }
+                    }
+                    
+                    finalData[ch] = channelFinalData;
+                    ReceivedData[ch].AddRange(channelFinalData);
                 }
 
-                // Update statistics
-                TotalSamples += samplesRecorded;
+                // Update statistics based on final processed data
+                int actualSamplesGenerated = finalData[0]?.Length ?? samplesRecorded;
+                TotalSamples += actualSamplesGenerated;
                 TotalBits += bytesRecorded * 8;
             }
         }
@@ -631,6 +706,12 @@ namespace PowerScope.Model
                 }
             }
 
+            // Unsubscribe from up/down sampling events
+            if (_upDownSampling != null)
+            {
+                _upDownSampling.PropertyChanged -= OnUpDownSamplingPropertyChanged;
+            }
+
             _disposed = true;
             GC.SuppressFinalize(this);
         }
@@ -690,6 +771,31 @@ namespace PowerScope.Model
             {
                 ReceivedData[i] = new RingBuffer<double>(bufferSize);
             }
+        }
+
+        #endregion
+
+        #region IUpDownSampling Implementation
+
+        public int UpDownSamplingFactor
+        {
+            get { return _upDownSampling.SamplingFactor; }
+            set { _upDownSampling.SamplingFactor = value; }
+        }
+
+        public double SampleRateMultiplier
+        {
+            get { return _upDownSampling.SampleRateMultiplier; }
+        }
+
+        public bool IsUpDownSamplingEnabled
+        {
+            get { return _upDownSampling.IsEnabled; }
+        }
+
+        public string UpDownSamplingDescription
+        {
+            get { return _upDownSampling.GetDescription(); }
         }
 
         #endregion
