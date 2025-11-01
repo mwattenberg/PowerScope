@@ -64,6 +64,13 @@ namespace PowerScope.Model
                 // Create stream element with configuration
                 XElement streamElement = new XElement("Stream");
 
+                // Get UpDownSampling factor from stream if it supports the interface
+                int upDownSamplingFactor = 0;
+                if (stream is IUpDownSampling upDownSamplingStream)
+                {
+                    upDownSamplingFactor = upDownSamplingStream.UpDownSamplingFactor;
+                }
+
                 // Save stream configuration - we need to reverse-engineer this from the stream
                 if (stream is DemoDataStream demoStream)
                 {
@@ -71,7 +78,8 @@ namespace PowerScope.Model
                         new XElement("StreamSource", "Demo"),
                         new XElement("NumberOfChannels", demoStream.ChannelCount),
                         new XElement("DemoSampleRate", demoStream.DemoSettings.SampleRate),
-                        new XElement("DemoSignalType", demoStream.DemoSettings.SignalType.ToString())
+                        new XElement("DemoSignalType", demoStream.DemoSettings.SignalType.ToString()),
+                        new XElement("UpDownSampling", upDownSamplingFactor)
                     );
                 }
                 else if (stream is AudioDataStream audioStream)
@@ -80,7 +88,8 @@ namespace PowerScope.Model
                         new XElement("StreamSource", "AudioInput"),
                         new XElement("NumberOfChannels", audioStream.ChannelCount),
                         new XElement("AudioDevice", audioStream.DeviceName ?? "Default"),
-                        new XElement("AudioSampleRate", audioStream.SampleRate)
+                        new XElement("AudioSampleRate", audioStream.SampleRate),
+                        new XElement("UpDownSampling", upDownSamplingFactor)
                     );
                 }
                 else if (stream is SerialDataStream serialStream)
@@ -128,7 +137,8 @@ namespace PowerScope.Model
                         new XElement("DataFormat", dataFormatStr), // Back to simple DataFormat
                         new XElement("NumberType", binaryFormatStr.Replace("_t", "").Replace("uint", "Uint").Replace("int", "Int").Replace("float", "Float")), // Map to NumberType
                         new XElement("Delimiter", delimiterStr),
-                        new XElement("FrameStart", frameStartStr)
+                        new XElement("FrameStart", frameStartStr),
+                        new XElement("UpDownSampling", upDownSamplingFactor)
                     );
                 }
 
@@ -385,8 +395,22 @@ namespace PowerScope.Model
                         break;
                 }
 
+                // Load UpDownSampling factor (common to all stream types)
+                XElement upDownSamplingElement = streamElement.Element("UpDownSampling");
+                if (upDownSamplingElement != null && int.TryParse(upDownSamplingElement.Value, out int upDownSamplingFactor))
+                {
+                    streamSettings.UpDownSampling = upDownSamplingFactor;
+                }
+
                 // Create the data stream
                 IDataStream dataStream = dataStreamBar.CreateDataStreamFromUserInput(streamSettings);
+                
+                // Apply UpDownSampling to the stream if it supports it
+                if (dataStream is IUpDownSampling upDownSamplingStream)
+                {
+                    upDownSamplingStream.UpDownSamplingFactor = streamSettings.UpDownSampling;
+                }
+                
                 dataStream.Connect();
                 dataStream.StartStreaming();
 

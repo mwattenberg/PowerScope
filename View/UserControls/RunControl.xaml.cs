@@ -62,6 +62,26 @@ namespace PowerScope.View.UserControls
             }
         }
 
+        /// <summary>
+        /// Controls recording state. Setting this updates button appearance without firing events.
+        /// Used by MainWindow to confirm recording started after dialog is confirmed.
+        /// </summary>
+        public bool IsRecording
+        {
+            get { return _recordstate == RecordStates.Recording; }
+            set
+            {
+                RecordStates newState = value ? RecordStates.Recording : RecordStates.Stopped;
+        
+                if (_recordstate != newState)
+                {
+                    _recordstate = newState;
+                    UpdateRecordButtonUI();
+                    // Don't fire event when property is set externally
+                }
+            }
+        }
+
         public RunControl()
         {
             InitializeComponent();
@@ -79,10 +99,18 @@ namespace PowerScope.View.UserControls
 
         private void RecordButton_Click(object sender, RoutedEventArgs e)
         {
-            if(RecordState == RecordStates.Recording)
-                this.RecordState = RecordStates.Stopped;
+            if(_recordstate == RecordStates.Recording)
+            {
+                // Stopping - directly set property and fire event
+                IsRecording = false;
+                RecordStateChanged?.Invoke(this, RecordStates.Stopped);
+            }
             else
-                this.RecordState = RecordStates.Recording;
+            {
+                // Starting - fire event, let MainWindow set property on success
+                // DON'T change state yet - MainWindow will set IsRecording = true if successful
+                RecordStateChanged?.Invoke(this, RecordStates.Recording);
+            }
         }
 
         private void LoadButton_Click(object sender, RoutedEventArgs e)

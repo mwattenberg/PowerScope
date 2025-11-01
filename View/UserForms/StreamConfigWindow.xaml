@@ -576,21 +576,21 @@
             <!-- Up/Down Sampling Controls -->
             <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Left" Margin="20,10,20,0">
                 <Label Content="Up / down sampling:" VerticalAlignment="Center" Width="130" 
-                       ToolTip="Sampling factor: positive values for upsampling, negative for downsampling, 0 for no change"/>
-                <StackPanel Orientation="Horizontal">
-                    <Button x:Name="Button_SamplingDown" Content="▼" Width="25" Height="25" 
-                            Click="Button_SamplingDown_Click" ToolTip="Decrease sampling factor"
-                            FontSize="10" Padding="0"/>
-                    <TextBox x:Name="TextBox_UpDownSampling" Width="50" Height="25" 
-                             Text="{Binding UpDownSampling, Mode=TwoWay}" 
-                             PreviewTextInput="SamplingFactor_PreviewTextInput"
-                             TextChanged="SamplingFactor_TextChanged"
-                             TextAlignment="Center" VerticalContentAlignment="Center"
-                             ToolTip="Range: -9 to +9. Positive = upsampling, Negative = downsampling"/>
-                    <Button x:Name="Button_SamplingUp" Content="▲" Width="25" Height="25" 
-                            Click="Button_SamplingUp_Click" ToolTip="Increase sampling factor"
-                            FontSize="10" Padding="0"/>
-                </StackPanel>
+                       ToolTip="Sampling factor: negative values for downsampling, 0 for no change, positive for upsampling"/>
+                <ComboBox x:Name="ComboBox_UpDownSampling" Width="80" Height="25" 
+                          SelectedValue="{Binding UpDownSampling, Mode=TwoWay}" 
+                          SelectedValuePath="Tag"
+                          ToolTip="Select sampling factor">
+                    <ComboBoxItem Content="1/5" Tag="-4"/>
+                    <ComboBoxItem Content="1/4" Tag="-3"/>
+                    <ComboBoxItem Content="1/3" Tag="-2"/>
+                    <ComboBoxItem Content="1/2" Tag="-1"/>
+                    <ComboBoxItem Content="1x" Tag="0" IsSelected="True"/>
+                    <ComboBoxItem Content="2x" Tag="1"/>
+                    <ComboBoxItem Content="3x" Tag="2"/>
+                    <ComboBoxItem Content="4x" Tag="3"/>
+                    <ComboBoxItem Content="5x" Tag="4"/>
+                </ComboBox>
             </StackPanel>
             
             <!-- Buttons -->

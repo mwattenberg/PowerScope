@@ -463,7 +463,15 @@ namespace PowerScope.Model
             //_fileWriter.SampleRate = GetCurrentSampleRate();
             _fileWriter.SampleRate = _channels[0].OwnerStream.SampleRate;
             _fileWriter.Channels = _channels;
-            return _fileWriter.StartRecording(filePath);
+
+            if (_fileWriter.StartRecording(filePath))
+            {
+                // Write all pending data immediately (captures current buffer state)
+                _fileWriter.WritePendingSamples();
+                return true;
+            }
+
+            return false;
         }
 
         /// <summary>

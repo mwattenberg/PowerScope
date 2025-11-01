@@ -112,15 +112,7 @@ namespace PowerScope.Model
             { 
                 lock (_sampleRateCalculationLock)
                 {
-                    double baseSampleRate = _calculatedSampleRate;
-                    
-                    // Apply up/down sampling multiplier if enabled
-                    if (_upDownSampling.IsEnabled)
-                    {
-                        return baseSampleRate * _upDownSampling.SampleRateMultiplier;
-                    }
-                    
-                    return baseSampleRate;
+                    return _calculatedSampleRate;
                 }
             } 
         }
@@ -423,7 +415,7 @@ namespace PowerScope.Model
                 IsConnected = true;
                 StatusMessage = "Connected";
             }
-            catch (UnauthorizedAccessException ex)
+            catch (UnauthorizedAccessException)
             {
                 if (_port != null)
                     _port.Dispose();
@@ -431,7 +423,7 @@ namespace PowerScope.Model
                 IsConnected = false;
                 //throw new PortAlreadyInUseException(SourceSetting.PortName, ex);
             }
-            catch (ArgumentException ex)
+            catch (ArgumentException)
             {
                 if (_port != null)
                     _port.Dispose();
@@ -439,7 +431,7 @@ namespace PowerScope.Model
                 IsConnected = false;
                 //throw new PortNotFoundException(SourceSetting.PortName, ex);
             }
-            catch (InvalidOperationException ex)
+            catch (InvalidOperationException)
             {
                 if (_port != null)
                     _port.Dispose();
@@ -447,7 +439,7 @@ namespace PowerScope.Model
                 IsConnected = false;
                 //throw new PortAlreadyInUseException(SourceSetting.PortName, ex);
             }
-            catch (System.IO.IOException ex)
+            catch (System.IO.IOException)
             {
                 if (_port != null)
                     _port.Dispose();
@@ -465,10 +457,9 @@ namespace PowerScope.Model
                 if (_port != null && _port.IsOpen)
                     _port.Close();
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 // Port might already be closed or in error state
-                StatusMessage = $"Warning during disconnect: {ex.Message}";
             }
             finally
             {
@@ -550,15 +541,15 @@ namespace PowerScope.Model
             if (!_isConnected && !_isStreaming)
                 return 0;
                 
-            try
-            {
-                return ReceivedData[channel].CopyLatestTo(destination, n);
-            }
-            catch (Exception)
-            {
-                // If there's an error accessing the buffer, return 0
-                return 0;
-            }
+            // try
+            // {
+            return ReceivedData[channel].CopyLatestTo(destination, n);
+            // }
+            // catch (Exception)
+            // {
+            //     // If there's an error accessing the buffer, return 0
+            //     return 0;
+            // }
         }
 
         private void clearData()
@@ -686,46 +677,27 @@ namespace PowerScope.Model
         /// <param name="reason">Human-readable reason for the disconnection</param>
         private void HandleRuntimeDisconnection(string reason)
         {
-            try
+            // Update status first
+            StatusMessage = $"Disconnected: {reason}";
+            
+            // Stop streaming
+            IsStreaming = false;
+            
+            // Close the port safely
+            if (_port != null && _port.IsOpen)
             {
-                // Update status first
-                StatusMessage = $"Disconnected: {reason}";
-                
-                // Stop streaming
-                IsStreaming = false;
-                
-                // Close the port safely
-                if (_port != null && _port.IsOpen)
-                {
-                    try
-                    {
-                        _port.Close();
-                    }
-                    catch
-                    {
-                        // Port might already be closed, ignore errors
-                    }
-                }
-                
-                // Update connection status
-                IsConnected = false;
-            }
-            catch (Exception ex)
-            {
-                // Ensure we always update the status, even if something fails
                 try
                 {
-                    StatusMessage = $"Error during disconnection handling: {ex.Message}";
-                    IsConnected = false;
-                    IsStreaming = false;
+                    _port.Close();
                 }
                 catch
                 {
-                    // Last resort - at least try to update flags directly
-                    _isConnected = false;
-                    _isStreaming = false;
+                    // Port might already be closed, ignore errors
                 }
             }
+            
+            // Update connection status
+            IsConnected = false;
         }
 
         private void ProcessReceivedData(byte[] readBuffer, int bytesRead, byte[] workingBuffer)
@@ -776,6 +748,7 @@ namespace PowerScope.Model
             }
             catch (Exception)
             {
+                // Parser failed - reset residue to recover
                 _residue = null;
             }
         }
@@ -813,23 +786,15 @@ namespace PowerScope.Model
                     double[] channelFinalData = channelProcessedSamples;
                     if (_upDownSampling.IsEnabled)
                     {
-                        try
+                        channelFinalData = _upDownSampling.ProcessChannelData(channel, channelProcessedSamples);
+                        
+                        // Safety check for up/down sampled data
+                        for (int i = 0; i < channelFinalData.Length; i++)
                         {
-                            channelFinalData = _upDownSampling.ProcessChannelData(channel, channelProcessedSamples);
-                            
-                            // Safety check for up/down sampled data
-                            for (int i = 0; i < channelFinalData.Length; i++)
+                            if (!double.IsFinite(channelFinalData[i]))
                             {
-                                if (!double.IsFinite(channelFinalData[i]))
-                                {
-                                    channelFinalData[i] = 0.0; // Replace NaN/Infinity with zero
-                                }
+                                channelFinalData[i] = 0.0; // Replace NaN/Infinity with zero
                             }
-                        }
-                        catch (Exception)
-                        {
-                            // If up/down sampling fails, fall back to processed samples
-                            channelFinalData = channelProcessedSamples;
                         }
                     }
                     

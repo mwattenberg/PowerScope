@@ -183,11 +183,8 @@ namespace PowerScope.Model
                     sinc = Math.Sin(x) / (Math.PI * n);
                 }
 
-
-                //double w = 0.5 * (1.0 - Math.Cos(2.0 * Math.PI * i / (len - 1))); // Hanning
                 double w = 0.42 - 0.5 * Math.Cos(2.0 * Math.PI * i / (len - 1)) + 0.08 * Math.Cos(4.0 * Math.PI * i / (len - 1)); //Blackman
                 h[i] = sinc * w;
-                //h[i] = sinc;
             }
 
             // Normalize to unity DC gain
