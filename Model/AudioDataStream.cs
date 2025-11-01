@@ -14,43 +14,43 @@ namespace PowerScope.Model
         private bool _isConnected = false;
         private bool _isStreaming = false;
         private string _statusMessage;
-        
+
         // Audio capture components
         private WasapiCapture _audioCapture;
         private MMDevice _audioDevice;
         private readonly string _deviceName;
         private readonly int _sampleRate;
         private int _channelCount;
-        
+
         // Data storage and processing
         public long TotalSamples { get; private set; }
         public long TotalBits { get; private set; }
         private RingBuffer<double>[] ReceivedData { get; set; }
         private readonly object _dataLock = new object();
-        
+
         // Channel-specific processing
         private ChannelSettings[] _channelSettings;
         private IDigitalFilter[] _channelFilters;
         private readonly object _channelConfigLock = new object();
-        
+
         // Up/Down sampling
         private readonly UpDownSampling _upDownSampling;
-        
+
         // Audio processing parameters
         private const int DefaultSampleRate = 44100;
         private const int RingBufferDurationSeconds = 10;
 
-        public int ChannelCount 
-        { 
-            get { return _channelCount; } 
+        public int ChannelCount
+        {
+            get { return _channelCount; }
         }
-        
+
         /// <summary>
         /// Gets the sample rate being used by the audio device
         /// </summary>
-        public int SampleRate 
-        { 
-            get { return _sampleRate; } 
+        public int SampleRate
+        {
+            get { return _sampleRate; }
         }
 
         /// <summary>
@@ -58,28 +58,28 @@ namespace PowerScope.Model
         /// Implements IDataStream.SampleRate
         /// When up/down sampling is enabled, this reflects the final sample rate after processing
         /// </summary>
-        double IDataStream.SampleRate 
-        { 
-            get 
-            { 
+        double IDataStream.SampleRate
+        {
+            get
+            {
                 double baseSampleRate = _sampleRate;
-                
+
                 // Apply up/down sampling multiplier if enabled
                 if (_upDownSampling.IsEnabled)
                 {
                     return baseSampleRate * _upDownSampling.SampleRateMultiplier;
                 }
-                
+
                 return baseSampleRate;
-            } 
+            }
         }
 
         /// <summary>
         /// Gets the name of the audio device being used
         /// </summary>
-        public string DeviceName 
-        { 
-            get { return _deviceName; } 
+        public string DeviceName
+        {
+            get { return _deviceName; }
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
@@ -87,16 +87,14 @@ namespace PowerScope.Model
         protected virtual void OnPropertyChanged(string propertyName)
         {
             if (PropertyChanged != null)
-            {
                 PropertyChanged.Invoke(this, new PropertyChangedEventArgs(propertyName));
-            }
         }
 
         public string StatusMessage
         {
             get { return _statusMessage; }
-            private set 
-            { 
+            private set
+            {
                 if (_statusMessage != value)
                 {
                     _statusMessage = value;
@@ -105,16 +103,16 @@ namespace PowerScope.Model
             }
         }
 
-        public string StreamType 
-        { 
-            get { return "Audio"; } 
+        public string StreamType
+        {
+            get { return "Audio"; }
         }
 
         public bool IsConnected
         {
             get { return _isConnected; }
-            private set 
-            { 
+            private set
+            {
                 if (_isConnected != value)
                 {
                     _isConnected = value;
@@ -126,8 +124,8 @@ namespace PowerScope.Model
         public bool IsStreaming
         {
             get { return _isStreaming; }
-            private set 
-            { 
+            private set
+            {
                 if (_isStreaming != value)
                 {
                     _isStreaming = value;
@@ -150,13 +148,13 @@ namespace PowerScope.Model
             {
                 _deviceName = deviceName;
             }
-            
+
             _sampleRate = sampleRate;
-            
+
             // Initialize up/down sampling
             _upDownSampling = new UpDownSampling(0); // Start with no sampling change
             _upDownSampling.PropertyChanged += OnUpDownSamplingPropertyChanged;
-            
+
             StatusMessage = "Disconnected";
             TotalSamples = 0;
             TotalBits = 0;
@@ -172,7 +170,7 @@ namespace PowerScope.Model
                 OnPropertyChanged(nameof(IsUpDownSamplingEnabled));
                 OnPropertyChanged(nameof(UpDownSamplingDescription));
                 OnPropertyChanged(nameof(SampleRate));
-                
+
                 // Reinitialize for new sampling factor
                 _upDownSampling.InitializeChannels(ChannelCount);
             }
@@ -182,21 +180,15 @@ namespace PowerScope.Model
 
         public void SetChannelSetting(int channelIndex, ChannelSettings settings)
         {
-            if (channelIndex < 0 || channelIndex >= ChannelCount)
-                return;
-
             lock (_channelConfigLock)
             {
-                if (_channelSettings == null) 
-                    return;
-                
                 _channelSettings[channelIndex] = settings;
-                
+
                 // Update filter reference and reset if filter type changed
                 IDigitalFilter newFilter = null;
                 if (settings != null)
                     newFilter = settings.Filter;
-                    
+
                 if (_channelFilters[channelIndex] != newFilter)
                 {
                     _channelFilters[channelIndex] = newFilter;
@@ -208,9 +200,6 @@ namespace PowerScope.Model
 
         public void UpdateChannelSettings(IReadOnlyList<ChannelSettings> channelSettings)
         {
-            if (channelSettings == null)
-                return;
-
             lock (_channelConfigLock)
             {
                 for (int i = 0; i < Math.Min(ChannelCount, channelSettings.Count); i++)
@@ -224,9 +213,6 @@ namespace PowerScope.Model
         {
             lock (_channelConfigLock)
             {
-                if (_channelFilters == null) 
-                    return;
-                
                 for (int i = 0; i < ChannelCount; i++)
                 {
                     if (_channelFilters[i] != null)
@@ -241,49 +227,40 @@ namespace PowerScope.Model
 
         public void Connect()
         {
-            try
+            // Find and initialize audio device
+            _audioDevice = FindAudioDevice(_deviceName);
+            if (_audioDevice == null)
             {
-                // Find and initialize audio device
-                _audioDevice = FindAudioDevice(_deviceName);
-                if (_audioDevice == null)
-                {
-                    StatusMessage = $"Audio device '{_deviceName}' not found";
-                    IsConnected = false;
-                    return;
-                }
-
-                // Initialize WASAPI capture with the specified sample rate
-                WaveFormat mixFormat = _audioDevice.AudioClient.MixFormat;
-                WaveFormat desiredFormat = new WaveFormat(_sampleRate, mixFormat.BitsPerSample, mixFormat.Channels);
-                
-                // Create WASAPI capture with the desired format
-                _audioCapture = new WasapiCapture(_audioDevice, false, 100);
-                
-                // Get actual channel count from the audio format
-                _channelCount = _audioCapture.WaveFormat.Channels;
-                
-                // Initialize ring buffers with smart default size
-                // PlotManager will call SetBufferSize() later with the actual PlotSettings.BufferSize
-                int defaultBufferSize = Math.Max(500000, _sampleRate * RingBufferDurationSeconds);
-                InitializeRingBuffers(defaultBufferSize);
-                
-                // Initialize channel processing arrays
-                _channelSettings = new ChannelSettings[_channelCount];
-                _channelFilters = new IDigitalFilter[_channelCount];
-                
-                // Set up data available event handler
-                _audioCapture.DataAvailable += OnDataAvailable;
-                _audioCapture.RecordingStopped += OnRecordingStopped;
-                
-                IsConnected = true;
-                StatusMessage = $"Connected to {_audioDevice.FriendlyName} ({_channelCount} ch, {_sampleRate} Hz)";
-            }
-            catch (Exception ex)
-            {
-                StatusMessage = $"Connection failed: {ex.Message}";
+                StatusMessage = $"Audio device '{_deviceName}' not found";
                 IsConnected = false;
-                CleanupAudioResources();
+                return;
             }
+
+            // Initialize WASAPI capture with the specified sample rate
+            WaveFormat mixFormat = _audioDevice.AudioClient.MixFormat;
+            WaveFormat desiredFormat = new WaveFormat(_sampleRate, mixFormat.BitsPerSample, mixFormat.Channels);
+
+            // Create WASAPI capture with the desired format
+            _audioCapture = new WasapiCapture(_audioDevice, false, 100);
+
+            // Get actual channel count from the audio format
+            _channelCount = _audioCapture.WaveFormat.Channels;
+
+            // Initialize ring buffers with smart default size
+            // PlotManager will call SetBufferSize() later with the actual PlotSettings.BufferSize
+            int defaultBufferSize = Math.Max(500000, _sampleRate * RingBufferDurationSeconds);
+            InitializeRingBuffers(defaultBufferSize);
+
+            // Initialize channel processing arrays
+            _channelSettings = new ChannelSettings[_channelCount];
+            _channelFilters = new IDigitalFilter[_channelCount];
+
+            // Set up data available event handler
+            _audioCapture.DataAvailable += OnDataAvailable;
+            _audioCapture.RecordingStopped += OnRecordingStopped;
+
+            IsConnected = true;
+            StatusMessage = $"Connected to {_audioDevice.FriendlyName} ({_channelCount} ch, {_sampleRate} Hz)";
         }
 
         public void Disconnect()
@@ -296,88 +273,53 @@ namespace PowerScope.Model
 
         public void StartStreaming()
         {
-            if (!_isConnected || _isStreaming || _audioCapture == null)
-                return;
+            // Reset filters when starting streaming
+            ResetChannelFilters();
 
-            try
-            {
-                // Reset filters when starting streaming
-                ResetChannelFilters();
-                
-                // Initialize up/down sampling for current channel configuration
-                _upDownSampling.InitializeChannels(ChannelCount);
-                _upDownSampling.Reset();
-                
-                _audioCapture.StartRecording();
-                IsStreaming = true;
-                StatusMessage = $"Streaming from {_audioDevice.FriendlyName}";
-            }
-            catch (Exception ex)
-            {
-                StatusMessage = $"Failed to start streaming: {ex.Message}";
-                IsStreaming = false;
-            }
+            // Initialize up/down sampling for current channel configuration
+            _upDownSampling.InitializeChannels(ChannelCount);
+            _upDownSampling.Reset();
+
+            _audioCapture.StartRecording();
+            IsStreaming = true;
+            StatusMessage = $"Streaming from {_audioDevice.FriendlyName}";
         }
 
         public void StopStreaming()
         {
-            if (!_isStreaming || _audioCapture == null)
+            if (!_isStreaming)
                 return;
 
-            try
-            {
-                _audioCapture.StopRecording();
-                IsStreaming = false;
-                
-                if (_isConnected)
-                {
-                    StatusMessage = $"Stopped - {_audioDevice.FriendlyName}";
-                }
-            }
-            catch (Exception ex)
-            {
-                StatusMessage = $"Error stopping stream: {ex.Message}";
-                IsStreaming = false;
-            }
+            _audioCapture.StopRecording();
+            IsStreaming = false;
+
+            if (_isConnected)
+                StatusMessage = $"Stopped - {_audioDevice.FriendlyName}";
         }
 
         public int CopyLatestTo(int channel, double[] destination, int n)
         {
-            if (channel < 0 || channel >= ChannelCount || ReceivedData == null)
-                return 0;
-            
-            try
-            {
-                return ReceivedData[channel].CopyLatestTo(destination, n);
-            }
-            catch (Exception)
-            {
-                return 0;
-            }
+            return ReceivedData[channel].CopyLatestTo(destination, n);
         }
 
         public void clearData()
         {
-            if (ReceivedData != null)
+            lock (_dataLock)
             {
-                lock (_dataLock)
+                foreach (RingBuffer<double> ringBuffer in ReceivedData)
                 {
-                    foreach (RingBuffer<double> ringBuffer in ReceivedData)
-                    {
-                        if (ringBuffer != null)
-                            ringBuffer.Clear();
-                    }
+                    ringBuffer.Clear();
                 }
             }
-            
+
             TotalSamples = 0;
             TotalBits = 0;
-            
+
             // Reset filters when clearing data
             ResetChannelFilters();
-            
+
             // Reset up/down sampling when clearing data
-            _upDownSampling?.Reset();
+            _upDownSampling.Reset();
         }
 
         #endregion
@@ -386,7 +328,7 @@ namespace PowerScope.Model
 
         private void OnDataAvailable(object sender, WaveInEventArgs e)
         {
-            if (!IsStreaming || e.Buffer == null || e.BytesRecorded == 0)
+            if (!IsStreaming)
                 return;
 
             ProcessAudioData(e.Buffer, e.BytesRecorded);
@@ -395,7 +337,7 @@ namespace PowerScope.Model
         private void OnRecordingStopped(object sender, StoppedEventArgs e)
         {
             IsStreaming = false;
-            
+
             if (e.Exception != null)
             {
                 StatusMessage = $"Recording stopped due to error: {e.Exception.Message}";
@@ -411,8 +353,8 @@ namespace PowerScope.Model
             WaveFormat format = _audioCapture.WaveFormat;
             int bytesPerSample = format.BitsPerSample / 8;
             int samplesRecorded = bytesRecorded / (bytesPerSample * format.Channels);
-            
-            if (samplesRecorded == 0) 
+
+            if (samplesRecorded == 0)
                 return;
 
             lock (_dataLock)
@@ -446,56 +388,30 @@ namespace PowerScope.Model
                 }
 
                 // Apply channel processing and up/down sampling, then add to ring buffers
-                // Use simple sequential processing since audio typically has fewer channels than serial data
                 double[][] finalData = new double[_channelCount][];
-                
+
                 for (int ch = 0; ch < _channelCount; ch++)
                 {
                     // Apply channel processing (gain, offset, filtering) to each sample
                     double[] channelProcessedSamples = new double[samplesRecorded];
                     for (int s = 0; s < samplesRecorded; s++)
                     {
-                        double processedSample = ApplyChannelProcessing(ch, channelData[ch][s]);
-                        
-                        // Safety check for invalid values
-                        if (!double.IsFinite(processedSample))
-                        {
-                            processedSample = 0.0; // Replace NaN/Infinity with zero
-                        }
-                        
-                        channelProcessedSamples[s] = processedSample;
+                        channelProcessedSamples[s] = ApplyChannelProcessing(ch, channelData[ch][s]);
                     }
-                    
+
                     // Apply up/down sampling per channel if enabled
                     double[] channelFinalData = channelProcessedSamples;
                     if (_upDownSampling.IsEnabled)
                     {
-                        try
-                        {
-                            channelFinalData = _upDownSampling.ProcessChannelData(ch, channelProcessedSamples);
-                            
-                            // Safety check for up/down sampled data
-                            for (int i = 0; i < channelFinalData.Length; i++)
-                            {
-                                if (!double.IsFinite(channelFinalData[i]))
-                                {
-                                    channelFinalData[i] = 0.0; // Replace NaN/Infinity with zero
-                                }
-                            }
-                        }
-                        catch (Exception)
-                        {
-                            // If up/down sampling fails, fall back to processed samples
-                            channelFinalData = channelProcessedSamples;
-                        }
+                        channelFinalData = _upDownSampling.ProcessChannelData(ch, channelProcessedSamples);
                     }
-                    
+
                     finalData[ch] = channelFinalData;
                     ReceivedData[ch].AddRange(channelFinalData);
                 }
 
                 // Update statistics based on final processed data
-                int actualSamplesGenerated = finalData[0]?.Length ?? samplesRecorded;
+                int actualSamplesGenerated = finalData[0].Length;
                 TotalSamples += actualSamplesGenerated;
                 TotalBits += bytesRecorded * 8;
             }
@@ -561,33 +477,21 @@ namespace PowerScope.Model
 
         private double ApplyChannelProcessing(int channel, double rawSample)
         {
-            // Get channel settings safely
-            ChannelSettings settings;
-            IDigitalFilter filter;
-            
-            lock (_channelConfigLock)
-            {
-                settings = null;
-                if (_channelSettings != null && channel < _channelSettings.Length)
-                    settings = _channelSettings[channel];
-                    
-                filter = null;
-                if (_channelFilters != null && channel < _channelFilters.Length)
-                    filter = _channelFilters[channel];
-            }
-            
+            ChannelSettings settings = _channelSettings[channel];
+
             if (settings == null)
                 return rawSample;
-            
+
             // Apply gain and offset
             double processed = (rawSample + settings.Offset) * settings.Gain;
-            
+
             // Apply filter if configured
+            IDigitalFilter filter = _channelFilters[channel];
             if (filter != null)
             {
                 processed = filter.Filter(processed);
             }
-            
+
             return processed;
         }
 
@@ -597,65 +501,42 @@ namespace PowerScope.Model
 
         private static MMDevice GetDefaultAudioDevice()
         {
-            try
-            {
-                MMDeviceEnumerator deviceEnumerator = new MMDeviceEnumerator();
-                return deviceEnumerator.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Console);
-            }
-            catch
-            {
-                return null;
-            }
+            MMDeviceEnumerator deviceEnumerator = new MMDeviceEnumerator();
+            return deviceEnumerator.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Console);
         }
 
         private static MMDevice FindAudioDevice(string deviceName)
         {
-            try
+            MMDeviceEnumerator deviceEnumerator = new MMDeviceEnumerator();
+            MMDeviceCollection devices = deviceEnumerator.EnumerateAudioEndPoints(DataFlow.Capture, DeviceState.Active);
+
+            foreach (MMDevice device in devices)
             {
-                MMDeviceEnumerator deviceEnumerator = new MMDeviceEnumerator();
-                MMDeviceCollection devices = deviceEnumerator.EnumerateAudioEndPoints(DataFlow.Capture, DeviceState.Active);
-                
-                foreach (MMDevice device in devices)
+                if (device.FriendlyName.Equals(deviceName, StringComparison.OrdinalIgnoreCase) ||
+    string.IsNullOrEmpty(deviceName))
                 {
-                    if (device.FriendlyName.Equals(deviceName, StringComparison.OrdinalIgnoreCase) ||
-                        string.IsNullOrEmpty(deviceName))
-                    {
-                        return device;
-                    }
-                }
-                
-                // If no match found and deviceName was specified, try default device
-                if (!string.IsNullOrEmpty(deviceName))
-                {
-                    return GetDefaultAudioDevice();
+                    return device;
                 }
             }
-            catch
-            {
-                // Fall back to default device
-            }
-            
+
+            // If no match found and deviceName was specified, try default device
+            if (!string.IsNullOrEmpty(deviceName))
+                return GetDefaultAudioDevice();
+
             return GetDefaultAudioDevice();
         }
 
         public static List<string> GetAvailableAudioDevices()
         {
             List<string> deviceNames = new List<string>();
-            try
+            MMDeviceEnumerator deviceEnumerator = new MMDeviceEnumerator();
+            MMDeviceCollection devices = deviceEnumerator.EnumerateAudioEndPoints(DataFlow.Capture, DeviceState.Active);
+
+            foreach (MMDevice device in devices)
             {
-                MMDeviceEnumerator deviceEnumerator = new MMDeviceEnumerator();
-                MMDeviceCollection devices = deviceEnumerator.EnumerateAudioEndPoints(DataFlow.Capture, DeviceState.Active);
-                
-                foreach (MMDevice device in devices)
-                {
-                    deviceNames.Add(device.FriendlyName);
-                }
+                deviceNames.Add(device.FriendlyName);
             }
-            catch
-            {
-                // Return empty list on error
-            }
-            
+
             return deviceNames;
         }
 
@@ -665,28 +546,19 @@ namespace PowerScope.Model
 
         private void CleanupAudioResources()
         {
-            try
+            if (_audioCapture != null)
             {
-                if (_audioCapture != null)
-                {
-                    _audioCapture.DataAvailable -= OnDataAvailable;
-                    _audioCapture.RecordingStopped -= OnRecordingStopped;
-                    
-                    if (_audioCapture.CaptureState != CaptureState.Stopped)
-                    {
-                        _audioCapture.StopRecording();
-                    }
-                    
-                    _audioCapture.Dispose();
-                    _audioCapture = null;
-                }
-                
-                _audioDevice = null;
+                _audioCapture.DataAvailable -= OnDataAvailable;
+                _audioCapture.RecordingStopped -= OnRecordingStopped;
+
+                if (_audioCapture.CaptureState != CaptureState.Stopped)
+                    _audioCapture.StopRecording();
+
+                _audioCapture.Dispose();
+                _audioCapture = null;
             }
-            catch
-            {
-                // Ignore cleanup errors
-            }
+
+            _audioDevice = null;
         }
 
         public void Dispose()
@@ -696,21 +568,14 @@ namespace PowerScope.Model
 
             StopStreaming();
             CleanupAudioResources();
-            
-            if (ReceivedData != null)
+
+            foreach (RingBuffer<double> ringBuffer in ReceivedData)
             {
-                foreach (RingBuffer<double> ringBuffer in ReceivedData)
-                {
-                    if (ringBuffer != null)
-                        ringBuffer.Clear();
-                }
+                ringBuffer.Clear();
             }
 
             // Unsubscribe from up/down sampling events
-            if (_upDownSampling != null)
-            {
-                _upDownSampling.PropertyChanged -= OnUpDownSamplingPropertyChanged;
-            }
+            _upDownSampling.PropertyChanged -= OnUpDownSamplingPropertyChanged;
 
             _disposed = true;
             GC.SuppressFinalize(this);
@@ -720,39 +585,33 @@ namespace PowerScope.Model
 
         #region IBufferResizable Implementation
 
-        public int BufferSize 
-        { 
-            get 
-            { 
+        public int BufferSize
+        {
+            get
+            {
                 lock (_channelConfigLock)
                 {
-                    return ReceivedData?[0]?.Capacity ?? 0;
+                    return ReceivedData[0].Capacity;
                 }
             }
             set
             {
-                if (value <= 0)
-                    return;
-
                 lock (_channelConfigLock)
                 {
                     // Clear existing data
-                    if (ReceivedData != null)
+                    foreach (RingBuffer<double> buffer in ReceivedData)
                     {
-                        foreach (var buffer in ReceivedData)
-                        {
-                            buffer?.Clear();
-                        }
+                        buffer.Clear();
                     }
 
                     // Recreate ring buffers with new size - no need to stop/restart streaming
                     InitializeRingBuffers(value);
-                    
+
                     // Reset statistics
                     TotalSamples = 0;
                     TotalBits = 0;
                 }
-                
+
                 // Notify that buffer size changed
                 OnPropertyChanged(nameof(BufferSize));
             }
@@ -760,12 +619,6 @@ namespace PowerScope.Model
 
         private void InitializeRingBuffers(int bufferSize)
         {
-            if (_channelCount <= 0)
-            {
-                // Channel count not known yet - will be called again during Connect()
-                return;
-            }
-            
             ReceivedData = new RingBuffer<double>[_channelCount];
             for (int i = 0; i < _channelCount; i++)
             {

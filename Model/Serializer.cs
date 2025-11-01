@@ -21,18 +21,14 @@ namespace PowerScope.Model
 
         public static void ReadSettingsFromXML(string filePath, PlotManager plotManager, DataStreamBar dataStreamBar)
         {
-            if (!File.Exists(filePath)) 
+            if (!File.Exists(filePath))
                 return;
-            try
-            {
-                XElement settingsXml = XElement.Load(filePath);
-                ReadPlotSettings(settingsXml, plotManager);
-                ReadDataStreamsWithChannels(settingsXml, dataStreamBar);
-            }
-            catch { /* Ignore errors and use defaults */ }
+
+            XElement settingsXml = XElement.Load(filePath);
+            ReadPlotSettings(settingsXml, plotManager);
+            ReadDataStreamsWithChannels(settingsXml, dataStreamBar);
         }
 
-        // --- Private helpers ---
         private static void WritePlotSettings(XElement parent, PlotManager plotManager)
         {
             parent.Add(new XElement("PlotUpdateRateFPS", plotManager.Settings.PlotUpdateRateFPS.ToString(System.Globalization.CultureInfo.InvariantCulture)));
@@ -50,141 +46,132 @@ namespace PowerScope.Model
         private static void WriteDataStreamsWithChannels(XElement parent, DataStreamBar dataStreamBar)
         {
             XElement dataStreamsElement = new XElement("DataStreams");
-            
-            // Group channels by their owner stream to save stream configurations
-            var streamGroups = dataStreamBar.Channels
-                .GroupBy(channel => channel.OwnerStream)
-                .ToList();
 
-            foreach (var streamGroup in streamGroups)
+            Dictionary<IDataStream, List<Channel>> streamGroups = new Dictionary<IDataStream, List<Channel>>();
+            foreach (Channel channel in dataStreamBar.Channels)
+            {
+                if (!streamGroups.ContainsKey(channel.OwnerStream))
+                    streamGroups[channel.OwnerStream] = new List<Channel>();
+                streamGroups[channel.OwnerStream].Add(channel);
+            }
+
+            foreach (KeyValuePair<IDataStream, List<Channel>> streamGroup in streamGroups)
             {
                 IDataStream stream = streamGroup.Key;
-                List<Channel> channels = streamGroup.ToList();
+                List<Channel> channels = streamGroup.Value;
 
-                // Create stream element with configuration
                 XElement streamElement = new XElement("Stream");
 
-                // Get UpDownSampling factor from stream if it supports the interface
                 int upDownSamplingFactor = 0;
                 if (stream is IUpDownSampling upDownSamplingStream)
                 {
                     upDownSamplingFactor = upDownSamplingStream.UpDownSamplingFactor;
                 }
 
-                // Save stream configuration - we need to reverse-engineer this from the stream
                 if (stream is DemoDataStream demoStream)
                 {
                     streamElement.Add(
-                        new XElement("StreamSource", "Demo"),
-                        new XElement("NumberOfChannels", demoStream.ChannelCount),
-                        new XElement("DemoSampleRate", demoStream.DemoSettings.SampleRate),
-                        new XElement("DemoSignalType", demoStream.DemoSettings.SignalType.ToString()),
-                        new XElement("UpDownSampling", upDownSamplingFactor)
-                    );
+                         new XElement("StreamSource", "Demo"),
+                    new XElement("NumberOfChannels", demoStream.ChannelCount),
+                    new XElement("DemoSampleRate", demoStream.DemoSettings.SampleRate),
+                      new XElement("DemoSignalType", demoStream.DemoSettings.SignalType.ToString()),
+                               new XElement("UpDownSampling", upDownSamplingFactor)
+                      );
                 }
                 else if (stream is AudioDataStream audioStream)
                 {
+                    string deviceName = audioStream.DeviceName;
+                    if (deviceName == null)
+                        deviceName = "Default";
+
                     streamElement.Add(
-                        new XElement("StreamSource", "AudioInput"),
-                        new XElement("NumberOfChannels", audioStream.ChannelCount),
-                        new XElement("AudioDevice", audioStream.DeviceName ?? "Default"),
-                        new XElement("AudioSampleRate", audioStream.SampleRate),
-                        new XElement("UpDownSampling", upDownSamplingFactor)
-                    );
+               new XElement("StreamSource", "AudioInput"),
+                     new XElement("NumberOfChannels", audioStream.ChannelCount),
+                new XElement("AudioDevice", deviceName),
+                          new XElement("AudioSampleRate", audioStream.SampleRate),
+                           new XElement("UpDownSampling", upDownSamplingFactor)
+                  );
                 }
                 else if (stream is SerialDataStream serialStream)
                 {
-                    // Determine data format from the parser mode - back to the simple approach
                     string dataFormatStr = serialStream.Parser.Mode == DataParser.ParserMode.ASCII ? "ASCII" : "RawBinary";
-                    
-                    // Get delimiter from parser if it's ASCII mode
-                    string delimiterStr = ","; // Default
+
+                    string delimiterStr = ",";
                     if (serialStream.Parser.Mode == DataParser.ParserMode.ASCII)
                     {
                         char sep = serialStream.Parser.Separator;
-                        delimiterStr = sep switch
-                        {
-                            ',' => ",",
-                            ' ' => "Space",
-                            '\t' => "Tab",
-                            ';' => ";",
-                            _ => sep.ToString()
-                        };
+                        delimiterStr = ConvertSeparatorToString(sep);
                     }
-                    
-                    // Get frame start from parser if it's binary mode with frame start
-                    string frameStartStr = "0xAA,0xAA"; // Default
+
+                    string frameStartStr = "0xAA,0xAA";
                     if (serialStream.Parser.Mode == DataParser.ParserMode.Binary && serialStream.Parser.FrameStart != null)
                     {
-                        frameStartStr = string.Join(",", serialStream.Parser.FrameStart.Select(b => $"0x{b:X2}"));
+                        frameStartStr = ConvertFrameStartToString(serialStream.Parser.FrameStart);
                     }
-                    
-                    // Get binary format if it's binary mode
-                    string binaryFormatStr = "uint16_t"; // Default
+
+                    string binaryFormatStr = "uint16_t";
                     if (serialStream.Parser.Mode == DataParser.ParserMode.Binary)
                     {
-                        binaryFormatStr = serialStream.Parser.format.ToString();
+                        binaryFormatStr = serialStream.Parser.Format.ToString();
                     }
 
+                    string numberTypeStr = ConvertBinaryFormatToNumberType(binaryFormatStr);
+
                     streamElement.Add(
-                        new XElement("StreamSource", "SerialPort"),
-                        new XElement("NumberOfChannels", serialStream.ChannelCount),
+                          new XElement("StreamSource", "SerialPort"),
+                     new XElement("NumberOfChannels", serialStream.ChannelCount),
                         new XElement("Port", serialStream.SourceSetting.PortName),
-                        new XElement("Baud", serialStream.SourceSetting.BaudRate),
-                        new XElement("DataBits", serialStream.SourceSetting.DataBits),
-                        new XElement("StopBits", serialStream.SourceSetting.StopBits),
-                        new XElement("Parity", serialStream.SourceSetting.Parity.ToString()),
-                        new XElement("DataFormat", dataFormatStr), // Back to simple DataFormat
-                        new XElement("NumberType", binaryFormatStr.Replace("_t", "").Replace("uint", "Uint").Replace("int", "Int").Replace("float", "Float")), // Map to NumberType
-                        new XElement("Delimiter", delimiterStr),
-                        new XElement("FrameStart", frameStartStr),
-                        new XElement("UpDownSampling", upDownSamplingFactor)
-                    );
+                           new XElement("Baud", serialStream.SourceSetting.BaudRate),
+                     new XElement("DataBits", serialStream.SourceSetting.DataBits),
+                new XElement("StopBits", serialStream.SourceSetting.StopBits),
+                 new XElement("Parity", serialStream.SourceSetting.Parity.ToString()),
+                    new XElement("DataFormat", dataFormatStr),
+                     new XElement("NumberType", numberTypeStr),
+                      new XElement("Delimiter", delimiterStr),
+                  new XElement("FrameStart", frameStartStr),
+                  new XElement("UpDownSampling", upDownSamplingFactor)
+                 );
                 }
 
-                // Save channels for this stream - all data comes directly from DataStreamBar.Channels
                 XElement channelsElement = new XElement("Channels");
                 foreach (Channel channel in channels)
                 {
                     XElement channelElement = new XElement("Channel",
-                        new XElement("LocalIndex", channel.LocalChannelIndex),
-                        new XElement("Label", channel.Settings.Label),
+                       new XElement("LocalIndex", channel.LocalChannelIndex),
+                      new XElement("Label", channel.Settings.Label),
                         new XElement("Color", channel.Settings.Color.ToString()),
-                        new XElement("IsEnabled", channel.Settings.IsEnabled),
-                        new XElement("Gain", channel.Settings.Gain.ToString(System.Globalization.CultureInfo.InvariantCulture)),
-                        new XElement("Offset", channel.Settings.Offset.ToString(System.Globalization.CultureInfo.InvariantCulture))
-                    );
+                  new XElement("IsEnabled", channel.Settings.IsEnabled),
+                          new XElement("Gain", channel.Settings.Gain.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+                      new XElement("Offset", channel.Settings.Offset.ToString(System.Globalization.CultureInfo.InvariantCulture))
+                      );
 
-                    // Add filter information if a filter is configured
                     if (channel.Settings.Filter != null)
                     {
                         XElement filterElement = new XElement("Filter",
-                            new XElement("Type", channel.Settings.Filter.GetFilterType())
-                        );
+                                 new XElement("Type", channel.Settings.Filter.GetFilterType())
+                       );
 
-                        // Add filter parameters
                         Dictionary<string, double> parameters = channel.Settings.Filter.GetFilterParameters();
                         XElement parametersElement = new XElement("Parameters");
                         foreach (KeyValuePair<string, double> parameter in parameters)
                         {
                             parametersElement.Add(new XElement("Parameter",
-                                new XAttribute("Name", parameter.Key),
+                               new XAttribute("Name", parameter.Key),
                                 new XAttribute("Value", parameter.Value.ToString(System.Globalization.CultureInfo.InvariantCulture))
-                            ));
+                              ));
                         }
                         filterElement.Add(parametersElement);
                         channelElement.Add(filterElement);
                     }
 
-                    // Save measurements for this channel
                     if (channel.Measurements.Count > 0)
                     {
                         XElement measurementsElement = new XElement("Measurements");
                         foreach (Measurement measurement in channel.Measurements)
                         {
                             XElement measurementElement = new XElement("Measurement",
-                                new XElement("Type", measurement.Type.ToString())
-                            );
+                          new XElement("Type", measurement.Type.ToString())
+                                );
                             measurementsElement.Add(measurementElement);
                         }
                         channelElement.Add(measurementsElement);
@@ -196,93 +183,50 @@ namespace PowerScope.Model
                 streamElement.Add(channelsElement);
                 dataStreamsElement.Add(streamElement);
             }
-            
+
             parent.Add(dataStreamsElement);
+        }
+
+        private static string GetElementValue(XElement parent, string elementName, string defaultValue)
+        {
+            XElement element = parent.Element(elementName);
+            if (element != null)
+                return element.Value;
+            else
+                return defaultValue;
+        }
+
+        private static int GetElementValueInt(XElement parent, string elementName, int defaultValue)
+        {
+            string value = GetElementValue(parent, elementName, defaultValue.ToString());
+            return int.Parse(value);
+        }
+
+        private static double GetElementValueDouble(XElement parent, string elementName, double defaultValue)
+        {
+            string value = GetElementValue(parent, elementName, defaultValue.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            return double.Parse(value, System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        private static bool GetElementValueBool(XElement parent, string elementName, bool defaultValue)
+        {
+            string value = GetElementValue(parent, elementName, defaultValue.ToString());
+            return bool.Parse(value);
         }
 
         private static void ReadPlotSettings(XElement settingsXml, PlotManager plotManager)
         {
-            XElement plotUpdateElement = settingsXml.Element("PlotUpdateRateFPS");
-            string plotUpdateValue;
-            if (plotUpdateElement != null)
-                plotUpdateValue = plotUpdateElement.Value;
-            else
-                plotUpdateValue = "30.0";
-            double plotUpdateRateFPS = double.Parse(plotUpdateValue, System.Globalization.CultureInfo.InvariantCulture);
+            double plotUpdateRateFPS = GetElementValueDouble(settingsXml, "PlotUpdateRateFPS", 30.0);
+            int lineWidth = GetElementValueInt(settingsXml, "LineWidth", 1);
+            bool antiAliasing = GetElementValueBool(settingsXml, "AntiAliasing", false);
+            bool showRenderTime = GetElementValueBool(settingsXml, "ShowRenderTime", false);
+            bool yAutoScale = GetElementValueBool(settingsXml, "YAutoScale", true);
+            int bufferSize = GetElementValueInt(settingsXml, "BufferSize", 500000);
+            int xMin = GetElementValueInt(settingsXml, "Xmin", 0);
+            int xMax = GetElementValueInt(settingsXml, "Xmax", 3000);
+            int yMin = GetElementValueInt(settingsXml, "Ymin", -200);
+            int yMax = GetElementValueInt(settingsXml, "Ymax", 4000);
 
-            XElement lineWidthElement = settingsXml.Element("LineWidth");
-            string lineWidthValue;
-            if (lineWidthElement != null)
-                lineWidthValue = lineWidthElement.Value;
-            else
-                lineWidthValue = "1";
-            int lineWidth = int.Parse(lineWidthValue);
-
-            XElement antiAliasingElement = settingsXml.Element("AntiAliasing");
-            string antiAliasingValue;
-            if (antiAliasingElement != null)
-                antiAliasingValue = antiAliasingElement.Value;
-            else
-                antiAliasingValue = "false";
-            bool antiAliasing = bool.Parse(antiAliasingValue);
-
-            XElement showRenderTimeElement = settingsXml.Element("ShowRenderTime");
-            string showRenderTimeValue;
-            if (showRenderTimeElement != null)
-                showRenderTimeValue = showRenderTimeElement.Value;
-            else
-                showRenderTimeValue = "false";
-            bool showRenderTime = bool.Parse(showRenderTimeValue);
-
-            XElement yAutoScaleElement = settingsXml.Element("YAutoScale");
-            string yAutoScaleValue;
-            if (yAutoScaleElement != null)
-                yAutoScaleValue = yAutoScaleElement.Value;
-            else
-                yAutoScaleValue = "true";
-            bool yAutoScale = bool.Parse(yAutoScaleValue);
-
-            XElement bufferSizeElement = settingsXml.Element("BufferSize");
-            string bufferSizeValue;
-            if (bufferSizeElement != null)
-                bufferSizeValue = bufferSizeElement.Value;
-            else
-                bufferSizeValue = "500000"; // Default buffer size
-            int bufferSize = int.Parse(bufferSizeValue);
-
-            XElement xMinElement = settingsXml.Element("Xmin");
-            string xMinValue;
-            if (xMinElement != null)
-                xMinValue = xMinElement.Value;
-            else
-                xMinValue = "0";
-            int xMin = int.Parse(xMinValue);
-
-            XElement xMaxElement = settingsXml.Element("Xmax");
-            string xMaxValue;
-            if (xMaxElement != null)
-                xMaxValue = xMaxElement.Value;
-            else
-                xMaxValue = "3000";
-            int xMax = int.Parse(xMaxValue);
-
-            XElement yMinElement = settingsXml.Element("Ymin");
-            string yMinValue;
-            if (yMinElement != null)
-                yMinValue = yMinElement.Value;
-            else
-                yMinValue = "-200";
-            int yMin = int.Parse(yMinValue);
-
-            XElement yMaxElement = settingsXml.Element("Ymax");
-            string yMaxValue;
-            if (yMaxElement != null)
-                yMaxValue = yMaxElement.Value;
-            else
-                yMaxValue = "4000";
-            int yMax = int.Parse(yMaxValue);
-            
-            // Apply settings to PlotManager.Settings (this will automatically update via DataBinding)
             plotManager.Settings.PlotUpdateRateFPS = plotUpdateRateFPS;
             plotManager.Settings.LineWidth = lineWidth;
             plotManager.Settings.AntiAliasing = antiAliasing;
@@ -293,8 +237,7 @@ namespace PowerScope.Model
             plotManager.Settings.Xmax = xMax;
             plotManager.Settings.Ymin = yMin;
             plotManager.Settings.Ymax = yMax;
-            
-            // Settings are automatically applied via PropertyChanged events in PlotManager
+
             plotManager.Plot.Plot.Axes.SetLimitsY(yMin, yMax);
             plotManager.Plot.Refresh();
         }
@@ -302,15 +245,13 @@ namespace PowerScope.Model
         private static void ReadDataStreamsWithChannels(XElement settingsXml, DataStreamBar dataStreamBar)
         {
             XElement dataStreamsElement = settingsXml.Element("DataStreams");
-            if (dataStreamsElement == null) 
+            if (dataStreamsElement == null)
                 return;
 
-            // Load and recreate streams with their channels
             foreach (XElement streamElement in dataStreamsElement.Elements("Stream"))
             {
-                // Load stream configuration
                 StreamSettings streamSettings = new StreamSettings();
-                
+
                 XElement streamSourceElement = streamElement.Element("StreamSource");
                 if (streamSourceElement != null && Enum.TryParse<StreamSource>(streamSourceElement.Value, out StreamSource streamSource))
                 {
@@ -323,7 +264,6 @@ namespace PowerScope.Model
                     streamSettings.NumberOfChannels = numberOfChannels;
                 }
 
-                // Load stream-specific settings
                 switch (streamSettings.StreamSource)
                 {
                     case StreamSource.Demo:
@@ -367,7 +307,6 @@ namespace PowerScope.Model
                         if (parityElement != null && Enum.TryParse<Parity>(parityElement.Value, out Parity parity))
                             streamSettings.Parity = parity;
 
-                        // Simplified: Back to DataFormat only, with ASCII as default fallback
                         XElement dataFormatElement = streamElement.Element("DataFormat");
                         if (dataFormatElement != null && Enum.TryParse<DataFormatType>(dataFormatElement.Value, out DataFormatType dataFormat))
                         {
@@ -375,10 +314,9 @@ namespace PowerScope.Model
                         }
                         else
                         {
-                            streamSettings.DataFormat = DataFormatType.ASCII; // Default fallback as requested
+                            streamSettings.DataFormat = DataFormatType.ASCII;
                         }
 
-                        // Get number type 
                         XElement numberTypeElement = streamElement.Element("NumberType");
                         if (numberTypeElement != null && Enum.TryParse<NumberTypeEnum>(numberTypeElement.Value, out NumberTypeEnum numberType))
                         {
@@ -395,26 +333,22 @@ namespace PowerScope.Model
                         break;
                 }
 
-                // Load UpDownSampling factor (common to all stream types)
                 XElement upDownSamplingElement = streamElement.Element("UpDownSampling");
                 if (upDownSamplingElement != null && int.TryParse(upDownSamplingElement.Value, out int upDownSamplingFactor))
                 {
                     streamSettings.UpDownSampling = upDownSamplingFactor;
                 }
 
-                // Create the data stream
                 IDataStream dataStream = dataStreamBar.CreateDataStreamFromUserInput(streamSettings);
-                
-                // Apply UpDownSampling to the stream if it supports it
+
                 if (dataStream is IUpDownSampling upDownSamplingStream)
                 {
                     upDownSamplingStream.UpDownSamplingFactor = streamSettings.UpDownSampling;
                 }
-                
+
                 dataStream.Connect();
                 dataStream.StartStreaming();
 
-                // Load channel settings and measurements directly to channels
                 XElement channelsElement = streamElement.Element("Channels");
                 if (channelsElement != null)
                 {
@@ -424,7 +358,7 @@ namespace PowerScope.Model
                     foreach (XElement channelElement in channelsElement.Elements("Channel"))
                     {
                         ChannelSettings setting = new ChannelSettings();
-                        
+
                         XElement labelElement = channelElement.Element("Label");
                         if (labelElement != null)
                             setting.Label = labelElement.Value;
@@ -432,7 +366,10 @@ namespace PowerScope.Model
                             setting.Label = "";
 
                         XElement colorElement = channelElement.Element("Color");
-                        setting.Color = ParseColor(colorElement?.Value);
+                        if (colorElement != null)
+                            setting.Color = ParseColor(colorElement.Value);
+                        else
+                            setting.Color = ParseColor(null);
 
                         XElement isEnabledElement = channelElement.Element("IsEnabled");
                         if (isEnabledElement != null && bool.TryParse(isEnabledElement.Value, out bool enabled))
@@ -452,7 +389,6 @@ namespace PowerScope.Model
                         else
                             setting.Offset = 0.0;
 
-                        // Load filter information
                         XElement filterElement = channelElement.Element("Filter");
                         if (filterElement != null)
                         {
@@ -461,28 +397,33 @@ namespace PowerScope.Model
                             {
                                 string filterType = typeElement.Value;
                                 XElement parametersElement = filterElement.Element("Parameters");
-                                
+
                                 if (parametersElement != null)
                                 {
                                     Dictionary<string, double> parameters = new Dictionary<string, double>();
                                     foreach (XElement paramElement in parametersElement.Elements("Parameter"))
                                     {
-                                        string paramName = paramElement.Attribute("Name")?.Value;
-                                        string paramValue = paramElement.Attribute("Value")?.Value;
-                                        
-                                        if (!string.IsNullOrEmpty(paramName) && !string.IsNullOrEmpty(paramValue) &&
-                                            double.TryParse(paramValue, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double value))
+                                        XAttribute nameAttr = paramElement.Attribute("Name");
+                                        XAttribute valueAttr = paramElement.Attribute("Value");
+
+                                        if (nameAttr != null && valueAttr != null)
                                         {
-                                            parameters[paramName] = value;
+                                            string paramName = nameAttr.Value;
+                                            string paramValue = valueAttr.Value;
+
+                                            if (!string.IsNullOrEmpty(paramName) && !string.IsNullOrEmpty(paramValue) &&
+                                               double.TryParse(paramValue, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double value))
+                                            {
+                                                parameters[paramName] = value;
+                                            }
                                         }
                                     }
-                                    
+
                                     setting.Filter = CreateFilterFromTypeAndParameters(filterType, parameters);
                                 }
                             }
                         }
 
-                        // Load measurements for this channel
                         List<MeasurementType> measurements = new List<MeasurementType>();
                         XElement measurementsElement = channelElement.Element("Measurements");
                         if (measurementsElement != null)
@@ -501,18 +442,24 @@ namespace PowerScope.Model
                         channelMeasurementsList.Add(measurements);
                     }
 
-                    // Create channels for this stream with loaded settings
-                    Color[] channelColors = channelSettingsList.Select(cs => cs.Color).ToArray();
+                    Color[] channelColors = new Color[channelSettingsList.Count];
+                    for (int i = 0; i < channelSettingsList.Count; i++)
+                    {
+                        channelColors[i] = channelSettingsList[i].Color;
+                    }
                     dataStreamBar.AddChannelsForStream(dataStream, channelColors);
 
-                    // Apply loaded settings and measurements directly to the created channels
-                    var streamChannels = dataStreamBar.GetChannelsForStream(dataStream).ToList();
+                    List<Channel> streamChannels = new List<Channel>();
+                    foreach (Channel ch in dataStreamBar.GetChannelsForStream(dataStream))
+                    {
+                        streamChannels.Add(ch);
+                    }
+
                     for (int i = 0; i < Math.Min(channelSettingsList.Count, streamChannels.Count); i++)
                     {
                         Channel channel = streamChannels[i];
                         ChannelSettings settings = channelSettingsList[i];
 
-                        // Update channel settings directly
                         channel.Settings.Label = settings.Label;
                         channel.Settings.Color = settings.Color;
                         channel.Settings.IsEnabled = settings.IsEnabled;
@@ -520,7 +467,6 @@ namespace PowerScope.Model
                         channel.Settings.Offset = settings.Offset;
                         channel.Settings.Filter = settings.Filter;
 
-                        // Add measurements to channel
                         if (i < channelMeasurementsList.Count)
                         {
                             List<MeasurementType> measurements = channelMeasurementsList[i];
@@ -531,55 +477,75 @@ namespace PowerScope.Model
                         }
                     }
 
-                    // Add stream info panel to UI
                     dataStreamBar.AddStreamInfoPanel(streamSettings, dataStream);
                 }
             }
-            
-            // No need to update ChannelControlBar - MainWindow handles this automatically via CollectionChanged events
+        }
+
+        private static string ConvertSeparatorToString(char separator)
+        {
+            switch (separator)
+            {
+                case ',':
+                    return ",";
+                case ' ':
+                    return "Space";
+                case '\t':
+                    return "Tab";
+                case ';':
+                    return ";";
+                default:
+                    return separator.ToString();
+            }
+        }
+
+        private static string ConvertFrameStartToString(byte[] frameStart)
+        {
+            string[] hexStrings = new string[frameStart.Length];
+            for (int i = 0; i < frameStart.Length; i++)
+            {
+                hexStrings[i] = $"0x{frameStart[i]:X2}";
+            }
+            return string.Join(",", hexStrings);
+        }
+
+        private static string ConvertBinaryFormatToNumberType(string binaryFormat)
+        {
+            string result = binaryFormat.Replace("_t", "");
+            result = result.Replace("uint", "Uint");
+            result = result.Replace("int", "Int");
+            result = result.Replace("float", "Float");
+            return result;
         }
 
         private static Color ParseColor(string colorString)
         {
             if (string.IsNullOrEmpty(colorString))
-                return Colors.Blue; // Default color
+                return Colors.Blue;
 
-            try
-            {
-                return (Color)ColorConverter.ConvertFromString(colorString);
-            }
-            catch
-            {
-                return Colors.Blue; // Default color if parsing fails
-            }
+            return (Color)ColorConverter.ConvertFromString(colorString);
         }
 
-        /// <summary>
-        /// Creates a filter instance from the saved filter type and parameters
-        /// </summary>
-        /// <param name="filterType">The type of filter to create</param>
-        /// <param name="parameters">Dictionary of parameter names and values</param>
-        /// <returns>IDigitalFilter instance or null if creation fails</returns>
         private static IDigitalFilter CreateFilterFromTypeAndParameters(string filterType, Dictionary<string, double> parameters)
         {
-            try
+            switch (filterType)
             {
-                return filterType switch
-                {
-                    "Exponential Low Pass" => CreateExponentialLowPassFilter(parameters),
-                    "Exponential High Pass" => CreateExponentialHighPassFilter(parameters),
-                    "Moving Average" => CreateMovingAverageFilter(parameters),
-                    "Median" => CreateMedianFilter(parameters),
-                    "Notch" => CreateNotchFilter(parameters),
-                    "Absolute" => new AbsoluteFilter(),
-                    "Squared" => new SquaredFilter(),
-                    _ => null
-                };
-            }
-            catch
-            {
-                // If filter creation fails, return null (no filtering)
-                return null;
+                case "Exponential Low Pass":
+                    return CreateExponentialLowPassFilter(parameters);
+                case "Exponential High Pass":
+                    return CreateExponentialHighPassFilter(parameters);
+                case "Moving Average":
+                    return CreateMovingAverageFilter(parameters);
+                case "Median":
+                    return CreateMedianFilter(parameters);
+                case "Notch":
+                    return CreateNotchFilter(parameters);
+                case "Absolute":
+                    return new AbsoluteFilter();
+                case "Squared":
+                    return new SquaredFilter();
+                default:
+                    return null;
             }
         }
 

@@ -4,6 +4,82 @@ using System.Linq;
 
 namespace PowerScope.Model
 {
+    /// <summary>
+    /// Lightweight circular buffer optimized for single-threaded digital filter use.
+    /// This is separate from RingBuffer<T> because:
+    /// - RingBuffer<T> includes thread-safety locking which adds overhead in single-threaded filter operations
+    /// - Filters process one sample at a time on a single thread and don't need synchronization
+    /// - This implementation is specialized for double values and optimized for the hot path
+    /// - Provides only the minimal interface needed by filters (Add, CopyTo, Clear)
+    /// </summary>
+    internal class CircularBuffer
+    {
+        private readonly double[] _buffer;
+        private readonly int _capacity;
+        private int _head;
+        private int _count;
+
+        public CircularBuffer(int capacity)
+        {
+            _capacity = capacity;
+            _buffer = new double[capacity];
+            _head = 0;
+            _count = 0;
+        }
+
+        public int Count
+        {
+            get { return _count; }
+        }
+
+        public int Capacity
+        {
+            get { return _capacity; }
+        }
+
+        public void Add(double value)
+        {
+            _buffer[_head] = value;
+            _head = (_head + 1) % _capacity;
+
+            if (_count < _capacity)
+                _count++;
+        }
+
+        public void CopyTo(double[] destination)
+        {
+            int startIndex = (_head - _count + _capacity) % _capacity;
+
+            if (startIndex + _count <= _capacity)
+            {
+                Array.Copy(_buffer, startIndex, destination, 0, _count);
+            }
+            else
+            {
+                int firstPart = _capacity - startIndex;
+                Array.Copy(_buffer, startIndex, destination, 0, firstPart);
+                Array.Copy(_buffer, 0, destination, firstPart, _count - firstPart);
+            }
+        }
+
+        public void Clear()
+        {
+            _head = 0;
+            _count = 0;
+        }
+
+        public double Sum()
+        {
+            double sum = 0.0;
+            for (int i = 0; i < _count; i++)
+            {
+                int index = (_head - _count + i + _capacity) % _capacity;
+                sum += _buffer[index];
+            }
+            return sum;
+        }
+    }
+
     public interface IDigitalFilter
     {
         double Filter(double input);
@@ -27,8 +103,6 @@ namespace PowerScope.Model
         /// <param name="alpha">Smoothing factor (0 < alpha <= 1). Lower alpha = more smoothing.</param>
         public ExponentialLowPassFilter(double alpha)
         {
-            if (alpha <= 0 || alpha > 1)
-                throw new ArgumentOutOfRangeException(nameof(alpha), "Alpha must be in (0, 1].");
             Alpha = alpha;
             _initialized = false;
         }
@@ -88,22 +162,19 @@ namespace PowerScope.Model
     public class ExponentialHighPassFilter : IDigitalFilter
     {
         private readonly ExponentialLowPassFilter _lowPass;
-        private bool _initialized;
-        private double _lastInput;
-        private double _lastOutput;
 
         /// <summary>
         /// Exposes the alpha value of the internal low pass filter
         /// </summary>
         public double Alpha
         {
-            get 
-            { 
-                return _lowPass.Alpha; 
+            get
+            {
+                return _lowPass.Alpha;
             }
-            set 
-            { 
-                _lowPass.Alpha = value; 
+            set
+            {
+                _lowPass.Alpha = value;
             }
         }
 
@@ -114,7 +185,6 @@ namespace PowerScope.Model
         public ExponentialHighPassFilter(double alpha)
         {
             _lowPass = new ExponentialLowPassFilter(alpha);
-            _initialized = false;
         }
 
         /// <summary>
@@ -126,9 +196,6 @@ namespace PowerScope.Model
         {
             double lowPassValue = _lowPass.Filter(input);
             double highPassValue = input - lowPassValue;
-            _lastOutput = highPassValue;
-            _lastInput = input;
-            _initialized = true;
             return highPassValue;
         }
 
@@ -138,9 +205,6 @@ namespace PowerScope.Model
         public void Reset()
         {
             _lowPass.Reset();
-            _initialized = false;
-            _lastInput = 0.0;
-            _lastOutput = 0.0;
         }
 
         /// <summary>
@@ -166,25 +230,36 @@ namespace PowerScope.Model
 
     public class MovingAverageFilter : IDigitalFilter
     {
-        private Queue<double> _window;
+        private CircularBuffer _window;
         private int _windowSize;
         private double _sum;
 
         public MovingAverageFilter(int windowSize)
         {
-            if (windowSize < 1)
-                throw new ArgumentOutOfRangeException(nameof(windowSize), "Window size must be >= 1.");
             _windowSize = windowSize;
-            _window = new Queue<double>(windowSize);
+            _window = new CircularBuffer(windowSize);
             _sum = 0.0;
         }
 
         public double Filter(double input)
         {
-            _window.Enqueue(input);
+            // Track the value being removed if buffer is full
+            double removedValue = 0.0;
+            bool bufferWasFull = _window.Count == _windowSize;
+
+            if (bufferWasFull)
+            {
+                // Calculate which value will be overwritten
+                // We need to subtract it from the sum before adding the new value
+                double[] temp = new double[_windowSize];
+                _window.CopyTo(temp);
+                removedValue = temp[0]; // Oldest value that will be overwritten
+                _sum -= removedValue;
+            }
+
+            _window.Add(input);
             _sum += input;
-            if (_window.Count > _windowSize)
-                _sum -= _window.Dequeue();
+
             return _sum / _window.Count;
         }
 
@@ -217,37 +292,30 @@ namespace PowerScope.Model
 
     public class MedianFilter : IDigitalFilter
     {
-        private Queue<double> _window;
+        private CircularBuffer _window;
         private int _windowSize;
+        private double[] _sortBuffer;
 
         public MedianFilter(int windowSize)
         {
-            if (windowSize < 1)
-                throw new ArgumentOutOfRangeException(nameof(windowSize), "Window size must be >= 1.");
             _windowSize = windowSize;
-            _window = new Queue<double>(windowSize);
+            _window = new CircularBuffer(windowSize);
+            _sortBuffer = new double[windowSize];
         }
 
         public double Filter(double input)
         {
-            _window.Enqueue(input);
-            if (_window.Count > _windowSize)
-                _window.Dequeue();
-            
-            double[] sortedArray = new double[_window.Count];
-            int index = 0;
-            foreach (double value in _window)
-            {
-                sortedArray[index] = value;
-                index++;
-            }
-            Array.Sort(sortedArray);
-            
-            int n = sortedArray.Length;
+            _window.Add(input);
+
+            // Copy to pre-allocated sort buffer and sort only the valid portion
+            _window.CopyTo(_sortBuffer);
+            Array.Sort(_sortBuffer, 0, _window.Count);
+
+            int n = _window.Count;
             if (n % 2 == 1)
-                return sortedArray[n / 2];
+                return _sortBuffer[n / 2];
             else
-                return (sortedArray[n / 2 - 1] + sortedArray[n / 2]) / 2.0;
+                return (_sortBuffer[n / 2 - 1] + _sortBuffer[n / 2]) / 2.0;
         }
 
         public void Reset()
@@ -279,11 +347,11 @@ namespace PowerScope.Model
     public class NotchFilter : IDigitalFilter
     {
         private readonly double _omega;
-        private double _r;
+        private readonly double _r;
         private double _x1, _x2, _y1, _y2;
         private readonly double _notchFreq;
         private readonly double _sampleRate;
-        private double _bandwidth;
+        private readonly double _bandwidth;
 
         /// <summary>
         /// Create a basic recursive notch filter
@@ -293,8 +361,6 @@ namespace PowerScope.Model
         /// <param name="bandwidth">Bandwidth (Hz), typical values: 1-5 Hz</param>
         public NotchFilter(double notchFreq, double sampleRate, double bandwidth = 2.0)
         {
-            if (notchFreq <= 0 || sampleRate <= 0)
-                throw new ArgumentOutOfRangeException("Frequencies must be positive.");
             _notchFreq = notchFreq;
             _sampleRate = sampleRate;
             _bandwidth = bandwidth;
@@ -306,7 +372,7 @@ namespace PowerScope.Model
         public double Filter(double input)
         {
             double y = input - 2 * Math.Cos(_omega) * _x1 + _x2
-                + 2 * _r * Math.Cos(_omega) * _y1 - _r * _r * _y2;
+             + 2 * _r * Math.Cos(_omega) * _y1 - _r * _r * _y2;
             _x2 = _x1;
             _x1 = input;
             _y2 = _y1;
@@ -343,44 +409,20 @@ namespace PowerScope.Model
     /// </summary>
     public class AbsoluteFilter : IDigitalFilter
     {
-        /// <summary>
-        /// Create a new absolute filter
-        /// </summary>
-        public AbsoluteFilter()
-        {
-        }
-
-        /// <summary>
-        /// Filter a new input value by taking its absolute value
-        /// </summary>
-        /// <param name="input">Input value</param>
-        /// <returns>Absolute value of input</returns>
         public double Filter(double input)
         {
             return Math.Abs(input);
         }
 
-        /// <summary>
-        /// Reset the filter to its initial state (no state to reset for absolute filter)
-        /// </summary>
         public void Reset()
         {
-            // No state to reset for absolute value filter
         }
 
-        /// <summary>
-        /// Returns the filter type as a string
-        /// </summary>
-        /// <returns>Filter type name</returns>
         public string GetFilterType()
         {
             return "Absolute";
         }
 
-        /// <summary>
-        /// Returns all filter parameters as a dictionary
-        /// </summary>
-        /// <returns>Empty dictionary since this filter has no parameters</returns>
         public Dictionary<string, double> GetFilterParameters()
         {
             return new Dictionary<string, double>();
@@ -392,44 +434,20 @@ namespace PowerScope.Model
     /// </summary>
     public class SquaredFilter : IDigitalFilter
     {
-        /// <summary>
-        /// Create a new squared filter
-        /// </summary>
-        public SquaredFilter()
-        {
-        }
-
-        /// <summary>
-        /// Filter a new input value by squaring it
-        /// </summary>
-        /// <param name="input">Input value</param>
-        /// <returns>Squared value of input</returns>
         public double Filter(double input)
         {
             return input * input;
         }
 
-        /// <summary>
-        /// Reset the filter to its initial state (no state to reset for squared filter)
-        /// </summary>
         public void Reset()
         {
-            // No state to reset for squared filter
         }
 
-        /// <summary>
-        /// Returns the filter type as a string
-        /// </summary>
-        /// <returns>Filter type name</returns>
         public string GetFilterType()
         {
             return "Squared";
         }
 
-        /// <summary>
-        /// Returns all filter parameters as a dictionary
-        /// </summary>
-        /// <returns>Empty dictionary since this filter has no parameters</returns>
         public Dictionary<string, double> GetFilterParameters()
         {
             return new Dictionary<string, double>();
@@ -439,16 +457,14 @@ namespace PowerScope.Model
     /// <summary>
     /// Downsampling filter - updates output only every Nth sample, with linear interpolation between the two most recent anchors.
     /// This implementation uses the two most recent captured anchors and interpolates between them over the downsampling interval.
-    /// It intentionally introduces a short delay (one anchor interval) to ensure smooth transitions between anchors.
     /// </summary>
     public class DownsamplingFilter : IDigitalFilter
     {
         private int _rate;
-        private int _counter; // samples since last capture
-        private double _anchorPrev; // older anchor sample
-        private double _anchorCurr; // newer anchor sample
-        private int _anchorsCount; // how many anchors we have (0,1,2)
-        private bool _initialized;
+        private int _counter;
+        private double _anchorPrev;
+        private double _anchorCurr;
+        private int _anchorsCount;
 
         /// <summary>
         /// Create a new downsampling filter
@@ -456,11 +472,8 @@ namespace PowerScope.Model
         /// <param name="rate">Downsampling rate (>= 1). For rate=3 anchors are taken every 3rd sample.</param>
         public DownsamplingFilter(int rate)
         {
-            if (rate < 1)
-                throw new ArgumentOutOfRangeException(nameof(rate), "Rate must be >= 1.");
             _rate = rate;
             _counter = 0;
-            _initialized = false;
             _anchorPrev = 0.0;
             _anchorCurr = 0.0;
             _anchorsCount = 0;
@@ -474,72 +487,50 @@ namespace PowerScope.Model
         /// <returns>Interpolated/downsampled output value</returns>
         public double Filter(double input)
         {
-            if (!_initialized)
+            if (_anchorsCount == 0)
             {
-                // First sample: establish the first anchor
                 _anchorCurr = input;
                 _anchorsCount = 1;
                 _counter = 0;
-                _initialized = true;
                 return _anchorCurr;
             }
 
-            // Advance sample counter
             _counter++;
 
-            // When counter reaches rate, capture a new anchor (shift older anchor)
             if (_counter >= _rate)
             {
-                if (_anchorsCount == 0)
-                {
-                    _anchorCurr = input;
-                    _anchorsCount = 1;
-                }
-                else if (_anchorsCount == 1)
+                if (_anchorsCount == 1)
                 {
                     _anchorPrev = _anchorCurr;
                     _anchorCurr = input;
                     _anchorsCount = 2;
                 }
-                else // anchorsCount >= 2
+                else
                 {
                     _anchorPrev = _anchorCurr;
                     _anchorCurr = input;
                 }
 
-                // reset counter so interpolation restarts from the older anchor
                 _counter = 0;
 
-                // If rate == 1, no interpolation interval, return the current anchor immediately
                 if (_rate == 1)
-                {
                     return _anchorCurr;
-                }
             }
 
-            // If we have two anchors, interpolate between them based on position within the interval
             if (_anchorsCount >= 2)
             {
-                // Use (rate - 1) as denominator so that when counter == rate - 1 we reach t == 1.0
                 if (_rate == 1)
-                {
                     return _anchorCurr;
-                }
 
-                double denom = Math.Max(1, _rate);
-                double t = (double)_counter / denom; // fractional progress between anchors (0 .. 1)
-                if (t < 0) t = 0;
-                if (t > 1) t = 1;
+                double t = (double)_counter / (double)_rate;
                 return _anchorPrev + (_anchorCurr - _anchorPrev) * t;
             }
 
-            // If only one anchor available, return that anchor (no interpolation possible)
             return _anchorCurr;
         }
 
         public void Reset()
         {
-            _initialized = false;
             _counter = 0;
             _anchorPrev = 0.0;
             _anchorCurr = 0.0;
@@ -553,7 +544,7 @@ namespace PowerScope.Model
 
         public Dictionary<string, double> GetFilterParameters()
         {
-            var parameters = new Dictionary<string, double>();
+            Dictionary<string, double> parameters = new Dictionary<string, double>();
             parameters.Add("Rate", _rate);
             return parameters;
         }
@@ -563,11 +554,12 @@ namespace PowerScope.Model
         /// </summary>
         public int Rate
         {
-            get => _rate;
+            get
+            {
+                return _rate;
+            }
             set
             {
-                if (value < 1)
-                    throw new ArgumentOutOfRangeException(nameof(value), "Rate must be >= 1.");
                 _rate = value;
             }
         }
@@ -579,29 +571,32 @@ namespace PowerScope.Model
     /// </summary>
     public class BiquadFilter : IDigitalFilter
     {
-        // Filter coefficients
-        public double B0 { get; set; } = 1.0;  // x[n] coefficient
-        public double B1 { get; set; } = 0.0;  // x[n-1] coefficient  
-        public double B2 { get; set; } = 0.0;  // x[n-2] coefficient
+        public double B0 { get; set; }
+        public double B1 { get; set; }
+        public double B2 { get; set; }
+        public double A1 { get; set; }
+        public double A2 { get; set; }
 
-        public double A1 { get; set; } = 0.0;  // y[n-1] coefficient
-        public double A2 { get; set; } = 0.0;  // y[n-2] coefficient
-
-        // State variables for input history
-        private double _x1, _x2;  // x[n-1], x[n-2]
-
-        // State variables for output history
-        private double _y1, _y2;  // y[n-1], y[n-2]
+        private double _x1, _x2;
+        private double _y1, _y2;
 
         public BiquadFilter()
         {
+            B0 = 1.0;
+            B1 = 0.0;
+            B2 = 0.0;
+            A1 = 0.0;
+            A2 = 0.0;
             Reset();
         }
 
         public BiquadFilter(double b0, double b1, double b2, double a1, double a2)
         {
-            B0 = b0; B1 = b1; B2 = b2;
-            A1 = a1; A2 = a2;
+            B0 = b0;
+            B1 = b1;
+            B2 = b2;
+            A1 = a1;
+            A2 = a2;
             Reset();
         }
 
@@ -612,14 +607,11 @@ namespace PowerScope.Model
         /// <returns>Filtered output</returns>
         public double Filter(double input)
         {
-            // Calculate output using difference equation (following your JS reference)
             double output = B0 * input + B1 * _x1 + B2 * _x2 - A1 * _y1 - A2 * _y2;
 
-            // Update input history (shift register)
             _x2 = _x1;
             _x1 = input;
 
-            // Update output history (shift register)
             _y2 = _y1;
             _y1 = output;
 
@@ -639,11 +631,13 @@ namespace PowerScope.Model
 
         public Dictionary<string, double> GetFilterParameters()
         {
-            return new Dictionary<string, double>
-        {
-            {"B0", B0}, {"B1", B1}, {"B2", B2},
-            {"A1", A1}, {"A2", A2}
-        };
+            Dictionary<string, double> parameters = new Dictionary<string, double>();
+            parameters.Add("B0", B0);
+            parameters.Add("B1", B1);
+            parameters.Add("B2", B2);
+            parameters.Add("A1", A1);
+            parameters.Add("A2", A2);
+            return parameters;
         }
 
         /// <summary>
@@ -651,10 +645,11 @@ namespace PowerScope.Model
         /// </summary>
         public void SetCoefficients(double b0, double b1, double b2, double a1, double a2)
         {
-            B0 = b0; B1 = b1; B2 = b2;
-            A1 = a1; A2 = a2;
+            B0 = b0;
+            B1 = b1;
+            B2 = b2;
+            A1 = a1;
+            A2 = a2;
         }
     }
-
-
 }

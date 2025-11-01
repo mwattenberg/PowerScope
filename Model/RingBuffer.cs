@@ -22,10 +22,25 @@ namespace PowerScope.Model
             _buffer = new T[capacity];
         }
 
-        public int Capacity => _capacity;
-        public int Count => _count;
-        public bool IsFull => _count == _capacity;
-        public bool IsEmpty => _count == 0;
+        public int Capacity
+        {
+            get { return _capacity; }
+        }
+
+        public int Count
+        {
+            get { return _count; }
+        }
+
+        public bool IsFull
+        {
+            get { return _count == _capacity; }
+        }
+
+        public bool IsEmpty
+        {
+            get { return _count == 0; }
+        }
 
         public void Add(T item)
         {
@@ -48,15 +63,29 @@ namespace PowerScope.Model
 
         public void AddRange(IEnumerable<T> items)
         {
-            foreach (var item in items)
+            lock (_lock)
             {
-                Add(item);
+                foreach (T item in items)
+                {
+                    _buffer[_head] = item;
+                    _head = (_head + 1) % _capacity;
+
+                    if (_count < _capacity)
+                    {
+                        _count++;
+                    }
+                    else
+                    {
+                        _tail = (_tail + 1) % _capacity;
+                    }
+                }
             }
         }
 
         public IEnumerable<T> GetLatest(int count)
         {
-            if (count <= 0) yield break;
+            if (count <= 0)
+                yield break;
 
             lock (_lock)
             {
@@ -78,7 +107,6 @@ namespace PowerScope.Model
         /// <returns>Actual number of elements copied</returns>
         public int CopyLatestTo(T[] destination, int requestedCount)
         {
-
             lock (_lock)
             {
                 int actualCount = Math.Min(Math.Min(requestedCount, _count), destination.Length);
@@ -114,13 +142,10 @@ namespace PowerScope.Model
 
         public IEnumerable<T> GetNewData(ref int lastReadPosition)
         {
-            var result = new List<T>();
+            List<T> result = new List<T>();
             
             lock (_lock)
             {
-                if (lastReadPosition == _head) 
-                    return result;
-
                 while (lastReadPosition != _head)
                 {
                     result.Add(_buffer[lastReadPosition]);
@@ -154,6 +179,9 @@ namespace PowerScope.Model
             }
         }
 
-        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+        IEnumerator IEnumerable.GetEnumerator()
+        {
+            return GetEnumerator();
+        }
     }
 }
