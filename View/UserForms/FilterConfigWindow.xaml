@@ -170,12 +170,6 @@
                                 <TextBlock Text="Median" Style="{StaticResource SmallLabelStyle}"/>
                             </StackPanel>
                         </Button>
-                        <Button Grid.Row="2" Grid.Column="2" x:Name="Button_Downsampling" Style="{StaticResource FilterButtonStyle}" Click="FilterButton_Click" Tag="Downsampling" ToolTip="Downsample Filter">
-                            <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
-                                <svgc:SvgViewbox Source="/Icons/downsample.svg" Width="48" Height="48" Margin="5"/>
-                                <TextBlock Text="Downsample" Style="{StaticResource SmallLabelStyle}"/>
-                            </StackPanel>
-                        </Button>
                         <Button Grid.Row="3" Grid.Column="0" x:Name="Button_Absolute" Style="{StaticResource FilterButtonStyle}" Click="FilterButton_Click" Tag="Absolute" ToolTip="Absolute Value">
                             <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
                                 <svgc:SvgViewbox Source="/Icons/abs.svg" Width="48" Height="48" Margin="5"/>

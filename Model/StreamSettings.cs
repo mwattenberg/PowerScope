@@ -86,6 +86,15 @@ namespace PowerScope.Model
         private uint _ftdiClockFrequency;
         private string _ftdiSelectedDevice;
 
+        // SPI-specific configuration properties
+        private uint _spiClockFrequency;
+        private byte _spiLatencyTimer;
+        private int _spiTransferInterval;
+        private int _spiTransferSize;
+        private byte _spiChipSelectPolarity;
+        private byte _spiMode;
+        private byte _spiDataOrder;
+
         // Callback for applying settings to data streams
         public Action<IDataStream> DataStreamConfigurationCallback { get; set; }
 
@@ -121,6 +130,15 @@ namespace PowerScope.Model
             FtdiDeviceIndex = 0; // Default to first device
             FtdiClockFrequency = 1000000; // Default to 1MHz
             FtdiSelectedDevice = null;
+            
+            // SPI defaults
+            SpiClockFrequency = 15000000; // Default to 15MHz for SPI
+            SpiLatencyTimer = 2; // Default latency timer
+            SpiTransferInterval = 10; // Default transfer interval
+            SpiTransferSize = 256; // Default transfer size
+            SpiChipSelectPolarity = 0; // Default active-low CS
+            SpiMode = 0; // Default SPI mode 0
+            SpiDataOrder = 0; // Default MSB first
             
             // StreamSource will be set by the configuration dialog based on selected tab
             StreamSource = StreamSource.SerialPort; // Default to serial port;
@@ -453,7 +471,71 @@ namespace PowerScope.Model
             }
         }
 
-        public event PropertyChangedEventHandler PropertyChanged;
+        // SPI Configuration Properties
+        public uint SpiClockFrequency
+        {
+   get { return _spiClockFrequency; }
+ set
+    {
+     if (_spiClockFrequency != value)
+    {
+               _spiClockFrequency = value;
+    OnPropertyChanged(nameof(SpiClockFrequency));
+        }
+ }
+        }
+
+        public byte SpiLatencyTimer
+        {
+       get { return _spiLatencyTimer; }
+         set { _spiLatencyTimer = 2; } // Always 2ms - fixed
+ }
+
+        public int SpiTransferInterval
+        {
+            get { return _spiTransferInterval; }
+            set { _spiTransferInterval = 10; } // Always 10ms - fixed
+      }
+
+        public int SpiTransferSize
+        {
+            get { return _spiTransferSize; }
+            set { _spiTransferSize = 256; } // Always 256 bytes - fixed
+        }
+
+     public byte SpiChipSelectPolarity
+        {
+  get { return _spiChipSelectPolarity; }
+            set
+{
+    if (_spiChipSelectPolarity != value && (value == 0 || value == 1))
+             {
+         _spiChipSelectPolarity = value;
+ OnPropertyChanged(nameof(SpiChipSelectPolarity));
+         }
+   }
+        }
+
+        public byte SpiMode
+        {
+       get { return _spiMode; }
+     set
+      {
+         if (_spiMode != value && value >= 0 && value <= 3)
+        {
+ _spiMode = value;
+ OnPropertyChanged(nameof(SpiMode));
+    }
+      }
+        }
+
+        public byte SpiDataOrder
+{
+  get { return _spiDataOrder; }
+            set { _spiDataOrder = 0; } // Always MSB First (0) - fixed
+        }
+
+      public event PropertyChangedEventHandler PropertyChanged;
 
         protected virtual void OnPropertyChanged(string propertyName)
         {

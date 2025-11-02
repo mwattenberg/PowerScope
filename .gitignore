@@ -363,3 +363,4 @@ MigrationBackup/
 FodyWeavers.xsd
 /Header.csv
 /nonHeader.csv
+/PowerScope.csproj

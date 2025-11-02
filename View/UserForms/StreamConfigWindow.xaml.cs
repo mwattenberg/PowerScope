@@ -232,31 +232,19 @@ namespace PowerScope.View.UserForms
                 else
                 {
                     // No devices found - show informative message
-                    var dllStatus = PowerScope.Model.FTDI_SerialDataStream.VerifyFtdiSharp();
-                    string noDeviceMessage;
-                    
-                    if (!dllStatus.IsAvailable)
-                    {
-                        noDeviceMessage = "FtdiSharp not available";
-                    }
-                    else
-                    {
-                        noDeviceMessage = "No FTDI devices found";
-                    }
-                    
-                    var noDeviceItem = new ComboBoxItem
-                    {
-                        Content = noDeviceMessage,
-                        IsEnabled = false,
-                        ToolTip = dllStatus.IsAvailable ? 
-                            "No FTDI devices are currently connected to the system." :
-                            $"FtdiSharp Status: {dllStatus.Message}"
-                    };
-                    
-                    ComboBox_FTDIDevice.Items.Add(noDeviceItem);
+                    string noDeviceMessage = "No FTDI devices found";
+       
+          var noDeviceItem = new ComboBoxItem
+ {
+    Content = noDeviceMessage,
+           IsEnabled = false,
+          ToolTip = "No FTDI devices are currently connected to the system."
+           };
+      
+       ComboBox_FTDIDevice.Items.Add(noDeviceItem);
                     ComboBox_FTDIDevice.SelectedIndex = 0;
-                    ViewModel.FtdiSelectedDevice = noDeviceMessage;
-                }
+              ViewModel.FtdiSelectedDevice = noDeviceMessage;
+         }
             }
             catch (Exception ex)
             {

@@ -237,6 +237,32 @@ namespace PowerScope.View.UserControls
                     dataStream = new FileDataStream(vm.FilePath, vm.FileLoopPlayback);
                     break;
                     
+                case StreamSource.FTDI:
+                    // Create FTDI data stream with SPI protocol
+                    DataParser ftdiParser;
+                    
+                    // Convert NumberType to BinaryFormat for FTDI
+                    DataParser.BinaryFormat binaryFormat = vm.NumberType switch
+                    {
+                        NumberTypeEnum.Int16 => DataParser.BinaryFormat.int16_t,
+                        NumberTypeEnum.Uint16 => DataParser.BinaryFormat.uint16_t,
+                        NumberTypeEnum.Int32 => DataParser.BinaryFormat.int32_t,
+                        NumberTypeEnum.Uint32 => DataParser.BinaryFormat.uint32_t,
+                        NumberTypeEnum.Float32 => DataParser.BinaryFormat.float_t,
+                        _ => DataParser.BinaryFormat.uint16_t // Default fallback
+                    };
+                    
+                    // Create data parser with frame start bytes if provided
+                    byte[] ftdiFrameStartBytes = ParseFrameStartBytes(vm.FrameStart);
+                    if (ftdiFrameStartBytes != null && ftdiFrameStartBytes.Length > 0)
+                        ftdiParser = new DataParser(binaryFormat, vm.NumberOfChannels, ftdiFrameStartBytes);
+                    else
+                        ftdiParser = new DataParser(binaryFormat, vm.NumberOfChannels);
+                    
+                    // Create FTDI stream with the configured SPI clock frequency
+                    dataStream = new FTDI_SerialDataStream(vm.FtdiDeviceIndex, vm.SpiClockFrequency, vm.NumberOfChannels, ftdiParser);
+                    break;
+                
                 case StreamSource.SerialPort:
                 default:
                     // Default to SerialDataStream
@@ -244,7 +270,7 @@ namespace PowerScope.View.UserControls
                     DataParser dataParser;
                     
                     // Convert NumberType to BinaryFormat
-                    DataParser.BinaryFormat binaryFormat = vm.NumberType switch
+                    DataParser.BinaryFormat serialBinaryFormat = vm.NumberType switch
                     {
                         NumberTypeEnum.Int16 => DataParser.BinaryFormat.int16_t,
                         NumberTypeEnum.Uint16 => DataParser.BinaryFormat.uint16_t,
@@ -266,9 +292,9 @@ namespace PowerScope.View.UserControls
                         // RawBinary - check if frame start is provided
                         byte[] frameStartBytes = ParseFrameStartBytes(vm.FrameStart);
                         if (frameStartBytes != null && frameStartBytes.Length > 0)
-                            dataParser = new DataParser(binaryFormat, vm.NumberOfChannels, frameStartBytes);
+                            dataParser = new DataParser(serialBinaryFormat, vm.NumberOfChannels, frameStartBytes);
                         else
-                            dataParser = new DataParser(binaryFormat, vm.NumberOfChannels);
+                            dataParser = new DataParser(serialBinaryFormat, vm.NumberOfChannels);
                     }
                     
                     dataStream = new SerialDataStream(sourceSetting, dataParser);

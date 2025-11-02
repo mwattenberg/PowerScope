@@ -53,7 +53,18 @@ namespace PowerScope
             InitializeControls();
             InitializeEventHandlers();
 
-            readSettingsXML();
+            // Try to read previous settings, but don't crash if they're invalid
+            try
+            {
+                readSettingsXML();
+            }
+            catch (Exception ex)
+            {
+                // Log the error but don't crash
+                System.Diagnostics.Debug.WriteLine($"Warning: Failed to restore previous settings: {ex.Message}");
+                // Application will continue with default settings
+            }
+            
 
             // Initialize channel display based on current streams - simplified with Channel-centric approach
             _plotManager.SetChannels(DataStreamBar.Channels);

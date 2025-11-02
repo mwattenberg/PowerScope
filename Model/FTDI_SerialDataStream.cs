@@ -29,8 +29,8 @@ namespace PowerScope.Model
         // FTDI Configuration
         private uint _deviceIndex;
         private string? _deviceSerialNumber;
-        private uint _spiClockFrequency;
         private int _channelCount;
+        private uint _clockFrequency;  // Store the clock frequency for SPI configuration
 
         // Sample rate calculation
         private long _totalSamplesAtLastCalculation = 0;
@@ -129,13 +129,13 @@ namespace PowerScope.Model
         /// Initializes a new instance of FTDI_SerialDataStream using FtdiSharp
         /// </summary>
         /// <param name="deviceIndex">FTDI device index (0 for first device)</param>
-        /// <param name="clockFrequency">SPI clock frequency in Hz</param>
+        /// <param name="clockFrequency">SPI clock frequency in Hz (e.g., 15000000 for 15MHz)</param>
         /// <param name="channelCount">Number of data channels</param>
         /// <param name="parser">Data parser for processing incoming data</param>
         public FTDI_SerialDataStream(uint deviceIndex, uint clockFrequency, int channelCount, DataParser parser)
         {
             _deviceIndex = deviceIndex;
-            _spiClockFrequency = clockFrequency;
+            _clockFrequency = clockFrequency;  // Store the clock frequency
             _channelCount = channelCount;
             _parser = parser;
 
@@ -154,16 +154,7 @@ namespace PowerScope.Model
             // Get device serial number for the specified index
             _deviceSerialNumber = GetDeviceSerialNumberByIndex(deviceIndex);
 
-            // Verify FtdiSharp availability during initialization
-            var verification = VerifyFtdiSharp();
-            if (verification.IsAvailable)
-            {
-                StatusMessage = $"FtdiSharp ready - {verification.Message}";
-            }
-            else
-            {
-                StatusMessage = $"FtdiSharp unavailable - {verification.Message}";
-            }
+            StatusMessage = "Ready";
 
             // Initialize connection state
             _isConnected = false;
@@ -358,9 +349,12 @@ namespace PowerScope.Model
                     return;
                 }
 
-                // Create SPI protocol handler with FtdiSharp
-                _spi = new SPI(_ftdiDevice.Value);
-                
+            
+
+                // Create SPI protocol handler with calculated slowDownFactor
+                _spi = new SPI(_ftdiDevice.Value, spiMode: 1, _clockFrequency / 1000);
+                //_spi = new SPI(_ftdiDevice.Value, spiMode: 1);
+
                 IsConnected = true;
                 StatusMessage = $"Connected to {_ftdiDevice.Value.SerialNumber}";
             }
@@ -505,10 +499,6 @@ namespace PowerScope.Model
                         ProcessReceivedData(readData);
                         consecutiveErrorCount = 0;
                     }
-                    else
-                    {
-                        Thread.Sleep(1); // Short sleep when no data
-                    }
                 }
                 catch (Exception ex)
                 {
@@ -518,8 +508,10 @@ namespace PowerScope.Model
                         HandleRuntimeDisconnection($"Read error: {ex.Message}");
                         break;
                     }
-                    Thread.Sleep(50);
+                    
                 }
+                
+                Thread.Sleep(50);
             }
         }
 
@@ -883,133 +875,6 @@ namespace PowerScope.Model
             
             _disposed = true;
             GC.SuppressFinalize(this);
-        }
-
-        #endregion
-
-        #region FtdiSharp Verification Methods
-
-        /// <summary>
-        /// Verifies that FtdiSharp is available and functional
-        /// </summary>
-        /// <returns>Verification result with detailed information</returns>
-        public static (bool IsAvailable, string Message, int DeviceCount) VerifyFtdiSharp()
-        {
-            try
-            {
-                var devices = FtdiDevices.Scan();
-                return (true, $"Found {devices.Length} FTDI devices", devices.Length);
-            }
-            catch (Exception ex)
-            {
-                return (false, $"FtdiSharp error: {ex.Message}", 0);
-            }
-        }
-
-        /// <summary>
-        /// Gets detailed information about the FtdiSharp library
-        /// </summary>
-        /// <returns>Dictionary with library information</returns>
-        public static Dictionary<string, string> GetFtdiSharpInfo()
-        {
-            var info = new Dictionary<string, string>();
-            
-            try
-            {
-                var verification = VerifyFtdiSharp();
-                info["Library Available"] = verification.IsAvailable.ToString();
-                info["Library Type"] = "FtdiSharp";
-                info["Verification Message"] = verification.Message;
-                
-                if (verification.IsAvailable)
-                {
-                    info["Device Count"] = verification.DeviceCount.ToString();
-                    
-                    // Get assembly information
-                    var assembly = typeof(FtdiDevice).Assembly;
-                    info["Assembly Version"] = assembly.GetName().Version?.ToString() ?? "Unknown";
-                    info["Assembly Location"] = assembly.Location;
-                }
-            }
-            catch (Exception ex)
-            {
-                info["Error"] = ex.Message;
-            }
-            
-            return info;
-        }
-
-        /// <summary>
-        /// Gets architecture and deployment information
-        /// </summary>
-        public static Dictionary<string, string> GetArchitectureInfo()
-        {
-            var info = new Dictionary<string, string>();
-            
-            info["Process Architecture"] = Environment.Is64BitProcess ? "x64" : "x86";
-            info["OS Architecture"] = Environment.Is64BitOperatingSystem ? "x64" : "x86";
-            info["Library"] = "FtdiSharp";
-            info[".NET Runtime"] = System.Runtime.InteropServices.RuntimeInformation.RuntimeIdentifier;
-            info["Framework Description"] = System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription;
-            
-            return info;
-        }
-
-        /// <summary>
-        /// Test method to demonstrate FtdiSharp device enumeration functionality
-        /// </summary>
-        public static void TestDeviceEnumeration()
-        {
-            try
-            {
-                System.Diagnostics.Debug.WriteLine("=== FtdiSharp Device Enumeration Test ===");
-                
-                // Test FtdiSharp verification
-                var verification = VerifyFtdiSharp();
-                System.Diagnostics.Debug.WriteLine($"FtdiSharp Status: {verification.IsAvailable} - {verification.Message}");
-                
-                if (!verification.IsAvailable)
-                {
-                    System.Diagnostics.Debug.WriteLine("Skipping device enumeration - FtdiSharp not available");
-                    return;
-                }
-                
-                // Test device listing
-                string[] devices = GetAvailableDevices();
-                System.Diagnostics.Debug.WriteLine($"Found {devices.Length} FTDI devices:");
-                
-                for (int i = 0; i < devices.Length; i++)
-                {
-                    System.Diagnostics.Debug.WriteLine($"  [{i}] {devices[i]}");
-                    
-                    // Test serial number extraction
-                    string? serialNumber = ExtractSerialNumber(devices[i]);
-                    System.Diagnostics.Debug.WriteLine($"      Serial: {serialNumber ?? "N/A"}");
-                    
-                    // Test short name generation
-                    string shortName = GetDeviceShortName(devices[i]);
-                    System.Diagnostics.Debug.WriteLine($"      Short: {shortName}");
-                }
-                
-                // Test detailed device info
-                var deviceDetails = GetAvailableDeviceDetails();
-                System.Diagnostics.Debug.WriteLine($"\nDetailed device information ({deviceDetails.Length} devices):");
-                
-                for (int i = 0; i < deviceDetails.Length; i++)
-                {
-                    var detail = deviceDetails[i];
-                    System.Diagnostics.Debug.WriteLine($"  Device {i}:");
-                    System.Diagnostics.Debug.WriteLine($"    Serial: {detail.SerialNumber}");
-                    System.Diagnostics.Debug.WriteLine($"    Description: {detail.Description}");
-                }
-                
-                System.Diagnostics.Debug.WriteLine("=== End FtdiSharp Device Enumeration Test ===");
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"FtdiSharp Test Exception: {ex.Message}");
-                System.Diagnostics.Debug.WriteLine($"Stack trace: {ex.StackTrace}");
-            }
         }
 
         #endregion

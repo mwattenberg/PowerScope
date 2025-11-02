@@ -411,27 +411,72 @@
                                 </StackPanel>
                                 
                                 <!-- Raw binary controls (always visible, no data format selection) -->
-                                <StackPanel x:Name="Panel_FTDIRawBinary" Margin="0,0,0,5">
+                                <StackPanel x:Name="Panel_FTDIRawBinary" Margin="0,0,0,10">
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
                                         <Label Content="Frame start:" VerticalAlignment="Center" ToolTip="Optional but recommended. Specify the frame start sequence to distinguish between frames." Width="80"/>
                                         <TextBox x:Name="TextBox_FTDIFrameStart" Width="200" Text="{Binding FrameStart, Mode=TwoWay}" />
                                     </StackPanel>
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
                                         <Label Content="Number Type:" VerticalAlignment="Center" ToolTip="Select the type of numbers in the data stream." Width="80"/>
-                                        <ComboBox x:Name="ComboBox_FTDINumberType" Width="200">
+                                        <ComboBox x:Name="ComboBox_FTDINumberType" Width="200" SelectedValuePath="Tag" SelectedValue="{Binding NumberType, Mode=TwoWay}">
                                             <ComboBoxItem Content="Uint8" Tag="Uint8" />
                                             <ComboBoxItem Content="Int8" Tag="Int8" />
                                             <ComboBoxItem Content="Uint16" Tag="Uint16" />
                                             <ComboBoxItem Content="Int16" Tag="Int16" IsSelected="True" />
                                             <ComboBoxItem Content="Uint32" Tag="Uint32" />
                                             <ComboBoxItem Content="Int32" Tag="Int32" />
-                                            <ComboBoxItem Content="Float" Tag="Float" />
+                                            <ComboBoxItem Content="Float32" Tag="Float32" />
+                                            <ComboBoxItem Content="Float64" Tag="Float64" />
                                         </ComboBox>
                                     </StackPanel>
                                 </StackPanel>
+                                <!-- SPI Configuration Section -->
+                                <Separator Margin="0,10,0,10" Height="1" Background="{DynamicResource PlotSettings_BorderBrush}"/>
+                                <Label Content="SPI Configuration" Style="{StaticResource BoldLabelStyle}" Margin="0,0,0,10"/>
+
+                                <!-- SPI Clock Frequency (Fixed Options) -->
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                                    <Label Content="Clock Speed:" VerticalAlignment="Center" ToolTip="SPI clock frequency. Select the appropriate speed for your slave device." Width="80"/>
+                                    <ComboBox x:Name="ComboBox_SPIClockFrequency" Width="200" 
+                        SelectedValuePath="Tag" SelectedValue="{Binding SpiClockFrequency, Mode=TwoWay}"
+                        ToolTip="Select SPI clock frequency">
+                                        <ComboBoxItem Content="1 MHz" Tag="1000000" />
+                                        <ComboBoxItem Content="5 MHz" Tag="5000000" />
+                                        <ComboBoxItem Content="15 MHz" Tag="15000000" IsSelected="True" />
+                                        <ComboBoxItem Content="30 MHz" Tag="30000000" />
+                                    </ComboBox>
+                                </StackPanel>
+
+                                <!-- Chip Select Polarity -->
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                                    <Label Content="CS Polarity:" VerticalAlignment="Center" ToolTip="Chip Select signal polarity: active low (standard) or active high." Width="80"/>
+                                    <ComboBox x:Name="ComboBox_SPICSPolarity" Width="200" SelectedValuePath="Tag" SelectedValue="{Binding SpiChipSelectPolarity, Mode=TwoWay}">
+                                        <ComboBoxItem Content="Active Low (Standard)" Tag="0" IsSelected="True"/>
+                                        <ComboBoxItem Content="Active High" Tag="1"/>
+                                    </ComboBox>
+                                </StackPanel>
+
+                                <!-- Clock Polarity and Phase (SPI Mode) -->
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                                    <Label Content="SPI Mode:" VerticalAlignment="Center" ToolTip="SPI clock polarity (CPOL) and phase (CPHA) mode." Width="80"/>
+                                    <ComboBox x:Name="ComboBox_SPIMode" Width="200" SelectedValuePath="Tag" SelectedValue="{Binding SpiMode, Mode=TwoWay}">
+                                        <ComboBoxItem Content="Mode 0 (CPOL=0, CPHA=0)" Tag="0" IsSelected="True"/>
+                                        <ComboBoxItem Content="Mode 1 (CPOL=0, CPHA=1)" Tag="1"/>
+                                        <ComboBoxItem Content="Mode 2 (CPOL=1, CPHA=0)" Tag="2"/>
+                                        <ComboBoxItem Content="Mode 3 (CPOL=1, CPHA=1)" Tag="3"/>
+                                    </ComboBox>
+                                </StackPanel>
+
+                                <!-- Info Box -->
+                                <TextBlock TextWrapping="Wrap" Style="{StaticResource ItalicTextStyle}" Margin="0,0,0,0">
+                <Run Text="Fixed configuration: 10ms transfer interval, 256-byte transfers, MSB-first data order."/>
+                <LineBreak/>
+                <Run Text="Clock speed must match your slave device requirements."/>
+                                </TextBlock>
                             </StackPanel>
                         </ScrollViewer>
                     </TabItem>
+
 
                     <TabItem Header="USB">
                         <StackPanel Margin="10" VerticalAlignment="Top">
