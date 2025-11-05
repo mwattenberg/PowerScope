@@ -31,7 +31,7 @@
                         ToolTip="Close"/>
             </Grid>
             <!-- Centered version textbox -->
-            <TextBox Grid.Row="1" Text="PowerScope 1.0 Alpha 4" 
+            <TextBox Grid.Row="1" Text="PowerScope 1.0 Alpha 5" 
                      HorizontalAlignment="Center"
                      Margin="0,6,0,4" 
                      BorderThickness="0" Background="Transparent" 

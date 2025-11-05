@@ -1,9 +1,10 @@
-﻿
-using System;
+﻿using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Controls;
 using PowerScope.Model;
+using PowerScope.View.UserForms;
 
 namespace PowerScope.View.UserControls
 {
@@ -53,6 +54,57 @@ namespace PowerScope.View.UserControls
             foreach (Channel channel in dataStreamBar.Channels)
             {
                 ChannelSettings.Add(channel.Settings);
+            }
+        }
+
+        /// <summary>
+        /// Handles the Add Virtual Channel button click
+        /// Opens VirtualChannelSettingsWindow for configuration
+        /// </summary>
+        private void AddVirtualChannelButton_Click(object sender, RoutedEventArgs e)
+        {
+            // Get list of available channels from DataStreamBar
+            var availableChannels = new List<Channel>();
+            if (DataStreamBar != null)
+            {
+                availableChannels.AddRange(DataStreamBar.Channels);
+            }
+
+            // If no channels available, show message
+            if (availableChannels.Count == 0)
+            {
+                MessageBox.Show("No input channels available. Please add a data stream first.",
+                    "No Channels Available",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
+
+            // Create a new virtual channel settings
+            var virtualChannelSettings = new ChannelSettings
+            {
+                Label = "Virtual Channel",
+                Color = System.Windows.Media.Colors.LimeGreen,
+                IsEnabled = true,
+                Gain = 1.0,
+                Offset = 0.0
+            };
+
+            // Create the view model with the available channels and target settings
+            var virtualChannelConfig = new VirtualChannelConfig(availableChannels, virtualChannelSettings);
+
+            // Create and show the virtual channel settings window
+            var virtualChannelWindow = new VirtualChannelSettingsWindow(virtualChannelConfig);
+            bool? dialogResult = virtualChannelWindow.ShowDialog();
+
+            // Only add the virtual channel if the user clicked Apply
+            if (dialogResult == true)
+            {
+                // Update the channel settings label from the config
+                virtualChannelSettings.Label = virtualChannelConfig.Label;
+
+                // Add to the collection
+                ChannelSettings.Add(virtualChannelSettings);
             }
         }
     }

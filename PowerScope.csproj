@@ -31,13 +31,13 @@
   <ItemGroup>
     <PackageReference Include="Aelian.FFT" Version="1.0.4" />
     <PackageReference Include="Extended.Wpf.Toolkit" Version="4.7.25104.5739" />
-    <PackageReference Include="FtdiSharp" Version="0.1.2" />
     <PackageReference Include="NAudio" Version="2.2.1" />
     <PackageReference Include="RJCP.SerialPortStream" Version="3.0.3" />
     <PackageReference Include="ScottPlot.WPF" Version="5.0.55" />
     <PackageReference Include="SharpVectors.Wpf" Version="1.8.5" />
     <PackageReference Include="System.IO.Ports" Version="10.0.0-preview.6.25358.103" />
     <PackageReference Include="System.Management" Version="9.0.7" />
+	<ProjectReference Include="C:\Users\wattenberg\source\repos\mwattenberg\FtdiSharp\src\FtdiSharp\FtdiSharp.csproj"/>
   </ItemGroup>
 
   <ItemGroup>
@@ -54,11 +54,16 @@
   <ItemGroup>
     <Compile Remove="Model\CursorChannelViewModel.cs" />
     <Compile Remove="Model\SerialDataStreamSinc.cs" />
+    <Compile Remove="SPI.cs" />
     <Compile Remove="View\UserControls\DraggableAxisLines.cs" />
   </ItemGroup>
 
   <ItemGroup>
     <None Remove="View\UserControls\xExpand.svg" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="SPI.cs" />
   </ItemGroup>
 
   <ItemGroup>
