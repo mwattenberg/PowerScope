@@ -59,11 +59,11 @@ namespace PowerScope.View.UserControls
 
         /// <summary>
         /// Handles the Add Virtual Channel button click
-        /// Opens VirtualChannelSettingsWindow for configuration
+        /// Opens VirtualChannelSettingsWindow for configuration and creates virtual channel
         /// </summary>
         private void AddVirtualChannelButton_Click(object sender, RoutedEventArgs e)
         {
-            // Get list of available channels from DataStreamBar
+            // Get list of available channels from DataStreamBar (physical AND virtual)
             var availableChannels = new List<Channel>();
             if (DataStreamBar != null)
             {
@@ -80,18 +80,8 @@ namespace PowerScope.View.UserControls
                 return;
             }
 
-            // Create a new virtual channel settings
-            var virtualChannelSettings = new ChannelSettings
-            {
-                Label = "Virtual Channel",
-                Color = System.Windows.Media.Colors.LimeGreen,
-                IsEnabled = true,
-                Gain = 1.0,
-                Offset = 0.0
-            };
-
-            // Create the view model with the available channels and target settings
-            var virtualChannelConfig = new VirtualChannelConfig(availableChannels, virtualChannelSettings);
+            // Create virtual channel configuration
+            var virtualChannelConfig = new VirtualChannelConfig(availableChannels, null);
 
             // Create and show the virtual channel settings window
             var virtualChannelWindow = new VirtualChannelSettingsWindow(virtualChannelConfig);
@@ -100,12 +90,54 @@ namespace PowerScope.View.UserControls
             // Only add the virtual channel if the user clicked Apply
             if (dialogResult == true)
             {
-                // Update the channel settings label from the config
-                virtualChannelSettings.Label = virtualChannelConfig.Label;
+                // Validate configuration
+                string validationError = virtualChannelConfig.Validate();
+                if (!string.IsNullOrEmpty(validationError))
+                {
+                    MessageBox.Show(validationError, "Configuration Error",
+                        MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
 
-                // Add to the collection
-                ChannelSettings.Add(virtualChannelSettings);
+                // Create virtual channel settings
+                var virtualChannelSettings = new ChannelSettings
+                {
+                    Label = virtualChannelConfig.Label ?? "Virtual Channel",
+                    Color = System.Windows.Media.Colors.LimeGreen,
+                    IsEnabled = true,
+                    Gain = 1.0,
+                    Offset = 0.0
+                };
+
+                // Create the virtual channel using operands (channels or constants)
+                Channel virtualChannel = new Channel(
+                    virtualChannelConfig.InputA,
+                    virtualChannelConfig.InputB,
+                    virtualChannelConfig.Operation,
+                    virtualChannelSettings);
+
+                // Add to DataStreamBar's channel collection
+                DataStreamBar.Channels.Add(virtualChannel);
+
+                // Sync the ChannelControlBar UI with the updated DataStreamBar
+                // This rebuilds the ChannelSettings collection from the authoritative source
+                UpdateFromDataStreamBar(DataStreamBar);
             }
+        }
+
+        /// <summary>
+        /// Gets the operation symbol for display purposes
+        /// </summary>
+        private string GetOperationSymbol(VirtualChannelOperationType operation)
+        {
+            return operation switch
+            {
+                VirtualChannelOperationType.Add => "+",
+                VirtualChannelOperationType.Subtract => "-",
+                VirtualChannelOperationType.Multiply => "×",
+                VirtualChannelOperationType.Divide => "÷",
+                _ => "?"
+            };
         }
     }
 }

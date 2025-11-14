@@ -8,6 +8,7 @@ namespace PowerScope.Model
     /// Represents a single channel that encapsulates both the data source and settings
     /// This eliminates the need for global channel indices and complex resolution logic
     /// Now also manages its own measurements
+    /// Supports both physical channels (backed by IDataStream) and virtual channels (VirtualDataStream)
     /// </summary>
     public class Channel : INotifyPropertyChanged
     {
@@ -24,7 +25,7 @@ namespace PowerScope.Model
         public ObservableCollection<Measurement> Measurements { get; private set; } = new ObservableCollection<Measurement>();
 
         /// <summary>
-        /// Creates a new Channel instance
+        /// Creates a new Channel instance (physical channel backed by IDataStream)
         /// </summary>
         /// <param name="ownerStream">The data stream that owns this channel</param>
         /// <param name="localChannelIndex">The local index within the owner stream (0-based)</param>
@@ -38,6 +39,72 @@ namespace PowerScope.Model
             _indexWithinDatastream = localChannelIndex;
             _settings = settings;
 
+            InitializeChannel();
+        }
+
+        /// <summary>
+        /// Creates a new virtual Channel from a single source channel (for filtering/transformation)
+        /// </summary>
+        /// <param name="sourceChannel">The channel to use as source</param>
+        /// <param name="settings">Channel settings for display and processing</param>
+        public Channel(Channel sourceChannel, ChannelSettings settings)
+        {
+            if (sourceChannel == null)
+                throw new ArgumentNullException(nameof(sourceChannel));
+
+            // Create virtual data stream
+            _ownerStream = new VirtualDataStream(sourceChannel);
+            _indexWithinDatastream = 0; // Virtual streams always use channel 0
+            _settings = settings;
+
+            InitializeChannel();
+        }
+
+        /// <summary>
+        /// Creates a new virtual Channel from two sources with mathematical operation
+        /// </summary>
+        public Channel(Channel sourceChannel1, Channel sourceChannel2, VirtualChannelOperationType operation, ChannelSettings settings)
+        {
+            if (sourceChannel1 == null)
+                throw new ArgumentNullException(nameof(sourceChannel1));
+            if (sourceChannel2 == null)
+                throw new ArgumentNullException(nameof(sourceChannel2));
+
+            // Create virtual data stream with operation
+            _ownerStream = new VirtualDataStream(
+                new ChannelOperand(sourceChannel1),
+                new ChannelOperand(sourceChannel2),
+                operation);
+            _indexWithinDatastream = 0; // Virtual streams always use channel 0
+            _settings = settings;
+
+            InitializeChannel();
+        }
+
+        /// <summary>
+        /// Creates a new virtual Channel from two operand sources with mathematical operation
+        /// Supports both channels and constants as operands
+        /// </summary>
+        public Channel(IOperandSource operandA, IOperandSource operandB, VirtualChannelOperationType operation, ChannelSettings settings)
+        {
+            if (operandA == null)
+                throw new ArgumentNullException(nameof(operandA));
+            if (operandB == null)
+                throw new ArgumentNullException(nameof(operandB));
+
+            // Create virtual data stream with operands (channels or constants)
+            _ownerStream = new VirtualDataStream(operandA, operandB, operation);
+            _indexWithinDatastream = 0; // Virtual streams always use channel 0
+            _settings = settings;
+
+            InitializeChannel();
+        }
+
+        /// <summary>
+        /// Common initialization for both physical and virtual channels
+        /// </summary>
+        private void InitializeChannel()
+        {
             // Subscribe to settings changes
             _settings.PropertyChanged += OnSettingsChanged;
             

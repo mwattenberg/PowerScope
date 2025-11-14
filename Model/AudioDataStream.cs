@@ -83,6 +83,12 @@ namespace PowerScope.Model
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
+        
+        /// <summary>
+        /// Raised when the data stream is being disposed
+        /// Allows dependent virtual streams to clean up automatically
+        /// </summary>
+        public event EventHandler Disposing;
 
         protected virtual void OnPropertyChanged(string propertyName)
         {
@@ -565,6 +571,9 @@ namespace PowerScope.Model
         {
             if (_disposed)
                 return;
+
+            // Raise Disposing event BEFORE disposing to notify virtual channels
+            Disposing?.Invoke(this, EventArgs.Empty);
 
             StopStreaming();
             CleanupAudioResources();

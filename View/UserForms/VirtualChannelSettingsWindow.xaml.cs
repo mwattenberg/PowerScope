@@ -5,67 +5,85 @@ using PowerScope.Model;
 namespace PowerScope.View.UserForms
 {
     /// <summary>
- /// Interaction logic for VirtualChannelSettingsWindow.xaml
- /// Uses VirtualChannelConfig view model for MVVM-style binding
- /// ComboBoxes display available channels with their colors
- /// </summary>
+    /// Interaction logic for VirtualChannelSettingsWindow.xaml
+    /// Uses VirtualChannelConfig view model for MVVM-style binding
+    /// ComboBoxes display available channels with their colors or accept constant numbers
+    /// </summary>
     public partial class VirtualChannelSettingsWindow : Window
     {
- private VirtualChannelConfig _config;
+        private VirtualChannelConfig _config;
 
         public VirtualChannelConfig VirtualChannelConfig
         {
-       get { return _config; }
-    }
-
-        public VirtualChannelSettingsWindow(VirtualChannelConfig config)
-       {
-      InitializeComponent();
-    
- _config = config ?? new VirtualChannelConfig();
-
-    // Set the data context for MVVM binding
-    DataContext = _config;
+   get { return _config; }
         }
 
- private void ApplyButton_Click(object sender, RoutedEventArgs e)
-   {
-         // Validate selections
- if (InputAComboBox.SelectedItem == null || InputBComboBox.SelectedItem == null)
+        public VirtualChannelSettingsWindow(VirtualChannelConfig config)
+      {
+ InitializeComponent();
+
+     _config = config ?? new VirtualChannelConfig();
+
+        // Set the data context for MVVM binding
+  DataContext = _config;
+        }
+
+        private void ApplyButton_Click(object sender, RoutedEventArgs e)
         {
-       MessageBox.Show("Please select both Input A and Input B channels.", "Validation Error", 
-            MessageBoxButton.OK, MessageBoxImage.Warning);
-       return;
-      }
+   // Parse Input A - could be a channel or a constant number
+            var operandA = ParseOperand(InputAComboBox);
+            if (operandA == null)
+          {
+     MessageBox.Show("Please select Input A channel or enter a valid number.", "Validation Error",
+MessageBoxButton.OK, MessageBoxImage.Warning);
+      return;
+     }
 
-      // Get selected channels
-           var inputA = InputAComboBox.SelectedItem as Channel;
-           var inputB = InputBComboBox.SelectedItem as Channel;
+   // Parse Input B - could be a channel or a constant number
+  var operandB = ParseOperand(InputBComboBox);
+            if (operandB == null)
+            {
+              MessageBox.Show("Please select Input B channel or enter a valid number.", "Validation Error",
+         MessageBoxButton.OK, MessageBoxImage.Warning);
+         return;
+            }
 
-         if (inputA == inputB)
-  {
-       MessageBox.Show("Input A and Input B cannot be the same channel.", "Validation Error",
-  MessageBoxButton.OK, MessageBoxImage.Warning);
-       return;
-    }
-
-    // Update the config from UI selections
-       _config.InputA = inputA;
-        _config.InputB = inputB;
-         _config.Label = LabelTextBox.Text;
+  // Update the config from UI selections
+         _config.InputA = operandA;
+            _config.InputB = operandB;
 
          // Update operation type based on selection
-            int operationIndex = OperationComboBox.SelectedIndex;
-  _config.Operation = (VirtualChannelOperationType)operationIndex;
+   int operationIndex = OperationComboBox.SelectedIndex;
+            _config.Operation = (VirtualChannelOperationType)operationIndex;
 
-       DialogResult = true;
-     Close();
+            DialogResult = true;
+Close();
+        }
+
+        /// <summary>
+        /// Parses a ComboBox value as either a Channel or a constant number
+  /// Returns IOperandSource (ChannelOperand or ConstantOperand) or null if invalid
+        /// </summary>
+        private IOperandSource ParseOperand(System.Windows.Controls.ComboBox comboBox)
+        {
+   // If a Channel is selected from dropdown
+            if (comboBox.SelectedItem is Channel channel)
+     {
+         return new ChannelOperand(channel);
+            }
+
+      // If text was entered, try to parse as a number
+   string text = comboBox.Text?.Trim();
+            if (!string.IsNullOrEmpty(text))
+            {
+     if (double.TryParse(text, System.Globalization.NumberStyles.Float | System.Globalization.NumberStyles.AllowExponent,
+  System.Globalization.CultureInfo.InvariantCulture, out double constantValue))
+     {
+      return new ConstantOperand(constantValue);
+         }
+}
+
+            return null;
   }
-
- private void CancelButton_Click(object sender, RoutedEventArgs e)
-  {
-        DialogResult = false;
- Close();
     }
-   }
 }

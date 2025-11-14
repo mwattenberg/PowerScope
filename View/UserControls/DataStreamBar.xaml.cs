@@ -52,6 +52,90 @@ namespace PowerScope.View.UserControls
         public DataStreamBar()
         {
             InitializeComponent();
+            
+            // Subscribe to channel collection changes to track disposal
+            Channels.CollectionChanged += Channels_CollectionChanged;
+        }
+
+        /// <summary>
+        /// Handles collection changes to subscribe to channel disposal events
+        /// </summary>
+        private void Channels_CollectionChanged(object sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+        {
+            if (e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Add)
+            {
+                foreach (Channel channel in e.NewItems)
+                {
+                    // Subscribe to the channel's owner stream disposal
+                    if (channel.OwnerStream != null)
+                    {
+                        channel.OwnerStream.Disposing += OnStreamDisposing;
+                    }
+                }
+            }
+            else if (e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Remove)
+            {
+                foreach (Channel channel in e.OldItems)
+                {
+                    // Unsubscribe when channel is removed
+                    if (channel.OwnerStream != null)
+                    {
+                        channel.OwnerStream.Disposing -= OnStreamDisposing;
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Called when any stream (physical or virtual) is disposing
+        /// Automatically removes all channels that belong to that stream
+        /// </summary>
+        private void OnStreamDisposing(object sender, EventArgs e)
+        {
+            if (sender is IDataStream disposingStream)
+            {
+                // Must run on UI thread
+                Application.Current?.Dispatcher?.Invoke(() =>
+                {
+                    // Find all channels that belong to this stream
+                    List<Channel> channelsToRemove = new List<Channel>();
+                    foreach (Channel channel in Channels)
+                    {
+                        if (channel.OwnerStream == disposingStream)
+                        {
+                            channelsToRemove.Add(channel);
+                        }
+                    }
+
+                    // Remove them (triggers cascade for dependent virtual channels)
+                    foreach (Channel channel in channelsToRemove)
+                    {
+                        Channels.Remove(channel);
+                    }
+
+                    // Update UI
+                    OnPropertyChanged(nameof(TotalChannelCount));
+ 
+                    // Also remove the StreamInfoPanel
+                    RemoveStreamInfoPanelForStream(disposingStream);
+                });
+            }
+        }
+
+        /// <summary>
+        /// Removes the StreamInfoPanel for a specific stream
+        /// </summary>
+        private void RemoveStreamInfoPanelForStream(IDataStream dataStream)
+        {
+            for (int i = Panel_Streams.Children.Count - 1; i >= 0; i--)
+            {
+                if (Panel_Streams.Children[i] is StreamInfoPanel panel && 
+                    panel.AssociatedDataStream == dataStream)
+                {
+                    Panel_Streams.Children.RemoveAt(i);
+                    break;
+                }
+            }
         }
 
         private void Button_AddStream_Click(object sender, RoutedEventArgs e)
@@ -121,6 +205,7 @@ namespace PowerScope.View.UserControls
 
         /// <summary>
         /// Removes channels associated with a specific data stream
+        /// Now works with automatic disposal cascade - disposing the stream triggers auto-removal
         /// </summary>
         /// <param name="dataStream">The data stream whose channels should be removed</param>
         private void RemoveChannelsForStream(IDataStream dataStream)
@@ -128,7 +213,16 @@ namespace PowerScope.View.UserControls
             if (dataStream == null)
                 return;
 
-            // Find and remove all channels belonging to this stream
+            // Unsubscribe from disposal event before disposing
+            dataStream.Disposing -= OnStreamDisposing;
+
+            // Clean up the stream - this will trigger OnStreamDisposing for any dependent virtual channels
+            dataStream.StopStreaming();
+            dataStream.Disconnect();
+            dataStream.Dispose(); // This triggers cascade disposal of virtual channels
+ 
+            // Note: Channels will be auto-removed via OnStreamDisposing event
+            // But we still need to clean up channels that belong directly to this stream
             List<Channel> channelsToRemove = new List<Channel>();
             foreach (Channel channel in Channels)
             {
@@ -143,11 +237,6 @@ namespace PowerScope.View.UserControls
                 Channels.Remove(channel);
                 channel.Dispose();
             }
-
-            // Clean up the stream
-            dataStream.StopStreaming();
-            dataStream.Disconnect();
-            dataStream.Dispose();
 
             // Update channel indices after removal
             UpdateChannelLabels();

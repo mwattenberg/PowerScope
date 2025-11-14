@@ -31,6 +31,14 @@ namespace PowerScope.Model
         //For streams with known fixed rates, returns the configured rate
         //For streams with variable rates, returns the current measured rate
         double SampleRate { get; }
+        
+        /// <summary>
+        /// Raised when the data stream is being disposed
+        /// Allows dependent virtual streams to clean up automatically
+        /// This enables cascade deletion when a source stream is removed
+        /// </summary>
+        event EventHandler Disposing;
+        
         //Connect to the data source, i.e. open serial port, USB , audio, etc.
         void Connect();
         //disconnect from the data source, i.e. close serial port, USB , audio, etc.
