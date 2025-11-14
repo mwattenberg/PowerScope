@@ -74,11 +74,17 @@ namespace PowerScope.Model
 
             // Track unique owner streams from channel operands
             _sourceStreams = new HashSet<IDataStream>();
-            foreach (var operand in _sourceOperands)
+            foreach (IOperandSource operand in _sourceOperands)
             {
-                if (!operand.IsConstant && operand.Channel?.OwnerStream != null)
+                if (!operand.IsConstant)
                 {
-                    _sourceStreams.Add(operand.Channel.OwnerStream);
+                    if (operand.Channel != null)
+                    {
+                        if (operand.Channel.OwnerStream != null)
+                        {
+                            _sourceStreams.Add(operand.Channel.OwnerStream);
+                        }
+                    }
                 }
             }
 
@@ -87,21 +93,12 @@ namespace PowerScope.Model
         }
 
         /// <summary>
-        /// Legacy constructor for backward compatibility - converts channels to operands
-        /// </summary>
-        [Obsolete("Use VirtualDataStream(IOperandSource, IOperandSource, VirtualChannelOperationType) instead")]
-        public VirtualDataStream(Channel sourceChannel1, Channel sourceChannel2, VirtualChannelOperationType operation)
-            : this(new ChannelOperand(sourceChannel1), new ChannelOperand(sourceChannel2), operation)
-        {
-        }
-
-        /// <summary>
         /// Subscribe to Disposing events from all source streams
         /// When any source stream disposes, this virtual stream must dispose too
         /// </summary>
         private void SubscribeToSourceStreams()
         {
-            foreach (var stream in _sourceStreams)
+            foreach (IDataStream stream in _sourceStreams)
             {
                 stream.Disposing += OnSourceStreamDisposing;
             }
@@ -112,7 +109,7 @@ namespace PowerScope.Model
         /// </summary>
         private void UnsubscribeFromSourceStreams()
         {
-            foreach (var stream in _sourceStreams)
+            foreach (IDataStream stream in _sourceStreams)
             {
                 stream.Disposing -= OnSourceStreamDisposing;
             }
@@ -160,14 +157,40 @@ namespace PowerScope.Model
             {
                 if (_sourceOperands.Count == 1)
                 {
-                    string sourceType = _sourceOperands[0].IsConstant ? "Constant" : _sourceOperands[0].Channel.StreamType;
+                    string sourceType;
+                    if (_sourceOperands[0].IsConstant)
+                    {
+                        sourceType = "Constant";
+                    }
+                    else
+                    {
+                        sourceType = _sourceOperands[0].Channel.StreamType;
+                    }
                     return $"Virtual ({sourceType})";
                 }
                 else
                 {
                     // Show operation between source types
-                    string source1Type = _sourceOperands[0].IsConstant ? "Constant" : _sourceOperands[0].Channel.StreamType;
-                    string source2Type = _sourceOperands[1].IsConstant ? "Constant" : _sourceOperands[1].Channel.StreamType;
+                    string source1Type;
+                    if (_sourceOperands[0].IsConstant)
+                    {
+                        source1Type = "Constant";
+                    }
+                    else
+                    {
+                        source1Type = _sourceOperands[0].Channel.StreamType;
+                    }
+
+                    string source2Type;
+                    if (_sourceOperands[1].IsConstant)
+                    {
+                        source2Type = "Constant";
+                    }
+                    else
+                    {
+                        source2Type = _sourceOperands[1].Channel.StreamType;
+                    }
+
                     return $"Virtual ({source1Type} {GetOperationSymbol()} {source2Type})";
                 }
             }
@@ -178,7 +201,7 @@ namespace PowerScope.Model
             get
             {
                 // Virtual stream is "connected" if all channel operands are connected
-                foreach (var operand in _sourceOperands)
+                foreach (IOperandSource operand in _sourceOperands)
                 {
                     if (!operand.IsConstant && !operand.Channel.IsStreamConnected)
                         return false;
@@ -192,7 +215,7 @@ namespace PowerScope.Model
             get
             {
                 // Virtual stream is "streaming" if any channel operand is streaming
-                foreach (var operand in _sourceOperands)
+                foreach (IOperandSource operand in _sourceOperands)
                 {
                     if (!operand.IsConstant && operand.Channel.IsStreamStreaming)
                         return true;
@@ -310,7 +333,13 @@ namespace PowerScope.Model
                     if (_sourceOperands[0].IsConstant)
                     {
                         // Fill destination with constant value
-                        actualSamples = FillWithConstant(destination, n, _sourceOperands[0].ConstantValue);
+                        double constantValue = _sourceOperands[0].ConstantValue;
+                        int samplesToFill = Math.Min(n, destination.Length);
+                        for (int i = 0; i < samplesToFill; i++)
+                        {
+                            destination[i] = constantValue;
+                        }
+                        actualSamples = samplesToFill;
                     }
                     else
                     {
@@ -334,75 +363,112 @@ namespace PowerScope.Model
         }
 
         /// <summary>
-        /// Fills destination array with constant value
-        /// </summary>
-        private int FillWithConstant(double[] destination, int n, double value)
-        {
-            int samplesToFill = Math.Min(n, destination.Length);
-
-            for (int i = 0; i < samplesToFill; i++)
-            {
-                destination[i] = value;
-            }
-
-            return samplesToFill;
-        }
-
-        /// <summary>
         /// Computes binary operation between two source operands (channels and/or constants)
+        /// Optimized to handle constant operands inline without buffer allocation
         /// </summary>
         private int ComputeBinaryOperation(double[] destination, int n)
         {
             // Ensure compute buffers are large enough
             int requiredSize = Math.Min(n, _computeBuffer1.Length);
 
-            // Get data from both operands
-            int samples1 = GetOperandData(_sourceOperands[0], _computeBuffer1, requiredSize);
-            int samples2 = GetOperandData(_sourceOperands[1], _computeBuffer2, requiredSize);
+            // Optimize for constants - detect which operands are constants
+            bool operand1IsConstant = _sourceOperands[0].IsConstant;
+            bool operand2IsConstant = _sourceOperands[1].IsConstant;
+
+            // Get constant values (if applicable) and fetch channel data
+            double constant1 = operand1IsConstant ? _sourceOperands[0].ConstantValue : 0.0;
+            double constant2 = operand2IsConstant ? _sourceOperands[1].ConstantValue : 0.0;
+
+            int samples1 = operand1IsConstant ? requiredSize : _sourceOperands[0].Channel.CopyLatestDataTo(_computeBuffer1, requiredSize);
+            int samples2 = operand2IsConstant ? requiredSize : _sourceOperands[1].Channel.CopyLatestDataTo(_computeBuffer2, requiredSize);
 
             // Use the minimum sample count (both sources must have data)
             int actualSamples = Math.Min(samples1, samples2);
             if (actualSamples <= 0)
                 return 0;
 
-            // Perform the operation sample-by-sample
-            for (int i = 0; i < actualSamples; i++)
+            // Perform the operation sample-by-sample with optimized paths for constants
+            if (operand1IsConstant && operand2IsConstant)
             {
-                double sample1 = _computeBuffer1[i];
-                double sample2 = _computeBuffer2[i];
-
-                destination[i] = _operation switch
+                // Both constant - compute once and fill entire destination
+                double result = _operation switch
                 {
-                    VirtualChannelOperationType.Add => sample1 + sample2,
-                    VirtualChannelOperationType.Subtract => sample1 - sample2,
-                    VirtualChannelOperationType.Multiply => sample1 * sample2,
-                    VirtualChannelOperationType.Divide => Math.Abs(sample2) > 1e-10 ? sample1 / sample2 : 0.0,
-                    _ => sample1 // Fallback to copy
+                    VirtualChannelOperationType.Add => constant1 + constant2,
+                    VirtualChannelOperationType.Subtract => constant1 - constant2,
+                    VirtualChannelOperationType.Multiply => constant1 * constant2,
+                    VirtualChannelOperationType.Divide => Math.Abs(constant2) > 1e-10 ? constant1 / constant2 : 0.0,
+                    _ => constant1
                 };
 
-                // Safety check for invalid values
-                if (!double.IsFinite(destination[i]))
+                if (!double.IsFinite(result))
+                    result = 0.0;
+
+                for (int i = 0; i < actualSamples; i++)
+                    destination[i] = result;
+            }
+            else if (operand1IsConstant)
+            {
+                // Operand 1 is constant, operand 2 is channel - avoid buffer for constant1
+                for (int i = 0; i < actualSamples; i++)
                 {
-                    destination[i] = 0.0;
+                    double sample2 = _computeBuffer2[i];
+
+                    destination[i] = _operation switch
+                    {
+                        VirtualChannelOperationType.Add => constant1 + sample2,
+                        VirtualChannelOperationType.Subtract => constant1 - sample2,
+                        VirtualChannelOperationType.Multiply => constant1 * sample2,
+                        VirtualChannelOperationType.Divide => Math.Abs(sample2) > 1e-10 ? constant1 / sample2 : 0.0,
+                        _ => constant1
+                    };
+
+                    if (!double.IsFinite(destination[i]))
+                        destination[i] = 0.0;
+                }
+            }
+            else if (operand2IsConstant)
+            {
+                // Operand 1 is channel, operand 2 is constant - avoid buffer for constant2
+                for (int i = 0; i < actualSamples; i++)
+                {
+                    double sample1 = _computeBuffer1[i];
+
+                    destination[i] = _operation switch
+                    {
+                        VirtualChannelOperationType.Add => sample1 + constant2,
+                        VirtualChannelOperationType.Subtract => sample1 - constant2,
+                        VirtualChannelOperationType.Multiply => sample1 * constant2,
+                        VirtualChannelOperationType.Divide => Math.Abs(constant2) > 1e-10 ? sample1 / constant2 : 0.0,
+                        _ => sample1
+                    };
+
+                    if (!double.IsFinite(destination[i]))
+                        destination[i] = 0.0;
+                }
+            }
+            else
+            {
+                // Both are channels - standard operation path
+                for (int i = 0; i < actualSamples; i++)
+                {
+                    double sample1 = _computeBuffer1[i];
+                    double sample2 = _computeBuffer2[i];
+
+                    destination[i] = _operation switch
+                    {
+                        VirtualChannelOperationType.Add => sample1 + sample2,
+                        VirtualChannelOperationType.Subtract => sample1 - sample2,
+                        VirtualChannelOperationType.Multiply => sample1 * sample2,
+                        VirtualChannelOperationType.Divide => Math.Abs(sample2) > 1e-10 ? sample1 / sample2 : 0.0,
+                        _ => sample1
+                    };
+
+                    if (!double.IsFinite(destination[i]))
+                        destination[i] = 0.0;
                 }
             }
 
             return actualSamples;
-        }
-
-        /// <summary>
-        /// Gets data from an operand source (channel or constant)
-        /// </summary>
-        private int GetOperandData(IOperandSource operand, double[] destination, int n)
-        {
-            if (operand.IsConstant)
-            {
-                return FillWithConstant(destination, n, operand.ConstantValue);
-            }
-            else
-            {
-                return operand.Channel.CopyLatestDataTo(destination, n);
-            }
         }
 
         /// <summary>
@@ -450,7 +516,10 @@ namespace PowerScope.Model
             // Virtual streams don't own data - clear filters only
             lock (_settingsLock)
             {
-                _virtualFilter?.Reset();
+                if (_virtualFilter != null)
+                {
+                    _virtualFilter.Reset();
+                }
             }
         }
 
@@ -468,11 +537,23 @@ namespace PowerScope.Model
                 _virtualChannelSettings = settings;
 
                 // Update filter reference and reset if filter type changed
-                var newFilter = settings?.Filter;
+                IDigitalFilter newFilter;
+                if (settings != null)
+                {
+                    newFilter = settings.Filter;
+                }
+                else
+                {
+                    newFilter = null;
+                }
+
                 if (_virtualFilter != newFilter)
                 {
                     _virtualFilter = newFilter;
-                    _virtualFilter?.Reset();
+                    if (_virtualFilter != null)
+                    {
+                        _virtualFilter.Reset();
+                    }
                 }
             }
         }
@@ -489,7 +570,10 @@ namespace PowerScope.Model
         {
             lock (_settingsLock)
             {
-                _virtualFilter?.Reset();
+                if (_virtualFilter != null)
+                {
+                    _virtualFilter.Reset();
+                }
             }
         }
 
@@ -516,19 +600,39 @@ namespace PowerScope.Model
         {
             if (_sourceOperands.Count == 1)
             {
-                string sourceName = _sourceOperands[0].IsConstant
-             ? _sourceOperands[0].ConstantValue.ToString("G")
-                    : _sourceOperands[0].Channel.Label;
+                string sourceName;
+                if (_sourceOperands[0].IsConstant)
+                {
+                    sourceName = _sourceOperands[0].ConstantValue.ToString("G");
+                }
+                else
+                {
+                    sourceName = _sourceOperands[0].Channel.Label;
+                }
                 return $"Virtual copy of {sourceName}";
             }
             else
             {
-                string source1Name = _sourceOperands[0].IsConstant
-                       ? _sourceOperands[0].ConstantValue.ToString("G")
-             : _sourceOperands[0].Channel.Label;
-                string source2Name = _sourceOperands[1].IsConstant
-               ? _sourceOperands[1].ConstantValue.ToString("G")
-    : _sourceOperands[1].Channel.Label;
+                string source1Name;
+                if (_sourceOperands[0].IsConstant)
+                {
+                    source1Name = _sourceOperands[0].ConstantValue.ToString("G");
+                }
+                else
+                {
+                    source1Name = _sourceOperands[0].Channel.Label;
+                }
+
+                string source2Name;
+                if (_sourceOperands[1].IsConstant)
+                {
+                    source2Name = _sourceOperands[1].ConstantValue.ToString("G");
+                }
+                else
+                {
+                    source2Name = _sourceOperands[1].Channel.Label;
+                }
+
                 string opSymbol = GetOperationSymbol();
                 return $"{source1Name} {opSymbol} {source2Name}";
             }
@@ -540,8 +644,8 @@ namespace PowerScope.Model
         /// </summary>
         public IReadOnlyList<Channel> GetSourceChannels()
         {
-            var channels = new List<Channel>();
-            foreach (var operand in _sourceOperands)
+            List<Channel> channels = new List<Channel>();
+            foreach (IOperandSource operand in _sourceOperands)
             {
                 if (!operand.IsConstant && operand.Channel != null)
                 {
@@ -571,7 +675,10 @@ namespace PowerScope.Model
 
             lock (_settingsLock)
             {
-                _virtualFilter?.Reset();
+                if (_virtualFilter != null)
+                {
+                    _virtualFilter.Reset();
+                }
                 _virtualChannelSettings = null;
             }
 
