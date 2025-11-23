@@ -18,7 +18,6 @@ namespace PowerScope.View.UserControls
         private static readonly Color DisabledColor = Colors.Gray;
         private static readonly Brush SelectedBrush = new SolidColorBrush(Colors.LimeGreen);
         private static readonly Brush DefaultBrush = new SolidColorBrush(DisabledColor);
-        private Channel _currentChannel;
 
         /// <summary>
         /// Gets the ChannelSettings from DataContext
@@ -28,17 +27,6 @@ namespace PowerScope.View.UserControls
             get
             {
                 return DataContext as ChannelSettings;
-            }
-        }
-
-        /// <summary>
-        /// Gets the current Channel for gradient detection
-        /// </summary>
-        public Channel CurrentChannel
-        {
-            get
-            {
-                return _currentChannel;
             }
         }
 
@@ -78,6 +66,10 @@ namespace PowerScope.View.UserControls
             if (e.PropertyName == nameof(ChannelSettings.IsEnabled))
             {
                 UpdatePlayPauseButton();
+            }
+            else if (e.PropertyName == nameof(ChannelSettings.DisplayColor) || e.PropertyName == nameof(ChannelSettings.IsVirtual))
+            {
+                UpdateTopColorBar();
             }
         }
 
@@ -320,39 +312,39 @@ namespace PowerScope.View.UserControls
 
         /// <summary>
         /// Updates the TopColorBar gradient when Channel or Color changes
-        /// Traverses parent hierarchy to find the Channel reference
+        /// Uses the IsVirtual flag from ChannelSettings
         /// </summary>
         private void UpdateTopColorBar()
         {
-            // Try to find the Channel from the parent ChannelControlBar
-            DependencyObject parent = LogicalTreeHelper.GetParent(this);
-            while (parent != null)
+            Border topColorBar = this.FindName("TopColorBar") as Border;
+            
+            if (topColorBar != null && Settings != null)
             {
-                if (parent is ChannelControlBar channelControlBar)
+                if (Settings.IsVirtual)
                 {
-                    // Found the ChannelControlBar - now try to find the matching Channel
-                    // by comparing this ChannelControl's DataContext (ChannelSettings) with each Channel's Settings
-                    foreach (Channel channel in channelControlBar.DataStreamBar?.Channels ?? new System.Collections.ObjectModel.ObservableCollection<Channel>())
-                    {
-                        if (channel.Settings == DataContext)
-                        {
-                            _currentChannel = channel;
-                            break;
-                        }
-                    }
-                    break;
-                }
-                parent = LogicalTreeHelper.GetParent(parent);
-            }
+                    // Create gradient from Gray to channel color
+                    LinearGradientBrush gradientBrush = new LinearGradientBrush();
+                    gradientBrush.StartPoint = new Point(0, 0.5);
+                    gradientBrush.EndPoint = new Point(1, 0.5);
 
-            // Force the binding to update by re-evaluating the TopColorBar binding
-            var topColorBar = this.FindName("TopColorBar") as Border;
-            if (topColorBar != null)
-            {
-                var binding = BindingOperations.GetBinding(topColorBar, Border.BackgroundProperty);
-                if (binding != null)
+                    GradientStop greyStop = new GradientStop();
+                    greyStop.Color = Colors.Black;
+                    greyStop.Offset = 0.0;
+
+                    GradientStop channelColorStop = new GradientStop();
+                    channelColorStop.Color = Settings.DisplayColor;
+                    channelColorStop.Offset = 1.0;
+
+                    gradientBrush.GradientStops.Add(greyStop);
+                    gradientBrush.GradientStops.Add(channelColorStop);
+
+                    topColorBar.Background = gradientBrush;
+                }
+                else
                 {
-                    BindingOperations.SetBinding(topColorBar, Border.BackgroundProperty, binding);
+                    // Solid color for physical channels
+                    SolidColorBrush solidBrush = new SolidColorBrush(Settings.DisplayColor);
+                    topColorBar.Background = solidBrush;
                 }
             }
         }

@@ -12,6 +12,7 @@ namespace PowerScope.Model
         private double _gain = 1.0;
         private double _offset = 0.0;
         private IDigitalFilter? _filter = null;
+        private bool _isVirtual = false;
 
         /// <summary>
         /// Event raised when a measurement is requested for this channel
@@ -113,6 +114,22 @@ namespace PowerScope.Model
                 {
                     _filter = value;
                     OnPropertyChanged(nameof(Filter));
+                }
+            }
+        }
+
+        public bool IsVirtual
+        {
+            get 
+            { 
+                return _isVirtual; 
+            }
+            set
+            {
+                if (_isVirtual != value)
+                {
+                    _isVirtual = value;
+                    OnPropertyChanged(nameof(IsVirtual));
                 }
             }
         }

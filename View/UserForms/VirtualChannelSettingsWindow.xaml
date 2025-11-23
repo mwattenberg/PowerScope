@@ -4,8 +4,9 @@
         xmlns:local="clr-namespace:PowerScope.View.UserControls"
         xmlns:svgc="http://sharpvectors.codeplex.com/svgc/"
       Title="Virtual Channel Configuration" 
-        Height="500" 
-        Width="750"
+        Height="450"
+        MinHeight="450"
+        Width="650"
     WindowStartupLocation="CenterOwner"
         Background="{DynamicResource PlotSettings_BackgroundBrush}">
     
@@ -16,9 +17,9 @@
   </Style>
     
         <Style x:Key="OperationButtonStyle" TargetType="Button">
-            <Setter Property="Width" Value="120"/>
-     <Setter Property="Height" Value="80"/>
-     <Setter Property="Margin" Value="5"/>
+            <Setter Property="Width" Value="110"/>
+     <Setter Property="Height" Value="70"/>
+     <Setter Property="Margin" Value="3"/>
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="Foreground" Value="{DynamicResource PlotSettings_ButtonForegroundBrush}"/>
      <Setter Property="BorderBrush" Value="Transparent"/>
@@ -79,13 +80,12 @@
      <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
    <RowDefinition Height="Auto"/>
-    <RowDefinition Height="70"/>
+    <RowDefinition Height="60"/>
             <RowDefinition Height="Auto"/>
     <RowDefinition Height="Auto"/>
         <RowDefinition Height="Auto"/>
-            <RowDefinition Height="70"/>
+            <RowDefinition Height="60"/>
           <RowDefinition Height="Auto"/>
-    <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
         <TextBlock Grid.Row="0" 
@@ -93,15 +93,15 @@
        FontSize="16" 
 FontWeight="Bold" 
               Foreground="{DynamicResource PlotSettings_HeaderForegroundBrush}" 
-      Margin="0,0,0,15"/>
+      Margin="0,0,0,10"/>
 
         <TextBlock Grid.Row="1" 
        Text="Input A:" 
         Foreground="{DynamicResource PlotSettings_LabelForegroundBrush}" 
          FontSize="13" 
-       Margin="0,5,0,5"/>
+       Margin="0,0,0,5"/>
         
-        <Grid Grid.Row="2" Margin="0,0,0,10">
+        <Grid Grid.Row="2" Margin="0,0,0,5">
      <Grid.ColumnDefinitions>
        <ColumnDefinition Width="*"/>
      <ColumnDefinition Width="Auto"/>
@@ -130,9 +130,9 @@ FontWeight="Bold"
          Text="Operation:" 
  Foreground="{DynamicResource PlotSettings_LabelForegroundBrush}" 
    FontSize="13" 
-     Margin="0,5,0,5"/>
+     Margin="0,0,0,5"/>
         
-        <UniformGrid Grid.Row="4" Rows="1" Columns="4" Margin="0,0,0,15">
+        <UniformGrid Grid.Row="4" Rows="1" Columns="4" Margin="0,0,0,10">
 <Button x:Name="Button_Add" Tag="Add" Style="{StaticResource OperationButtonStyle}" Click="OperationButton_Click">
        <StackPanel>
           <svgc:SvgViewbox Source="/Icons/plus.svg" Width="48" Height="48" HorizontalAlignment="Center"/>
@@ -163,9 +163,9 @@ FontWeight="Bold"
    Text="Input B:" 
          Foreground="{DynamicResource PlotSettings_LabelForegroundBrush}" 
      FontSize="13" 
-              Margin="0,5,0,5"/>
+              Margin="0,0,0,5"/>
         
-  <Grid Grid.Row="6" Margin="0,0,0,10">
+  <Grid Grid.Row="6" Margin="0,0,0,5">
          <Grid.ColumnDefinitions>
       <ColumnDefinition Width="*"/>
          <ColumnDefinition Width="Auto"/>
@@ -190,16 +190,7 @@ FontWeight="Bold"
             </Grid>
      </Grid>
 
-        <StackPanel Grid.Row="7" Orientation="Horizontal" Margin="0,10,0,20">
-    <TextBlock Text="Channel Label:" 
-    Foreground="{DynamicResource PlotSettings_LabelForegroundBrush}" 
-         VerticalAlignment="Center" 
- Width="100" 
-             Margin="0,0,10,0"/>
-            <TextBox x:Name="LabelTextBox" Width="300" Text="{Binding Label, Mode=TwoWay}"/>
-</StackPanel>
-
-        <StackPanel Grid.Row="8" Orientation="Horizontal" HorizontalAlignment="Right">
+        <StackPanel Grid.Row="7" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
             <Button Content="Apply" Click="ApplyButton_Click"/>
         </StackPanel>
     </Grid>
