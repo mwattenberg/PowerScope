@@ -85,7 +85,7 @@ namespace PowerScope.Model
         /// Creates a new virtual Channel from two operand sources with mathematical operation
         /// Supports both channels and constants as operands
         /// </summary>
-        public Channel(IOperandSource operandA, IOperandSource operandB, VirtualChannelOperationType operation, ChannelSettings settings)
+        public Channel(IVirtualSource operandA, IVirtualSource operandB, VirtualChannelOperationType operation, ChannelSettings settings)
         {
             if (operandA == null)
                 throw new ArgumentNullException(nameof(operandA));

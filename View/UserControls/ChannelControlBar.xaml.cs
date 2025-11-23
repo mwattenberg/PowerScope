@@ -100,10 +100,11 @@ namespace PowerScope.View.UserControls
                 }
 
                 // Create virtual channel settings
+                int globalIndex = DataStreamBar.Channels.Count;
                 var virtualChannelSettings = new ChannelSettings
                 {
                     Label = virtualChannelConfig.Label ?? "Virtual Channel",
-                    Color = System.Windows.Media.Colors.LimeGreen,
+                    Color = PlotManager.GetColor(globalIndex),
                     IsEnabled = true,
                     Gain = 1.0,
                     Offset = 0.0

@@ -190,6 +190,21 @@ namespace PowerScope.View.UserControls
                 {
                     channelSettings.Color = channelColors[globalIndex];
                 }
+                else if (dataStream is VirtualDataStream virtualStream)
+                {
+                    // Virtual channels inherit their source channel's color
+                    // This maintains visual consistency and avoids forced palette colors
+                    Channel sourceChannel = virtualStream.GetPrimarySourceChannel();
+                    if (sourceChannel != null)
+                    {
+                        channelSettings.Color = sourceChannel.Settings.Color;
+                    }
+                    else
+                    {
+                        // Fallback if no source available (all constant operands)
+                        channelSettings.Color = PlotManager.GetColor(globalIndex);
+                    }
+                }
                 else
                 {
                     channelSettings.Color = PlotManager.GetColor(globalIndex);

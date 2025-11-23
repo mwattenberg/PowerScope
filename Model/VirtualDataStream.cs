@@ -14,7 +14,7 @@ namespace PowerScope.Model
     /// </summary>
     public class VirtualDataStream : IDataStream, IChannelConfigurable
     {
-        private readonly List<IOperandSource> _sourceOperands;
+        private readonly List<IVirtualSource> _sourceOperands;
         private readonly HashSet<IDataStream> _sourceStreams; // Track unique source streams
         private readonly VirtualChannelOperationType _operation;
         private bool _disposed = false;
@@ -45,7 +45,7 @@ namespace PowerScope.Model
             if (sourceChannel == null)
                 throw new ArgumentNullException(nameof(sourceChannel));
 
-            _sourceOperands = new List<IOperandSource> { new ChannelOperand(sourceChannel) };
+            _sourceOperands = new List<IVirtualSource> { new ChannelOperand(sourceChannel) };
             _operation = VirtualChannelOperationType.Add; // Default, not used for single source
 
             // Track unique owner streams
@@ -62,19 +62,19 @@ namespace PowerScope.Model
         /// <summary>
         /// Creates a virtual data stream from two source operands (channels or constants) with a mathematical operation
         /// </summary>
-        public VirtualDataStream(IOperandSource operandA, IOperandSource operandB, VirtualChannelOperationType operation)
+        public VirtualDataStream(IVirtualSource operandA, IVirtualSource operandB, VirtualChannelOperationType operation)
         {
             if (operandA == null)
                 throw new ArgumentNullException(nameof(operandA));
             if (operandB == null)
                 throw new ArgumentNullException(nameof(operandB));
 
-            _sourceOperands = new List<IOperandSource> { operandA, operandB };
+            _sourceOperands = new List<IVirtualSource> { operandA, operandB };
             _operation = operation;
 
             // Track unique owner streams from channel operands
             _sourceStreams = new HashSet<IDataStream>();
-            foreach (IOperandSource operand in _sourceOperands)
+            foreach (IVirtualSource operand in _sourceOperands)
             {
                 if (!operand.IsConstant)
                 {
@@ -201,7 +201,7 @@ namespace PowerScope.Model
             get
             {
                 // Virtual stream is "connected" if all channel operands are connected
-                foreach (IOperandSource operand in _sourceOperands)
+                foreach (IVirtualSource operand in _sourceOperands)
                 {
                     if (!operand.IsConstant && !operand.Channel.IsStreamConnected)
                         return false;
@@ -215,7 +215,7 @@ namespace PowerScope.Model
             get
             {
                 // Virtual stream is "streaming" if any channel operand is streaming
-                foreach (IOperandSource operand in _sourceOperands)
+                foreach (IVirtualSource operand in _sourceOperands)
                 {
                     if (!operand.IsConstant && operand.Channel.IsStreamStreaming)
                         return true;
@@ -645,7 +645,7 @@ namespace PowerScope.Model
         public IReadOnlyList<Channel> GetSourceChannels()
         {
             List<Channel> channels = new List<Channel>();
-            foreach (IOperandSource operand in _sourceOperands)
+            foreach (IVirtualSource operand in _sourceOperands)
             {
                 if (!operand.IsConstant && operand.Channel != null)
                 {
@@ -653,6 +653,23 @@ namespace PowerScope.Model
                 }
             }
             return channels.AsReadOnly();
+        }
+
+        /// <summary>
+        /// Gets the primary (first) source channel for this virtual stream
+        /// Useful for inheriting color and display properties from the source
+        /// Returns null if no channel operands are present (all constant operands)
+        /// </summary>
+        public Channel GetPrimarySourceChannel()
+        {
+            foreach (IVirtualSource operand in _sourceOperands)
+            {
+                if (!operand.IsConstant && operand.Channel != null)
+                {
+                    return operand.Channel;
+                }
+            }
+            return null;
         }
 
         #endregion

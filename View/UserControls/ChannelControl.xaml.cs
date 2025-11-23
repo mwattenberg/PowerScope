@@ -18,16 +18,28 @@ namespace PowerScope.View.UserControls
         private static readonly Color DisabledColor = Colors.Gray;
         private static readonly Brush SelectedBrush = new SolidColorBrush(Colors.LimeGreen);
         private static readonly Brush DefaultBrush = new SolidColorBrush(DisabledColor);
+        private Channel _currentChannel;
 
         /// <summary>
         /// Gets the ChannelSettings from DataContext
         /// </summary>
-        public ChannelSettings Settings 
-        { 
-            get 
-            { 
-                return DataContext as ChannelSettings; 
-            } 
+        public ChannelSettings Settings
+        {
+            get
+            {
+                return DataContext as ChannelSettings;
+            }
+        }
+
+        /// <summary>
+        /// Gets the current Channel for gradient detection
+        /// </summary>
+        public Channel CurrentChannel
+        {
+            get
+            {
+                return _currentChannel;
+            }
         }
 
         public ChannelControl()
@@ -57,6 +69,7 @@ namespace PowerScope.View.UserControls
             {
                 newSettings.PropertyChanged += Settings_PropertyChanged;
                 UpdatePlayPauseButton(); // Update button when DataContext changes
+                UpdateTopColorBar();  // Update gradient when DataContext changes
             }
         }
 
@@ -82,7 +95,7 @@ namespace PowerScope.View.UserControls
         {
             var playPauseIcon = this.FindName("PlayPauseIcon") as TextBlock;
             var playPauseButton = this.FindName("PlayPauseButton") as Button;
-            
+
             if (playPauseIcon != null && playPauseButton != null && Settings != null)
             {
                 if (Settings.IsEnabled)
@@ -128,8 +141,8 @@ namespace PowerScope.View.UserControls
                 // Show measurement selection dialog directly in ChannelControl
                 View.UserForms.MeasurementSelection measurementSelection = new View.UserForms.MeasurementSelection();
                 measurementSelection.Owner = Window.GetWindow(this);
-                
-                if (measurementSelection.ShowDialog() == true && 
+
+                if (measurementSelection.ShowDialog() == true &&
                     measurementSelection.SelectedMeasurementType.HasValue)
                 {
                     // Request measurement through ChannelSettings event
@@ -160,14 +173,14 @@ namespace PowerScope.View.UserControls
         {
             var textBox = sender as TextBox;
             if (textBox == null || Settings == null) return;
-            
+
             // Only respond to mouse wheel when the textbox has focus or mouse is over it
             if (!textBox.IsFocused && !textBox.IsMouseOver)
                 return;
 
             // Positive Delta means wheel up (increase), negative means wheel down (decrease)
             bool increase;
-            
+
             // Parse the current textbox value with culture invariance
             if (double.TryParse(textBox.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out double currentValue))
             {
@@ -189,15 +202,14 @@ namespace PowerScope.View.UserControls
             // Check for modifier keys to determine increment size
             bool ctrlPressed = Keyboard.IsKeyDown(Key.LeftCtrl) || Keyboard.IsKeyDown(Key.RightCtrl);
             bool altPressed = Keyboard.IsKeyDown(Key.LeftAlt) || Keyboard.IsKeyDown(Key.RightAlt);
-            
+
             AdjustValue(textBox, increase, ctrlPressed, altPressed);
             e.Handled = true;
         }
 
         /// <summary>
         /// Common method to adjust gain or offset values
-        /// </summary>
-        /// <param name="textBox">The textbox being adjusted</param>
+        /// /// <param name="textBox">The textbox being adjusted</param>
         /// <param name="increase">True to increase, false to decrease</param>
         /// <param name="ctrlPressed">True if Ctrl is pressed (10% increments)</param>
         /// <param name="altPressed">True if Alt is pressed (0.1% increments)</param>
@@ -261,7 +273,7 @@ namespace PowerScope.View.UserControls
 
             // Get current state
             string inputChar = e.Text;
-            
+
             // Allow digits always
             if (char.IsDigit(inputChar, 0))
             {
@@ -284,8 +296,8 @@ namespace PowerScope.View.UserControls
             }
 
             // Allow 'e' or 'E' for exponential notation
-            if ((inputChar.ToLower() == "e") && !textBox.Text.ToLower().Contains('e') && 
-                textBox.Text.Length > 0 && textBox.Text.Any(char.IsDigit))
+            if ((inputChar.ToLower() == "e") && !textBox.Text.ToLower().Contains('e') &&
+              textBox.Text.Length > 0 && textBox.Text.Any(char.IsDigit))
             {
                 e.Handled = false;
                 return;
@@ -304,6 +316,45 @@ namespace PowerScope.View.UserControls
 
             // Block all other characters
             e.Handled = true;
+        }
+
+        /// <summary>
+        /// Updates the TopColorBar gradient when Channel or Color changes
+        /// Traverses parent hierarchy to find the Channel reference
+        /// </summary>
+        private void UpdateTopColorBar()
+        {
+            // Try to find the Channel from the parent ChannelControlBar
+            DependencyObject parent = LogicalTreeHelper.GetParent(this);
+            while (parent != null)
+            {
+                if (parent is ChannelControlBar channelControlBar)
+                {
+                    // Found the ChannelControlBar - now try to find the matching Channel
+                    // by comparing this ChannelControl's DataContext (ChannelSettings) with each Channel's Settings
+                    foreach (Channel channel in channelControlBar.DataStreamBar?.Channels ?? new System.Collections.ObjectModel.ObservableCollection<Channel>())
+                    {
+                        if (channel.Settings == DataContext)
+                        {
+                            _currentChannel = channel;
+                            break;
+                        }
+                    }
+                    break;
+                }
+                parent = LogicalTreeHelper.GetParent(parent);
+            }
+
+            // Force the binding to update by re-evaluating the TopColorBar binding
+            var topColorBar = this.FindName("TopColorBar") as Border;
+            if (topColorBar != null)
+            {
+                var binding = BindingOperations.GetBinding(topColorBar, Border.BackgroundProperty);
+                if (binding != null)
+                {
+                    BindingOperations.SetBinding(topColorBar, Border.BackgroundProperty, binding);
+                }
+            }
         }
     }
 }
