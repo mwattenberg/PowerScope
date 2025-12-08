@@ -5,8 +5,9 @@
         xmlns:svgc="http://sharpvectors.codeplex.com/svgc/"
       Title="Virtual Channel Configuration" 
         Height="450"
-        MinHeight="450"
-        Width="650"
+     MinHeight="450"
+        Width="450"
+   MinWidth="450"
     WindowStartupLocation="CenterOwner"
         Background="{DynamicResource PlotSettings_BackgroundBrush}">
     
@@ -17,32 +18,30 @@
   </Style>
     
         <Style x:Key="OperationButtonStyle" TargetType="Button">
-            <Setter Property="Width" Value="110"/>
-     <Setter Property="Height" Value="70"/>
+ <Setter Property="Width" Value="56"/>
+     <Setter Property="Height" Value="56"/>
      <Setter Property="Margin" Value="3"/>
-            <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Background" Value="Transparent"/>
             <Setter Property="Foreground" Value="{DynamicResource PlotSettings_ButtonForegroundBrush}"/>
-     <Setter Property="BorderBrush" Value="Transparent"/>
-            <Setter Property="BorderThickness" Value="0"/>
-    <Setter Property="FontSize" Value="12"/>
-          <Setter Property="FontWeight" Value="SemiBold"/>
-       <Setter Property="Cursor" Value="Hand"/>
+ <Setter Property="BorderBrush" Value="Transparent"/>
+ <Setter Property="BorderThickness" Value="0"/>
+    <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
-         <Setter.Value>
-          <ControlTemplate TargetType="Button">
-  <Border Background="{TemplateBinding Background}"
-             BorderBrush="{TemplateBinding BorderBrush}"
-    BorderThickness="{TemplateBinding BorderThickness}"
-         CornerRadius="4">
-         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-               </Border>
-    <ControlTemplate.Triggers>
-          <Trigger Property="IsMouseOver" Value="True">
+       <Setter.Value>
+        <ControlTemplate TargetType="Button">
+        <Border Background="{TemplateBinding Background}"
+     BorderBrush="{TemplateBinding BorderBrush}"
+       BorderThickness="{TemplateBinding BorderThickness}"
+               CornerRadius="4">
+ <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+              </Border>
+        <ControlTemplate.Triggers>
+     <Trigger Property="IsMouseOver" Value="True">
          <Setter Property="Background" Value="{DynamicResource PlotSettings_ButtonHoverBrush}"/>
-        </Trigger>
-     </ControlTemplate.Triggers>
-           </ControlTemplate>
-       </Setter.Value>
+            </Trigger>
+       </ControlTemplate.Triggers>
+     </ControlTemplate>
+  </Setter.Value>
             </Setter>
         </Style>
 
@@ -102,93 +101,45 @@ FontWeight="Bold"
        Margin="0,0,0,5"/>
         
         <Grid Grid.Row="2" Margin="0,0,0,5">
-     <Grid.ColumnDefinitions>
-       <ColumnDefinition Width="*"/>
-     <ColumnDefinition Width="Auto"/>
-            </Grid.ColumnDefinitions>
-       <local:VirtualChannelSelectionBar x:Name="InputASelector" Grid.Column="0" Margin="0,0,10,0"/>
-            <Grid Grid.Column="1" Width="56" Height="56">
-                <Button x:Name="InputAConstantButton" Style="{StaticResource ConstantButtonStyle}" 
-                        Content="0" Click="InputAConstantButton_Click"
-                        ToolTip="Click to enter constant value"/>
-                <TextBox x:Name="InputAConstantTextBox" 
-                         Visibility="Collapsed"
-                         Width="56" Height="56"
-                         BorderThickness="3"
-                         BorderBrush="White"
-                         Background="{DynamicResource PlotSettings_TextBoxBackgroundBrush}"
-                         Foreground="{DynamicResource PlotSettings_LabelForegroundBrush}"
-                         FontSize="12"
-                         TextAlignment="Center"
-                         VerticalContentAlignment="Center"
-                         KeyDown="ConstantTextBox_KeyDown"
-                         LostFocus="ConstantTextBox_LostFocus"/>
-            </Grid>
-     </Grid>
+   <Grid.ColumnDefinitions>
+  <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+     <local:VirtualChannelSelectionBar x:Name="InputASelector" Grid.Column="0" Margin="0,0,10,0"/>
+        </Grid>
 
         <TextBlock Grid.Row="3" 
-         Text="Operation:" 
- Foreground="{DynamicResource PlotSettings_LabelForegroundBrush}" 
-   FontSize="13" 
-     Margin="0,0,0,5"/>
-        
+     Text="Operation:" 
+Foreground="{DynamicResource PlotSettings_LabelForegroundBrush}" 
+    FontSize="13" 
+      Margin="0,0,0,5"/>
+     
         <UniformGrid Grid.Row="4" Rows="1" Columns="4" Margin="0,0,0,10">
-<Button x:Name="Button_Add" Tag="Add" Style="{StaticResource OperationButtonStyle}" Click="OperationButton_Click">
-       <StackPanel>
-          <svgc:SvgViewbox Source="/Icons/plus.svg" Width="48" Height="48" HorizontalAlignment="Center"/>
-    <TextBlock Text="Add" FontSize="12" HorizontalAlignment="Center" Margin="0,5,0,0"/>
-    </StackPanel>
+            <Button x:Name="Button_Add" Tag="Add" Style="{StaticResource OperationButtonStyle}" Click="OperationButton_Click">
+       <svgc:SvgViewbox Source="/Icons/plus.svg" Width="48" Height="48" HorizontalAlignment="Center" VerticalAlignment="Center"/>
  </Button>
-       <Button x:Name="Button_Subtract" Tag="Subtract" Style="{StaticResource OperationButtonStyle}" Click="OperationButton_Click">
-      <StackPanel>
-  <svgc:SvgViewbox Source="/Icons/minus.svg" Width="48" Height="48" HorizontalAlignment="Center"/>
-          <TextBlock Text="Subtract" FontSize="12" HorizontalAlignment="Center" Margin="0,5,0,0"/>
-       </StackPanel>
-        </Button>
-   <Button x:Name="Button_Multiply" Tag="Multiply" Style="{StaticResource OperationButtonStyle}" Click="OperationButton_Click">
-    <StackPanel>
-   <svgc:SvgViewbox Source="/Icons/multiply.svg" Width="48" Height="48" HorizontalAlignment="Center"/>
-           <TextBlock Text="Multiply" FontSize="12" HorizontalAlignment="Center" Margin="0,5,0,0"/>
-          </StackPanel>
+            <Button x:Name="Button_Subtract" Tag="Subtract" Style="{StaticResource OperationButtonStyle}" Click="OperationButton_Click">
+     <svgc:SvgViewbox Source="/Icons/minus.svg" Width="48" Height="48" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+  </Button>
+     <Button x:Name="Button_Multiply" Tag="Multiply" Style="{StaticResource OperationButtonStyle}" Click="OperationButton_Click">
+     <svgc:SvgViewbox Source="/Icons/multiply.svg" Width="48" Height="48" HorizontalAlignment="Center" VerticalAlignment="Center"/>
             </Button>
-            <Button x:Name="Button_Divide" Tag="Divide" Style="{StaticResource OperationButtonStyle}" Click="OperationButton_Click">
-       <StackPanel>
-       <svgc:SvgViewbox Source="/Icons/divide.svg" Width="48" Height="48" HorizontalAlignment="Center"/>
-      <TextBlock Text="Divide" FontSize="12" HorizontalAlignment="Center" Margin="0,5,0,0"/>
-       </StackPanel>
+ <Button x:Name="Button_Divide" Tag="Divide" Style="{StaticResource OperationButtonStyle}" Click="OperationButton_Click">
+      <svgc:SvgViewbox Source="/Icons/divide.svg" Width="48" Height="48" HorizontalAlignment="Center" VerticalAlignment="Center"/>
             </Button>
-   </UniformGrid>
+     </UniformGrid>
 
-        <TextBlock Grid.Row="5" 
-   Text="Input B:" 
-         Foreground="{DynamicResource PlotSettings_LabelForegroundBrush}" 
-     FontSize="13" 
-              Margin="0,0,0,5"/>
+      <TextBlock Grid.Row="5" 
+ Text="Input B:" 
+       Foreground="{DynamicResource PlotSettings_LabelForegroundBrush}" 
+   FontSize="13" 
+            Margin="0,0,0,5"/>
         
-  <Grid Grid.Row="6" Margin="0,0,0,5">
-         <Grid.ColumnDefinitions>
-      <ColumnDefinition Width="*"/>
-         <ColumnDefinition Width="Auto"/>
-   </Grid.ColumnDefinitions>
-            <local:VirtualChannelSelectionBar x:Name="InputBSelector" Grid.Column="0" Margin="0,0,10,0"/>
-            <Grid Grid.Column="1" Width="56" Height="56">
-                <Button x:Name="InputBConstantButton" Style="{StaticResource ConstantButtonStyle}" 
-                        Content="0" Click="InputBConstantButton_Click"
-                        ToolTip="Click to enter constant value"/>
-                <TextBox x:Name="InputBConstantTextBox" 
-                         Visibility="Collapsed"
-                         Width="56" Height="56"
-                         BorderThickness="3"
-                         BorderBrush="White"
-                         Background="{DynamicResource PlotSettings_TextBoxBackgroundBrush}"
-                         Foreground="{DynamicResource PlotSettings_LabelForegroundBrush}"
-                         FontSize="12"
-                         TextAlignment="Center"
-                         VerticalContentAlignment="Center"
-                         KeyDown="ConstantTextBox_KeyDown"
-                         LostFocus="ConstantTextBox_LostFocus"/>
-            </Grid>
-     </Grid>
+<Grid Grid.Row="6" Margin="0,0,0,5">
+  <Grid.ColumnDefinitions>
+    <ColumnDefinition Width="*"/>
+     </Grid.ColumnDefinitions>
+  <local:VirtualChannelSelectionBar x:Name="InputBSelector" Grid.Column="0" Margin="0,0,10,0"/>
+      </Grid>
 
         <StackPanel Grid.Row="7" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
             <Button Content="Apply" Click="ApplyButton_Click"/>

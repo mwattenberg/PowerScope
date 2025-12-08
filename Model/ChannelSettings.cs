@@ -1,9 +1,17 @@
 using System;
 using System.ComponentModel;
+using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using System.Windows.Media;
 
 namespace PowerScope.Model
 {
+    /// <summary>
+    /// ChannelSettings serves as the MVVM ViewModel for channel UI display and interaction.
+    /// Contains both display properties (Label, Color) and interaction properties (Gain, Offset, Filter).
+    /// Maintains a back-reference to the owner Channel to provide access to Measurements collection.
+    /// This eliminates the need for separate ViewModel classes while keeping concerns clean.
+    /// </summary>
     public class ChannelSettings : INotifyPropertyChanged
     {
         private string _label = "Channel";
@@ -13,12 +21,15 @@ namespace PowerScope.Model
         private double _offset = 0.0;
         private IDigitalFilter? _filter = null;
         private bool _isVirtual = false;
+        private Channel _ownerChannel;
 
         /// <summary>
         /// Event raised when a measurement is requested for this channel
         /// Channel subscribes to this and handles the measurement creation
         /// </summary>
         public event EventHandler<MeasurementType> MeasurementRequested;
+
+        public event PropertyChangedEventHandler PropertyChanged;
 
         public string Label
         {
@@ -146,21 +157,121 @@ namespace PowerScope.Model
         }
 
         /// <summary>
-        /// Requests a measurement of the specified type to be added to this channel
-        /// Called by UI controls, handled by the Channel that owns these settings
+        /// Gets the measurements collection from the owner channel.
+        /// Returns an empty collection if no owner channel is set.
+        /// This enables UI binding without creating circular dependencies.
+        /// </summary>
+        public ObservableCollection<Measurement> Measurements
+        {
+            get
+            {
+                if (_ownerChannel != null)
+                {
+                    return _ownerChannel.Measurements;
+                }
+                return new ObservableCollection<Measurement>();
+            }
+        }
+
+        /// <summary>
+        /// Gets the count of active measurements.
+        /// Raises PropertyChanged when measurements are added/removed.
+        /// Used for UI button styling (e.g., highlight when count > 0).
+        /// </summary>
+        public int MeasurementCount
+        {
+            get
+            {
+                if (_ownerChannel != null)
+                {
+                    return _ownerChannel.Measurements.Count;
+                }
+                return 0;
+            }
+        }
+
+        /// <summary>
+        /// Gets whether any measurements are active.
+        /// Useful for boolean binding in XAML (e.g., button styling).
+        /// </summary>
+        public bool HasMeasurements
+        {
+            get { return MeasurementCount > 0; }
+        }
+
+        /// <summary>
+        /// Adds a measurement of the specified type to this channel.
+        /// Direct method call (not event-based) for clean architecture.
+        /// Delegates to the owner channel if available.
         /// </summary>
         /// <param name="measurementType">Type of measurement to add</param>
-        public void RequestMeasurement(MeasurementType measurementType)
+        public void AddMeasurement(MeasurementType measurementType)
         {
+            if (_ownerChannel != null)
+            {
+                _ownerChannel.AddMeasurement(measurementType);
+            }
+        }
+
+        /// <summary>
+        /// Removes a specific measurement from this channel.
+        /// Direct method call (not event-based) for clean architecture.
+        /// Delegates to the owner channel if available.
+        /// </summary>
+        /// <param name="measurement">The measurement to remove</param>
+        public void RemoveMeasurement(Measurement measurement)
+        {
+      if (_ownerChannel != null && measurement != null)
+  {
+        _ownerChannel.RemoveMeasurement(measurement);
+ }
+        }
+
+   /// <summary>
+        /// Requests a measurement of the specified type to be added to this channel.
+        /// Called by UI controls, handled by the Channel that owns these settings.
+        /// DEPRECATED: Use AddMeasurement() instead for cleaner event-free architecture.
+        /// </summary>
+        /// <param name="measurementType">Type of measurement to add</param>
+    public void RequestMeasurement(MeasurementType measurementType)
+  {
             MeasurementRequested?.Invoke(this, measurementType);
         }
 
-        public event PropertyChangedEventHandler PropertyChanged;
+        /// <summary>
+        /// Internal method called by Channel to establish the back-reference.
+        /// This is set during Channel construction and never changes.
+        /// Ensures ChannelSettings can access its owner Channel's Measurements.
+        /// </summary>
+        /// <param name="ownerChannel">The Channel that owns this ChannelSettings</param>
+        internal void SetOwnerChannel(Channel ownerChannel)
+        {
+            if (_ownerChannel != null)
+            {
+                _ownerChannel.Measurements.CollectionChanged -= OnMeasurementsCollectionChanged;
+            }
+
+            _ownerChannel = ownerChannel;
+
+            if (_ownerChannel != null)
+            {
+                _ownerChannel.Measurements.CollectionChanged += OnMeasurementsCollectionChanged;
+            }
+        }
+
+        /// <summary>
+        /// Called when measurements are added or removed.
+        /// Raises PropertyChanged for MeasurementCount and HasMeasurements.
+        /// </summary>
+        private void OnMeasurementsCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
+        {
+            OnPropertyChanged(nameof(MeasurementCount));
+            OnPropertyChanged(nameof(HasMeasurements));
+        }
 
         protected virtual void OnPropertyChanged(string propertyName)
         {
-            if (PropertyChanged != null)
-                PropertyChanged.Invoke(this, new PropertyChangedEventArgs(propertyName));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
 
         public ChannelSettings()

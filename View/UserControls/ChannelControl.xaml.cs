@@ -43,6 +43,7 @@ namespace PowerScope.View.UserControls
         {
             UpdatePlayPauseButton();
             UpdateFilterButtonStyle();
+            UpdateMeasureButtonStyle();
         }
 
         private void ChannelControl_DataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
@@ -59,6 +60,8 @@ namespace PowerScope.View.UserControls
                 newSettings.PropertyChanged += Settings_PropertyChanged;
                 UpdatePlayPauseButton(); // Update button when DataContext changes
                 UpdateTopColorBar();  // Update gradient when DataContext changes
+                UpdateFilterButtonStyle();  // Update filter button styling
+                UpdateMeasureButtonStyle();  // Update measure button styling
             }
         }
 
@@ -75,6 +78,11 @@ namespace PowerScope.View.UserControls
             else if (e.PropertyName == nameof(ChannelSettings.Filter))
             {
                 UpdateFilterButtonStyle();
+            }
+            else if (e.PropertyName == nameof(ChannelSettings.HasMeasurements) || 
+            e.PropertyName == nameof(ChannelSettings.MeasurementCount))
+            {
+                UpdateMeasureButtonStyle();
             }
         }
 
@@ -103,6 +111,36 @@ namespace PowerScope.View.UserControls
                     else
                     {
                         filterButton.Background = new SolidColorBrush(Colors.Gray);
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Updates the measure button background color based on whether measurements are active
+        /// </summary>
+        private void UpdateMeasureButtonStyle()
+        {
+            Button measureButton = this.FindName("ButtonMeasure") as Button;
+
+            if (measureButton != null && Settings != null)
+            {
+                if (Settings.HasMeasurements)
+                {
+                    // Measurements are active - use LimeGreen background
+                    measureButton.Background = new SolidColorBrush(Colors.LimeGreen);
+                }
+                else
+                {
+                    // Measurements are inactive - use default button background
+                    object defaultBrush = Application.Current.Resources["PlotSettings_TextBoxBackgroundBrush"];
+                    if (defaultBrush != null)
+                    {
+                        measureButton.Background = (Brush)defaultBrush;
+                    }
+                    else
+                    {
+                        measureButton.Background = new SolidColorBrush(Colors.Gray);
                     }
                 }
             }
@@ -172,9 +210,8 @@ namespace PowerScope.View.UserControls
                 if (measurementSelection.ShowDialog() == true &&
                     measurementSelection.SelectedMeasurementType.HasValue)
                 {
-                    // Request measurement through ChannelSettings event
-                    // The Channel that owns these settings will receive the event and add the measurement
-                    Settings.RequestMeasurement(measurementSelection.SelectedMeasurementType.Value);
+                    // Add measurement directly via ChannelSettings (clean event-free call)
+                    Settings.AddMeasurement(measurementSelection.SelectedMeasurementType.Value);
                 }
             }
         }

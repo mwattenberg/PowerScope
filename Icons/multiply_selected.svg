@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title">
+  <title>Multiplication (�) Selected</title>
+  <rect x="8" y="8" width="32" height="32" rx="8" stroke="#32CD32" stroke-width="2" fill="none"/>
+  <g stroke="#32CD32" stroke-width="3" stroke-linecap="round">
+    <line x1="18" y1="18" x2="30" y2="30"/>
+    <line x1="30" y1="18" x2="18" y2="30"/>
+  </g>
+</svg>

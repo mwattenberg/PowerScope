@@ -154,12 +154,16 @@ namespace PowerScope.View.UserControls
             ClearAllSelections();
 
             if (source == null)
+            {
+                UpdateConstantButtonStyle();
                 return;
+            }
 
             if (source.IsConstant)
             {
                 _constantOption.IsSelected = true;
                 _constantOption.ConstantValue = source.ConstantValue;
+                ConstantButton.Content = _constantOption.ConstantValue.ToString("G4", System.Globalization.CultureInfo.InvariantCulture);
             }
             else
             {
@@ -167,6 +171,8 @@ namespace PowerScope.View.UserControls
                 if (matchingChannel != null)
                     matchingChannel.IsSelected = true;
             }
+
+            UpdateConstantButtonStyle();
         }
 
         /// <summary>
@@ -204,6 +210,9 @@ namespace PowerScope.View.UserControls
                 // Select this channel
                 selectableChannel.IsSelected = true;
 
+                // Update constant button styling
+                UpdateConstantButtonStyle();
+
                 // Raise event
                 SelectionChanged?.Invoke(this, new ChannelOperand(selectableChannel.Channel));
             }
@@ -230,7 +239,66 @@ namespace PowerScope.View.UserControls
         }
 
         /// <summary>
-        /// Clears all selections
+        /// Handles constant button click
+        /// </summary>
+        private void ConstantButton_Click(object sender, RoutedEventArgs e)
+        {
+            ConstantButton.Visibility = Visibility.Collapsed;
+            ConstantTextBox.Visibility = Visibility.Visible;
+            ConstantTextBox.Text = _constantOption.ConstantValue.ToString("G", System.Globalization.CultureInfo.InvariantCulture);
+            ConstantTextBox.Focus();
+            ConstantTextBox.SelectAll();
+        }
+
+        /// <summary>
+        /// Handles key presses in constant textbox
+        /// </summary>
+        private void ConstantTextBox_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+        {
+            if (e.Key == System.Windows.Input.Key.Enter)
+            {
+                System.Windows.Input.Keyboard.ClearFocus();
+            }
+            else if (e.Key == System.Windows.Input.Key.Escape)
+            {
+                ConstantTextBox.Visibility = Visibility.Collapsed;
+                ConstantButton.Visibility = Visibility.Visible;
+                e.Handled = true;
+            }
+        }
+
+        /// <summary>
+        /// Handles when constant textbox loses focus
+        /// </summary>
+        private void ConstantTextBox_LostFocus(object sender, RoutedEventArgs e)
+        {
+            string inputText = ConstantTextBox.Text.Replace(',', '.');
+            if (double.TryParse(inputText,
+                System.Globalization.NumberStyles.Float | System.Globalization.NumberStyles.AllowExponent,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out double value))
+            {
+                _constantOption.ConstantValue = value;
+                _constantOption.IsSelected = true;
+                ClearChannelSelections();
+                ConstantButton.Content = _constantOption.ConstantValue.ToString("G4", System.Globalization.CultureInfo.InvariantCulture);
+                ConstantButton.BorderBrush = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Colors.LimeGreen);
+                ConstantButton.BorderThickness = new Thickness(3);
+
+                // Raise event
+                SelectionChanged?.Invoke(this, new ConstantOperand(_constantOption.ConstantValue));
+            }
+            else
+            {
+                ConstantTextBox.Text = _constantOption.ConstantValue.ToString("G", System.Globalization.CultureInfo.InvariantCulture);
+            }
+
+            ConstantTextBox.Visibility = Visibility.Collapsed;
+            ConstantButton.Visibility = Visibility.Visible;
+        }
+
+        /// <summary>
+        /// Clears all selections (both channels and constant)
         /// </summary>
         private void ClearAllSelections()
         {
@@ -238,6 +306,32 @@ namespace PowerScope.View.UserControls
                 sc.IsSelected = false;
 
             _constantOption.IsSelected = false;
+        }
+
+        /// <summary>
+        /// Clears channel selections (used when constant is selected)
+        /// </summary>
+        private void ClearChannelSelections()
+        {
+            foreach (var sc in _selectableChannels)
+                sc.IsSelected = false;
+        }
+
+        /// <summary>
+        /// Updates constant button styling based on selection state
+        /// </summary>
+        private void UpdateConstantButtonStyle()
+        {
+            if (_constantOption.IsSelected)
+            {
+                ConstantButton.BorderBrush = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Colors.LimeGreen);
+                ConstantButton.BorderThickness = new Thickness(3);
+            }
+            else
+            {
+                ConstantButton.BorderBrush = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Colors.Gray);
+                ConstantButton.BorderThickness = new Thickness(2);
+            }
         }
     }
 

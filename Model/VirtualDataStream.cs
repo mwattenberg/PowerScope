@@ -27,6 +27,7 @@ namespace PowerScope.Model
         // Temporary buffers for computation (reused to avoid allocations)
         private double[] _computeBuffer1;
         private double[] _computeBuffer2;
+        private int _allocatedSize = 0;  // Track currently allocated size
         private readonly object _computeLock = new object();
 
         public event PropertyChangedEventHandler PropertyChanged;
@@ -127,10 +128,35 @@ namespace PowerScope.Model
 
         private void InitializeComputeBuffers()
         {
-            // Pre-allocate compute buffers to avoid per-call allocations
-            int maxBufferSize = 100000; // Reasonable max for temporary computation
-            _computeBuffer1 = new double[maxBufferSize];
-            _computeBuffer2 = new double[maxBufferSize];
+            // Start with a small initial allocation - grow on demand
+            int initialSize = 10000;
+            _computeBuffer1 = new double[initialSize];
+            _computeBuffer2 = new double[initialSize];
+            _allocatedSize = initialSize;
+        }
+
+        /// <summary>
+        /// Ensures compute buffers are large enough for the requested size
+        /// Grows buffers lazily only when needed, avoiding unnecessary allocations
+        /// Maximum allocation is capped at 50 million samples to prevent excessive memory use
+        /// </summary>
+        private void EnsureComputeBuffersAllocated(int requiredSize)
+        {
+            // Cap maximum size at 50 million samples
+            int maxAllowedSize = 50_000_000;
+            int clampedSize = Math.Min(requiredSize, maxAllowedSize);
+
+            // Check if buffers are already large enough
+            if (clampedSize <= _allocatedSize)
+                return;
+
+            // Allocate with 50% overhead to amortize allocation costs
+            // This minimizes reallocations while being memory-conscious
+            int newSize = (int)(clampedSize * 1.5);
+
+            _computeBuffer1 = new double[newSize];
+            _computeBuffer2 = new double[newSize];
+            _allocatedSize = newSize;
         }
 
         #region IDataStream Implementation
@@ -368,8 +394,8 @@ namespace PowerScope.Model
         /// </summary>
         private int ComputeBinaryOperation(double[] destination, int n)
         {
-            // Ensure compute buffers are large enough
-            int requiredSize = Math.Min(n, _computeBuffer1.Length);
+            // Ensure compute buffers are large enough for this computation
+            EnsureComputeBuffersAllocated(n);
 
             // Optimize for constants - detect which operands are constants
             bool operand1IsConstant = _sourceOperands[0].IsConstant;
@@ -379,8 +405,8 @@ namespace PowerScope.Model
             double constant1 = operand1IsConstant ? _sourceOperands[0].ConstantValue : 0.0;
             double constant2 = operand2IsConstant ? _sourceOperands[1].ConstantValue : 0.0;
 
-            int samples1 = operand1IsConstant ? requiredSize : _sourceOperands[0].Channel.CopyLatestDataTo(_computeBuffer1, requiredSize);
-            int samples2 = operand2IsConstant ? requiredSize : _sourceOperands[1].Channel.CopyLatestDataTo(_computeBuffer2, requiredSize);
+            int samples1 = operand1IsConstant ? n : _sourceOperands[0].Channel.CopyLatestDataTo(_computeBuffer1, n);
+            int samples2 = operand2IsConstant ? n : _sourceOperands[1].Channel.CopyLatestDataTo(_computeBuffer2, n);
 
             // Use the minimum sample count (both sources must have data)
             int actualSamples = Math.Min(samples1, samples2);

@@ -105,11 +105,11 @@ namespace PowerScope.Model
         /// </summary>
         private void InitializeChannel()
         {
+            // Establish back-reference in ChannelSettings for ViewModel pattern
+            _settings.SetOwnerChannel(this);
+            
             // Subscribe to settings changes
             _settings.PropertyChanged += OnSettingsChanged;
-            
-            // Subscribe to measurement requests from the settings
-            _settings.MeasurementRequested += OnMeasurementRequested;
 
             // Apply settings to the stream if it supports channel configuration
             if (_ownerStream is IChannelConfigurable configurableStream)
@@ -148,14 +148,12 @@ namespace PowerScope.Model
                     if (_settings != null)
                     {
                         _settings.PropertyChanged -= OnSettingsChanged;
-                        _settings.MeasurementRequested -= OnMeasurementRequested;
                     }
 
                     _settings = value;
 
                     // Subscribe to new settings
                     _settings.PropertyChanged += OnSettingsChanged;
-                    _settings.MeasurementRequested += OnMeasurementRequested;
 
                     // Apply new settings to the stream
                     if (_ownerStream is IChannelConfigurable configurableStream)
@@ -296,16 +294,6 @@ namespace PowerScope.Model
             }
         }
 
-        /// <summary>
-        /// Handles measurement requests from the ChannelSettings
-        /// </summary>
-        /// <param name="sender">ChannelSettings that requested the measurement</param>
-        /// <param name="measurementType">Type of measurement to add</param>
-        private void OnMeasurementRequested(object sender, MeasurementType measurementType)
-        {
-            AddMeasurement(measurementType);
-        }
-
         private void OnSettingsChanged(object sender, PropertyChangedEventArgs e)
         {
             // Forward settings property changes
@@ -358,7 +346,6 @@ namespace PowerScope.Model
                 if (_settings != null)
                 {
                     _settings.PropertyChanged -= OnSettingsChanged;
-                    _settings.MeasurementRequested -= OnMeasurementRequested;
                 }
 
                 _disposed = true;
