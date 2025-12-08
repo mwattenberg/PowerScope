@@ -10,7 +10,7 @@
         <!-- Value converter -->
         <converters:ColorToBrushConverter x:Key="ColorToBrushConverter"/>
         <converters:ExponentialNotationConverter x:Key="ExponentialNotationConverter"/>
-        
+
         <!-- Use global button style -->
         <Style TargetType="Button" BasedOn="{StaticResource ButtonStyle}">
             <Setter Property="Foreground" Value="White"/>
@@ -97,7 +97,7 @@
             <Setter Property="Padding" Value="0"/>
             <Setter Property="Margin" Value="0"/>
         </Style>
-        
+
         <!-- Non-bold button style for secondary buttons -->
         <Style x:Key="SecondaryButtonStyle" TargetType="Button" BasedOn="{StaticResource ButtonStyle}">
             <Setter Property="Foreground" Value="White"/>
@@ -130,8 +130,8 @@
             <RowDefinition Height="20"/>
             <RowDefinition Height="20"/>
             <RowDefinition Height="42"/>
-            <RowDefinition Height="32"/>
-            <RowDefinition Height="28"/>
+            <RowDefinition Height="30"/>
+            <RowDefinition Height="30"/>
         </Grid.RowDefinitions>
         <!-- Top color bar with channel label and play/pause button -->
         <Border x:Name="TopColorBar" Grid.Row="0" CornerRadius="3" Height="20">
@@ -195,7 +195,7 @@
                          PreviewTextInput="SignedDecimalOnly_PreviewTextInput"
                          KeyDown="GainOffset_KeyDown" 
                          MouseWheel="GainOffset_MouseWheel"
-                         ToolTip="Mouse wheel adjustment: Normal (1%) | Ctrl (10%) | Alt (0.1%)"/> 
+                         ToolTip="Mouse wheel adjustment: Normal (1%) | Ctrl (10%) | Alt (0.1%)"/>
                 <TextBox x:Name="GainTextBox" Grid.Column="1" Grid.Row="1" 
                          Text="{Binding Gain, Converter={StaticResource ExponentialNotationConverter}, UpdateSourceTrigger=LostFocus}" 
                          Style="{StaticResource GainOffsetInputStyle}" 
@@ -206,11 +206,18 @@
                          ToolTip="Mouse wheel adjustment: Normal (1%) | Ctrl (10%) | Alt (0.1%)"/>
             </Grid>
         </Border>
-        <!-- Filters button -->
-        <Button x:Name="ButtonFilters" Grid.Row="3" Content="Filters" Height="28" Margin="4,2,4,2" 
-                Style="{StaticResource SecondaryButtonStyle}" Click="ButtonFilters_Click"/>
-        <!-- Measure button -->
-        <Button x:Name="ButtonMeasure" Grid.Row="4" Content="Measure" Height="24" Margin="4,2,4,2" 
-                Style="{StaticResource SecondaryButtonStyle}" Click="ButtonMeasure_Click"/>
+        <!-- Filters and Measure buttons container -->
+        <Grid Grid.Row="3" Grid.RowSpan="2" Margin="2">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <!-- Filters button -->
+            <Button x:Name="ButtonFilters" Grid.Row="0" Content="Filters" Margin="0,0,0,2"
+                    Style="{StaticResource SecondaryButtonStyle}" Click="ButtonFilters_Click"/>
+            <!-- Measure button -->
+            <Button x:Name="ButtonMeasure" Grid.Row="1" Content="Measure" Margin="0,2,0,0"
+                    Style="{StaticResource SecondaryButtonStyle}" Click="ButtonMeasure_Click"/>
+        </Grid>
     </Grid>
 </UserControl>

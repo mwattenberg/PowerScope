@@ -42,6 +42,7 @@ namespace PowerScope.View.UserControls
         private void ChannelControl_Loaded(object sender, RoutedEventArgs e)
         {
             UpdatePlayPauseButton();
+            UpdateFilterButtonStyle();
         }
 
         private void ChannelControl_DataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
@@ -70,6 +71,40 @@ namespace PowerScope.View.UserControls
             else if (e.PropertyName == nameof(ChannelSettings.DisplayColor) || e.PropertyName == nameof(ChannelSettings.IsVirtual))
             {
                 UpdateTopColorBar();
+            }
+            else if (e.PropertyName == nameof(ChannelSettings.Filter))
+            {
+                UpdateFilterButtonStyle();
+            }
+        }
+
+        /// <summary>
+        /// Updates the filter button background color based on whether a filter is active
+        /// </summary>
+        private void UpdateFilterButtonStyle()
+        {
+            Button filterButton = this.FindName("ButtonFilters") as Button;
+
+            if (filterButton != null && Settings != null)
+            {
+                if (Settings.Filter != null)
+                {
+                    // Filter is active - use LimeGreen background
+                    filterButton.Background = new SolidColorBrush(Colors.LimeGreen);
+                }
+                else
+                {
+                    // Filter is inactive - use default button background
+                    object defaultBrush = Application.Current.Resources["PlotSettings_TextBoxBackgroundBrush"];
+                    if (defaultBrush != null)
+                    {
+                        filterButton.Background = (Brush)defaultBrush;
+                    }
+                    else
+                    {
+                        filterButton.Background = new SolidColorBrush(Colors.Gray);
+                    }
+                }
             }
         }
 
