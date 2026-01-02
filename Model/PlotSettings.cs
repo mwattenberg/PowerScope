@@ -102,7 +102,7 @@ namespace PowerScope.Model
         private int _ymax = 4000;
         private bool _yAutoScale = true;
         private int _bufferSize = 50000;
-        private bool _triggerModeEnabled = false;
+        private bool _enableEdgeTrigger = false;
 
         /// <summary>
         /// Plot refresh rate option (enum-based)
@@ -289,17 +289,19 @@ namespace PowerScope.Model
         }
 
         /// <summary>
-        /// Enable or disable trigger mode for data acquisition
+        /// Enable or disable edge trigger mode for data acquisition
+        /// When false (default), roll trigger is active - plot continuously updates
+        /// When true, plot updates only when trigger condition is met
         /// </summary>
-        public bool TriggerModeEnabled
+        public bool EnableEdgeTrigger
         {
-            get { return _triggerModeEnabled; }
+            get { return _enableEdgeTrigger; }
             set
             {
-                if (_triggerModeEnabled != value)
+                if (_enableEdgeTrigger != value)
                 {
-                    _triggerModeEnabled = value;
-                    OnPropertyChanged(nameof(TriggerModeEnabled));
+                    _enableEdgeTrigger = value;
+                    OnPropertyChanged(nameof(EnableEdgeTrigger));
                 }
             }
         }

@@ -16,6 +16,8 @@ namespace PowerScope.View.UserControls
         private static readonly SolidColorBrush ActiveBrush = new SolidColorBrush(Colors.LimeGreen);
         private static readonly SolidColorBrush InactiveBrush = new SolidColorBrush(Color.FromRgb(0x2D, 0x2D, 0x30));
 
+        private PlotManager _plotManager;
+
         /// <summary>
         /// PlotSettings instance used as DataContext
         /// </summary>
@@ -29,6 +31,15 @@ namespace PowerScope.View.UserControls
             { 
                 DataContext = value; 
             }
+        }
+
+        /// <summary>
+        /// Reference to PlotManager for trigger line control
+        /// </summary>
+        public PlotManager PlotManager
+        {
+            get { return _plotManager; }
+            set { _plotManager = value; }
         }
 
         public HorizontalControl()
@@ -63,9 +74,10 @@ namespace PowerScope.View.UserControls
 
         private void Settings_PropertyChanged(object sender, PropertyChangedEventArgs e)
         {
-            if (e.PropertyName == nameof(PlotSettings.TriggerModeEnabled))
+            if (e.PropertyName == nameof(PlotSettings.EnableEdgeTrigger))
             {
                 UpdateModeButtonAppearance();
+                UpdateTriggerLineVisibility();
             }
         }
 
@@ -73,7 +85,7 @@ namespace PowerScope.View.UserControls
         {
             if (Settings != null && RollButton != null && TriggerButton != null)
             {
-                if (Settings.TriggerModeEnabled)
+                if (Settings.EnableEdgeTrigger)
                 {
                     // Trigger mode is active
                     RollButton.Background = InactiveBrush;
@@ -85,6 +97,24 @@ namespace PowerScope.View.UserControls
                     RollButton.Background = ActiveBrush;
                     TriggerButton.Background = InactiveBrush;
                 }
+            }
+        }
+
+        /// <summary>
+        /// Updates trigger line visibility based on trigger mode
+        /// </summary>
+        private void UpdateTriggerLineVisibility()
+        {
+            if (_plotManager == null)
+                return;
+
+            if (Settings != null && Settings.EnableEdgeTrigger)
+            {
+                _plotManager.ShowTriggerLine();
+            }
+            else
+            {
+                _plotManager.HideTriggerLine();
             }
         }
 
@@ -118,8 +148,8 @@ namespace PowerScope.View.UserControls
         {
             if (Settings != null)
             {
-                Settings.TriggerModeEnabled = false; // Roll mode means trigger is disabled
-                // UpdateModeButtonAppearance() will be called automatically via PropertyChanged
+                Settings.EnableEdgeTrigger = false; // Roll mode means trigger is disabled
+                // UpdateModeButtonAppearance() and UpdateTriggerLineVisibility() will be called automatically via PropertyChanged
             }
         }
 
@@ -127,8 +157,8 @@ namespace PowerScope.View.UserControls
         {
             if (Settings != null)
             {
-                Settings.TriggerModeEnabled = true; // Enable trigger mode
-                // UpdateModeButtonAppearance() will be called automatically via PropertyChanged
+                Settings.EnableEdgeTrigger = true; // Enable trigger mode
+                // UpdateModeButtonAppearance() and UpdateTriggerLineVisibility() will be called automatically via PropertyChanged
             }
         }
     }

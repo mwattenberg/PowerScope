@@ -79,12 +79,12 @@
      <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
    <RowDefinition Height="Auto"/>
-    <RowDefinition Height="60"/>
+    <RowDefinition Height="70"/>
             <RowDefinition Height="Auto"/>
     <RowDefinition Height="Auto"/>
         <RowDefinition Height="Auto"/>
-            <RowDefinition Height="60"/>
-          <RowDefinition Height="Auto"/>
+        <RowDefinition Height="70"/>
+      <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
         <TextBlock Grid.Row="0" 

@@ -37,6 +37,15 @@ namespace PowerScope.Model
         // Recording functionality is now encapsulated in PlotFileWriter
         private readonly PlotFileWriter _fileWriter;
 
+        // Trigger state tracking
+        private bool _triggerArmed = true;
+        private double _triggerLevel = 0.0; // Trigger level for edge detection
+        private long _lastCheckedTotalSamples = 0; // Track absolute position in stream (uses IDataStream.TotalSamples)
+        private double _triggerHoldoffSeconds = 0.0; // Trigger holdoff time in seconds (0 = disabled)
+    private DateTime _lastTriggerTime = DateTime.MinValue; // Time of last trigger for holdoff
+        private bool _singleShotMode = false; // Single-shot trigger mode (false = continuous)
+        private bool _singleShotTriggered = false; // Has single-shot trigger fired?
+
         //We need the DPI to scale the cursor correctly
         //The implementation is a bit hacky and it should have already been fixed
         //Maybe I am misunderstanding something...
@@ -52,6 +61,10 @@ namespace PowerScope.Model
         private VerticalLine _verticalCursorB;
         private AxisLine _plottableBeingDragged;
         private bool _cursorMouseHandlingEnabled;
+
+        // Trigger level line
+        private HorizontalLine _triggerLevelLine;
+        private bool _triggerLineVisible = false;
 
         public event PropertyChangedEventHandler PropertyChanged;
 
@@ -135,7 +148,71 @@ namespace PowerScope.Model
         public CursorMode ActiveCursorMode { get; private set; }
 
         /// <summary>
-        /// Enables vertical cursors - no parameter needed since PlotManager owns the cursor
+     /// Whether the trigger level line is currently visible
+        /// </summary>
+ public bool IsTriggerLineVisible
+        {
+      get { return _triggerLineVisible; }
+        }
+
+      /// <summary>
+   /// Trigger holdoff time in seconds (0 = disabled)
+     /// Prevents re-triggering for specified time after a trigger event
+   /// </summary>
+        public double TriggerHoldoffSeconds
+  {
+  get { return _triggerHoldoffSeconds; }
+   set 
+   {
+if (_triggerHoldoffSeconds != value)
+    {
+     _triggerHoldoffSeconds = Math.Max(0.0, value); // Clamp to non-negative
+       OnPropertyChanged(nameof(TriggerHoldoffSeconds));
+ System.Diagnostics.Debug.WriteLine($"Trigger holdoff set to: {_triggerHoldoffSeconds:F3} seconds");
+  }
+  }
+   }
+
+    /// <summary>
+ /// Single-shot trigger mode
+ /// When true, trigger fires once and requires manual re-arm
+   /// When false (default), trigger continuously
+        /// </summary>
+    public bool SingleShotMode
+ {
+ get { return _singleShotMode; }
+   set
+   {
+      if (_singleShotMode != value)
+     {
+     _singleShotMode = value;
+        OnPropertyChanged(nameof(SingleShotMode));
+     System.Diagnostics.Debug.WriteLine($"Single-shot mode: {_singleShotMode}");
+    
+            if (!_singleShotMode)
+       {
+          // Switching to continuous mode - reset single-shot state
+   _singleShotTriggered = false;
+     }
+    }
+   }
+  }
+
+      /// <summary>
+  /// Manually re-arm the trigger (for single-shot mode)
+        /// </summary>
+  public void RearmTrigger()
+{
+   _singleShotTriggered = false;
+_triggerArmed = true;
+   _lastCheckedTotalSamples = 0; // Reset to allow checking from current position
+     System.Diagnostics.Debug.WriteLine("Trigger manually re-armed");
+  OnPropertyChanged(nameof(SingleShotMode)); // Notify UI of state change
+  }
+       
+
+        /// <summary>
+     /// Enables vertical cursors - no parameter needed since PlotManager owns the cursor
         /// </summary>
         public void EnableVerticalCursors()
         {
@@ -174,13 +251,79 @@ namespace PowerScope.Model
         public void DisableCursors()
         {
             RemoveAllCursor();
-            RemoveCursorMouseHandling();
-            ActiveCursorMode = CursorMode.None;
-            HasActiveCursors = false;
-            _cursor.ActiveMode = CursorMode.None;
-            _plot.Refresh();
-            OnPropertyChanged(nameof(HasActiveCursors));
-            OnPropertyChanged(nameof(ActiveCursorMode));
+            
+// Remove mouse handling only if trigger line is not visible
+     if (!_triggerLineVisible && _cursorMouseHandlingEnabled)
+        {
+  RemoveCursorMouseHandling();
+   }
+   
+ ActiveCursorMode = CursorMode.None;
+HasActiveCursors = false;
+     _cursor.ActiveMode = CursorMode.None;
+   _plot.Refresh();
+      OnPropertyChanged(nameof(HasActiveCursors));
+    OnPropertyChanged(nameof(ActiveCursorMode));
+        }
+
+        /// <summary>
+     /// Shows the trigger level line at the current trigger level
+   /// </summary>
+        public void ShowTriggerLine()
+{
+     if (_triggerLevelLine != null)
+       return;
+
+ // Get current y-axis limits to place trigger line in middle
+    var limits = _plot.Plot.Axes.GetYAxes().First().Range;
+   double initialTriggerLevel = (limits.Min + limits.Max) / 2.0;
+   _triggerLevel = initialTriggerLevel;
+
+   // Reset trigger tracking when showing trigger line
+   _triggerArmed = true;
+   _lastCheckedTotalSamples = 0;
+   _singleShotTriggered = false;
+   _lastTriggerTime = DateTime.MinValue;
+
+     // Create trigger level line at current trigger level
+   _triggerLevelLine = _plot.Plot.Add.HorizontalLine(_triggerLevel);
+          _triggerLevelLine.IsDraggable = true;
+     _triggerLevelLine.LineWidth = 1;
+      _triggerLevelLine.Color = ScottPlot.Color.FromHex("#808080"); // Grey color
+    _triggerLevelLine.Text = $"Trigger: {_triggerLevel:F1}";
+   
+     // Setup mouse handling if not already setup (trigger line needs it to be draggable)
+  if (!_cursorMouseHandlingEnabled)
+       {
+     SetupCursorMouseHandling();
+      }
+
+     _triggerLineVisible = true;
+ OnPropertyChanged(nameof(IsTriggerLineVisible));
+        _plot.Refresh();
+        }
+
+        /// <summary>
+    /// Hides the trigger level line
+ /// </summary>
+        public void HideTriggerLine()
+ {
+   if (_triggerLevelLine != null)
+   {
+       _plot.Plot.Remove(_triggerLevelLine);
+     _triggerLevelLine = null;
+        }
+   
+ _triggerLineVisible = false;
+       OnPropertyChanged(nameof(IsTriggerLineVisible));
+    
+  // Remove mouse handling only if no cursors are active
+   if (!HasActiveCursors && _cursorMouseHandlingEnabled)
+       {
+      RemoveCursorMouseHandling();
+  }
+    
+ _plot.Refresh();
         }
 
         private void CreateVerticalCursors()
@@ -309,36 +452,48 @@ namespace PowerScope.Model
         private void Plot_MouseMove(object sender, MouseEventArgs e)
         {
             Point pos = e.GetPosition(_plot);
-            var rect = _plot.Plot.GetCoordinateRect((float)pos.X, (float)pos.Y, radius: 10);
+   var rect = _plot.Plot.GetCoordinateRect((float)pos.X, (float)pos.Y, radius: 10);
 
-            if (_plottableBeingDragged == null)
+        if (_plottableBeingDragged == null)
+     {
+       AxisLine lineUnderMouse = GetLineUnderMouse((float)(pos.X), (float)(pos.Y));
+      //AxisLine lineUnderMouse = GetLineUnderMouse((float)(pos.X / 0.8), (float)(pos.Y / 0.8));
+     if (lineUnderMouse == null)
+        Mouse.OverrideCursor = null;
+       else if (lineUnderMouse.IsDraggable && lineUnderMouse is VerticalLine)
+       Mouse.OverrideCursor = Cursors.SizeWE;
+     else if (lineUnderMouse.IsDraggable && lineUnderMouse is HorizontalLine)
+     Mouse.OverrideCursor = Cursors.SizeNS;
+        }
+         else
             {
-                AxisLine lineUnderMouse = GetLineUnderMouse((float)(pos.X), (float)(pos.Y));
-                //AxisLine lineUnderMouse = GetLineUnderMouse((float)(pos.X / 0.8), (float)(pos.Y / 0.8));
-                if (lineUnderMouse == null)
-                    Mouse.OverrideCursor = null;
-                else if (lineUnderMouse.IsDraggable && lineUnderMouse is VerticalLine)
-                    Mouse.OverrideCursor = Cursors.SizeWE;
-                else if (lineUnderMouse.IsDraggable && lineUnderMouse is HorizontalLine)
-                    Mouse.OverrideCursor = Cursors.SizeNS;
-            }
-            else
+   if (_plottableBeingDragged is HorizontalLine horizontalLine)
+              {
+     horizontalLine.Y = rect.VerticalCenter*_dpi.DpiScaleX;
+   
+   // Check if this is the trigger line
+      if (horizontalLine == _triggerLevelLine)
+         {
+    _triggerLevel = horizontalLine.Y;
+    horizontalLine.Text = $"Trigger: {_triggerLevel:F1}";
+      System.Diagnostics.Debug.WriteLine($"Trigger level adjusted to: {_triggerLevel:F3}");
+ }
+         else
+  {
+   // Regular cursor line
+   horizontalLine.Text = $"{horizontalLine.Y:0.0}";
+ UpdateHorizontalCursorData();
+       }
+ }
+        else if (_plottableBeingDragged is VerticalLine verticalLine)
             {
-                if (_plottableBeingDragged is HorizontalLine horizontalLine)
-                {
-                    horizontalLine.Y = rect.VerticalCenter*_dpi.DpiScaleX;
-                    horizontalLine.Text = $"{horizontalLine.Y:0.0}";
-                    UpdateHorizontalCursorData();
-                }
-                else if (_plottableBeingDragged is VerticalLine verticalLine)
-                {
-                    verticalLine.X = rect.HorizontalCenter*_dpi.DpiScaleY;
-                    verticalLine.Text = $"{verticalLine.X:0}";
-                    UpdateVerticalCursorData();
-                }
-                _plot.Refresh();
-                e.Handled = true;
-            }
+          verticalLine.X = rect.HorizontalCenter*_dpi.DpiScaleY;
+       verticalLine.Text = $"{verticalLine.X:0}";
+ UpdateVerticalCursorData();
+ }
+      _plot.Refresh();
+            e.Handled = true;
+       }
         }
 
         private AxisLine GetLineUnderMouse(float x, float y)
@@ -354,7 +509,7 @@ namespace PowerScope.Model
 
         /// <summary>
         /// Updates the cursor model with current vertical cursor positions
-        /// </summary>
+        /// /// </summary>
         private void UpdateVerticalCursorData()
         {
             if (_verticalCursorA == null || _verticalCursorB == null)
@@ -375,7 +530,7 @@ namespace PowerScope.Model
 
         /// <summary>
         /// Updates the cursor model with current horizontal cursor positions
-        /// </summary>
+        /// /// </summary>
         private void UpdateHorizontalCursorData()
         {
             if (_horizontalCursorA == null || _horizontalCursorB == null)
@@ -500,11 +655,13 @@ namespace PowerScope.Model
                         _plot.Refresh();
                         break;
                             
+
                     case nameof(PlotSettings.Xmax):
                         RebuildSignalsForNewXRange();
                         UpdateMeasurementWindowLength();
                         break;
                             
+
                     case nameof(PlotSettings.LineWidth):
                     case nameof(PlotSettings.AntiAliasing):
                     case nameof(PlotSettings.ShowRenderTime):
@@ -525,11 +682,15 @@ namespace PowerScope.Model
                         
                         break;
                         
-                    case nameof(PlotSettings.TriggerModeEnabled):
-                        // Handle trigger mode changes - for future trigger implementation
-                        System.Diagnostics.Debug.WriteLine($"Trigger mode changed to: {Settings.TriggerModeEnabled}");
-                        break;
-                }
+                    case nameof(PlotSettings.EnableEdgeTrigger):
+       // Reset trigger state when mode changes
+    _triggerArmed = true;
+   _lastCheckedTotalSamples = 0; // Reset sample tracking to current stream position
+    _singleShotTriggered = false; // Reset single-shot state
+      System.Diagnostics.Debug.WriteLine($"Edge trigger mode changed to: {Settings.EnableEdgeTrigger}");
+  break;
+    }
+
             });
         }
 
@@ -803,37 +964,180 @@ namespace PowerScope.Model
 
             _plot.Plot.RenderManager.EnableRendering = false;
 
-            CopyChannelDataToPlot();
-            
-            // Record data if recording is active
-            if (_fileWriter != null && _fileWriter.IsRecording)
-            {
-                _fileWriter.WritePendingSamples();
+            // Check trigger condition before updating plot
+       bool shouldUpdatePlot = false;
+      
+if (Settings.EnableEdgeTrigger)
+      {
+              // Edge trigger mode - only update if trigger condition is met
+           shouldUpdatePlot = CheckTriggerCondition();
+ }
+            else
+  {
+           // Roll mode - always update
+   shouldUpdatePlot = true;
+  }
+
+  if (shouldUpdatePlot)
+ {
+           CopyChannelDataToPlot();
+       
+         // Record data if recording is active
+                if (_fileWriter != null && _fileWriter.IsRecording)
+       {
+   _fileWriter.WritePendingSamples();
+    }
+
+  if (Settings.YAutoScale)
+          _plot.Plot.Axes.AutoScaleY();
+
+      _plot.Plot.RenderManager.EnableRendering = true;
+     _plot.Refresh();
             }
-
-            if (Settings.YAutoScale)
-                _plot.Plot.Axes.AutoScaleY();
-
-            _plot.Plot.RenderManager.EnableRendering = true;
-            _plot.Refresh();
+            else
+            {
+     // Re-enable rendering without refresh
+      _plot.Plot.RenderManager.EnableRendering = true;
         }
+  }
 
         private void CopyChannelDataToPlot()
         {
-            if (_channels == null) 
-                return;
-            
+    if (_channels == null) 
+      return;
+  
             for (int i = 0; i < _channels.Count && i < _maxChannels; i++)
             {
-                Channel channel = _channels[i];
-                
-                if (channel.IsEnabled)
-                {
-                    channel.CopyLatestDataTo(_data[i], Settings.Xmax);
-                }
-            }
+  Channel channel = _channels[i];
+          
+    if (channel.IsEnabled)
+   {
+             channel.CopyLatestDataTo(_data[i], Settings.Xmax);
+    }
+      }
         }
 
+   /// <summary>
+    /// Checks if trigger condition is met for edge trigger mode
+    /// Implements rising edge detection with buffer-based search
+    /// Only scans NEW samples since last check using TotalSamples tracking
+    /// This prevents re-triggering on old data and is much more efficient
+    /// Supports trigger holdoff and single-shot mode
+  /// </summary>
+  /// <returns>True if trigger condition is met and plot should update</returns>
+    private bool CheckTriggerCondition()
+        {
+// Need at least one enabled channel to trigger on
+    if (_channels == null || _channels.Count == 0)
+ return false;
+
+   // Use first enabled channel as trigger source
+ Channel triggerChannel = null;
+ for (int i = 0; i < _channels.Count; i++)
+ {
+  if (_channels[i].IsEnabled)
+        {
+       triggerChannel = _channels[i];
+ break;
+}
+     }
+
+    if (triggerChannel == null)
+       return false;
+
+   // Single-shot mode: if already triggered, don't trigger again
+   if (_singleShotMode && _singleShotTriggered)
+   {
+   return false;
+    }
+
+     // Trigger holdoff: check if we're still in holdoff period after last trigger
+   if (_triggerHoldoffSeconds > 0.0)
+ {
+     TimeSpan timeSinceLastTrigger = DateTime.Now - _lastTriggerTime;
+  if (timeSinceLastTrigger.TotalSeconds < _triggerHoldoffSeconds)
+   {
+    // Still in holdoff period, don't trigger
+  System.Diagnostics.Debug.WriteLine($"Trigger holdoff active: {timeSinceLastTrigger.TotalSeconds:F3}s / {_triggerHoldoffSeconds:F3}s");
+    return false;
+  }
+        }
+
+   // Get current total samples from stream to determine how much new data has arrived
+   long currentTotalSamples = triggerChannel.OwnerStream.TotalSamples;
+long newSampleCount = currentTotalSamples - _lastCheckedTotalSamples;
+
+   if (newSampleCount <= 0)
+   {
+    // No new samples since last check - don't trigger
+    return false;
+   }
+
+   // Initialize tracking on first check
+   if (_lastCheckedTotalSamples == 0)
+   {
+    _lastCheckedTotalSamples = currentTotalSamples;
+    return false; // Skip first check to establish baseline
+   }
+
+     // Get buffer of recent samples
+  double[] sampleBuffer = new double[Settings.Xmax];
+      int samplesCopied = triggerChannel.CopyLatestDataTo(sampleBuffer, Settings.Xmax);
+   
+  if (samplesCopied < 2)
+ {
+  // Need at least 2 samples to detect an edge
+   return false;
+ }
+
+   // Calculate where NEW samples start in the buffer
+   // New samples are at the END of the buffer
+   int startScanIndex = Math.Max(1, samplesCopied - (int)newSampleCount);
+   startScanIndex = Math.Max(startScanIndex, 1); // Need at least index 1 to compare with previous
+int endScanIndex = samplesCopied;
+
+ System.Diagnostics.Debug.WriteLine($"Trigger check: {newSampleCount} new samples, scanning buffer[{startScanIndex}..{endScanIndex}] of {samplesCopied} total");
+
+ // Search through NEW samples only for rising edge trigger
+  bool triggerDetected = false;
+  
+   for (int i = startScanIndex; i < endScanIndex; i++)
+ {
+         double previousSample = sampleBuffer[i - 1];
+  double currentSample = sampleBuffer[i];
+    
+    // Check for rising edge: previous below trigger, current at or above trigger
+     if (_triggerArmed && previousSample < _triggerLevel && currentSample >= _triggerLevel)
+     {
+    triggerDetected = true;
+    _triggerArmed = false; // Disarm until signal goes below trigger level again
+  _lastTriggerTime = DateTime.Now; // Record trigger time for holdoff
+  
+   if (_singleShotMode)
+           {
+     _singleShotTriggered = true; // Mark single-shot as fired
+  }
+  
+      System.Diagnostics.Debug.WriteLine($"TRIGGER DETECTED - Channel: {triggerChannel.Label}, Sample {i}/{samplesCopied}, Previous: {previousSample:F3}, Current: {currentSample:F3}, Level: {_triggerLevel:F3}");
+    
+         // Found first trigger in this buffer - stop searching
+     // This ensures we trigger once per update cycle even if multiple crossings occur
+  break;
+  }
+   
+        // Re-arm trigger when signal goes below trigger level
+      if (currentSample < _triggerLevel && !_triggerArmed)
+{
+    _triggerArmed = true;
+   System.Diagnostics.Debug.WriteLine($"TRIGGER RE-ARMED - Channel: {triggerChannel.Label}, Sample {i}/{samplesCopied}, Current: {currentSample:F3}");
+     }
+      }
+
+   // Update tracking to current position
+   _lastCheckedTotalSamples = currentTotalSamples;
+
+  return triggerDetected;
+     }
         #endregion
     
         /// <summary>

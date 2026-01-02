@@ -175,7 +175,8 @@ namespace PowerScope
         void InitializeControls()
         {
             // Set PlotSettings as DataContext for controls
-            HorizontalControl.Settings = _plotManager.Settings;
+  HorizontalControl.Settings = _plotManager.Settings;
+  HorizontalControl.PlotManager = _plotManager;
             VerticalControl.Settings = _plotManager.Settings;
 
             // Set dependencies for MeasurementBar - now gets channels from ChannelControlBar!
