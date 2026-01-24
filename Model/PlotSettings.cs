@@ -115,6 +115,8 @@ namespace PowerScope.Model
         private Channel _triggerSourceChannel = null;
         private TriggerEdgeType _triggerEdge = TriggerEdgeType.Rising;
         private bool _singleShotMode = false;
+        private double _triggerLevel = 0.0;
+        private int _triggerPosition = 100;
 
         /// <summary>
         /// Plot refresh rate option (enum-based)
@@ -383,6 +385,38 @@ namespace PowerScope.Model
                     // Notify button color properties
                     OnPropertyChanged(nameof(NormalModeButtonBackground));
                     OnPropertyChanged(nameof(SingleModeButtonBackground));
+                }
+            }
+        }
+
+        /// <summary>
+        /// Trigger level (Y-axis value) for edge detection
+        /// </summary>
+        public double TriggerLevel
+        {
+            get { return _triggerLevel; }
+            set
+            {
+                if (_triggerLevel != value)
+                {
+                    _triggerLevel = value;
+                    OnPropertyChanged(nameof(TriggerLevel));
+                }
+            }
+        }
+
+        /// <summary>
+        /// Trigger position (X-axis sample index) where trigger point appears on display
+        /// </summary>
+        public int TriggerPosition
+        {
+            get { return _triggerPosition; }
+            set
+            {
+                if (_triggerPosition != value)
+                {
+                    _triggerPosition = value;
+                    OnPropertyChanged(nameof(TriggerPosition));
                 }
             }
         }

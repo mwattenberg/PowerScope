@@ -27,6 +27,9 @@ namespace PowerScope.Model
             XElement settingsXml = XElement.Load(filePath);
             ReadPlotSettings(settingsXml, plotManager);
             ReadDataStreamsWithChannels(settingsXml, dataStreamBar);
+
+            // Restore trigger source channel after channels are loaded
+            RestoreTriggerSourceChannel(settingsXml, plotManager, dataStreamBar);
         }
 
         private static void WritePlotSettings(XElement parent, PlotManager plotManager)
@@ -41,6 +44,19 @@ namespace PowerScope.Model
             parent.Add(new XElement("Xmax", plotManager.Settings.Xmax));
             parent.Add(new XElement("Ymin", plotManager.Settings.Ymin));
             parent.Add(new XElement("Ymax", plotManager.Settings.Ymax));
+
+            // Trigger settings
+            parent.Add(new XElement("EnableEdgeTrigger", plotManager.Settings.EnableEdgeTrigger));
+            parent.Add(new XElement("TriggerEdge", plotManager.Settings.TriggerEdge.ToString()));
+            parent.Add(new XElement("SingleShotMode", plotManager.Settings.SingleShotMode));
+            parent.Add(new XElement("TriggerLevel", plotManager.Settings.TriggerLevel.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+            parent.Add(new XElement("TriggerPosition", plotManager.Settings.TriggerPosition));
+
+            // Save trigger source channel by label (empty string if null)
+            string triggerChannelLabel = "";
+            if (plotManager.Settings.TriggerSourceChannel != null)
+                triggerChannelLabel = plotManager.Settings.TriggerSourceChannel.Label;
+            parent.Add(new XElement("TriggerSourceChannelLabel", triggerChannelLabel));
         }
 
         private static void WriteDataStreamsWithChannels(XElement parent, DataStreamBar dataStreamBar)
@@ -227,6 +243,17 @@ namespace PowerScope.Model
             int yMin = GetElementValueInt(settingsXml, "Ymin", -200);
             int yMax = GetElementValueInt(settingsXml, "Ymax", 4000);
 
+            // Trigger settings
+            bool enableEdgeTrigger = GetElementValueBool(settingsXml, "EnableEdgeTrigger", false);
+            string triggerEdgeStr = GetElementValue(settingsXml, "TriggerEdge", "Rising");
+            bool singleShotMode = GetElementValueBool(settingsXml, "SingleShotMode", false);
+            double triggerLevel = GetElementValueDouble(settingsXml, "TriggerLevel", 0.0);
+            int triggerPosition = GetElementValueInt(settingsXml, "TriggerPosition", 100);
+
+            TriggerEdgeType triggerEdge = TriggerEdgeType.Rising;
+            if (Enum.TryParse<TriggerEdgeType>(triggerEdgeStr, out TriggerEdgeType parsedEdge))
+                triggerEdge = parsedEdge;
+
             plotManager.Settings.PlotUpdateRateFPS = plotUpdateRateFPS;
             plotManager.Settings.LineWidth = lineWidth;
             plotManager.Settings.AntiAliasing = antiAliasing;
@@ -238,8 +265,42 @@ namespace PowerScope.Model
             plotManager.Settings.Ymin = yMin;
             plotManager.Settings.Ymax = yMax;
 
+            // Apply trigger settings (TriggerSourceChannel restored after channels are loaded)
+            plotManager.Settings.TriggerLevel = triggerLevel;
+            plotManager.Settings.TriggerPosition = triggerPosition;
+            plotManager.Settings.TriggerEdge = triggerEdge;
+            plotManager.Settings.SingleShotMode = singleShotMode;
+            plotManager.Settings.EnableEdgeTrigger = enableEdgeTrigger;
+
             plotManager.Plot.Plot.Axes.SetLimitsY(yMin, yMax);
             plotManager.Plot.Refresh();
+        }
+
+        /// <summary>
+        /// Restores trigger source channel after channels have been loaded
+        /// </summary>
+        private static void RestoreTriggerSourceChannel(XElement settingsXml, PlotManager plotManager, DataStreamBar dataStreamBar)
+        {
+            string triggerChannelLabel = GetElementValue(settingsXml, "TriggerSourceChannelLabel", "");
+
+            if (string.IsNullOrEmpty(triggerChannelLabel))
+            {
+                plotManager.Settings.TriggerSourceChannel = null;
+                return;
+            }
+
+            // Find channel by label
+            foreach (Channel channel in dataStreamBar.Channels)
+            {
+                if (channel.Label == triggerChannelLabel)
+                {
+                    plotManager.Settings.TriggerSourceChannel = channel;
+                    return;
+                }
+            }
+
+            // Channel not found, leave as null
+            plotManager.Settings.TriggerSourceChannel = null;
         }
 
         private static void ReadDataStreamsWithChannels(XElement settingsXml, DataStreamBar dataStreamBar)
