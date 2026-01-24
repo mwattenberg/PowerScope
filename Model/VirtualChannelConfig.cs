@@ -135,9 +135,16 @@ namespace PowerScope.Model
             if (InputB == null)
                 return "Please select Input B channel or enter a constant.";
 
-            // Check that we're not using the same channel twice (but constants are allowed to be the same)
-            if (!InputA.IsConstant && !InputB.IsConstant && InputA == InputB)
-                return "Input A and Input B cannot be the same channel.";
+            if (InputA.Channel != null && InputB.Channel != null)
+            {
+                if (InputA.Channel.OwnerStream is ConstantDataStream && InputB.Channel.OwnerStream is ConstantDataStream)
+                {
+                }
+                else if (InputA.Channel == InputB.Channel)
+                {
+                    return "Input A and Input B cannot be the same channel.";
+                }
+            }
 
             if (string.IsNullOrWhiteSpace(Label))
                 return "Please enter a channel label.";

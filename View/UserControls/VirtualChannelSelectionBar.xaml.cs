@@ -159,11 +159,11 @@ namespace PowerScope.View.UserControls
                 return;
             }
 
-            if (source.IsConstant)
+            if (source is ConstantOperand constantOperand)
             {
                 _constantOption.IsSelected = true;
-                _constantOption.ConstantValue = source.ConstantValue;
-                ConstantButton.Content = _constantOption.ConstantValue.ToString("G4", System.Globalization.CultureInfo.InvariantCulture);
+                _constantOption.ConstantValue = constantOperand.ConstantValue;
+                ConstantButton.Content = constantOperand.ConstantValue.ToString("G4", System.Globalization.CultureInfo.InvariantCulture);
             }
             else
             {

@@ -157,6 +157,74 @@ namespace PowerScope.Model
         }
 
         /// <summary>
+        /// Gets the owner Channel that this ChannelSettings belongs to.
+        /// Useful for accessing the underlying stream (e.g., VirtualDataStream source channels).
+        /// </summary>
+        public Channel OwnerChannel
+        {
+            get { return _ownerChannel; }
+        }
+
+        /// <summary>
+        /// Gets the first parent channel if this is a virtual channel
+        /// Returns null for physical channels
+        /// </summary>
+        public Channel ParentChannelA
+        {
+            get
+            {
+                if (_ownerChannel == null || !_isVirtual)
+                    return null;
+                    
+                VirtualDataStream virtualStream = _ownerChannel.OwnerStream as VirtualDataStream;
+                if (virtualStream != null)
+                {
+                    return virtualStream.GetParentChannelA();
+                }
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Gets the second parent channel if this is a binary virtual channel
+        /// Returns null for physical channels or single-source virtuals
+        /// </summary>
+        public Channel ParentChannelB
+        {
+            get
+            {
+                if (_ownerChannel == null || !_isVirtual)
+                    return null;
+                    
+                VirtualDataStream virtualStream = _ownerChannel.OwnerStream as VirtualDataStream;
+                if (virtualStream != null)
+                {
+                    return virtualStream.GetParentChannelB();
+                }
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Gets whether this is a binary operation virtual channel (two parents)
+        /// </summary>
+        public bool IsBinaryVirtual
+        {
+            get
+            {
+                if (_ownerChannel == null || !_isVirtual)
+                    return false;
+                    
+                VirtualDataStream virtualStream = _ownerChannel.OwnerStream as VirtualDataStream;
+                if (virtualStream != null)
+                {
+                    return virtualStream.IsBinaryOperation;
+                }
+                return false;
+            }
+        }
+
+        /// <summary>
         /// Gets the measurements collection from the owner channel.
         /// Returns an empty collection if no owner channel is set.
         /// This enables UI binding without creating circular dependencies.

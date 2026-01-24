@@ -5,30 +5,20 @@ namespace PowerScope.Model
 {
     /// <summary>
     /// Represents a source for virtual channel operations
-    /// Can be either a Channel or a constant numeric value
+    /// Both channels and constants are represented as Channel objects
+    /// Constants use ConstantDataStream internally
     /// </summary>
     public interface IVirtualSource : INotifyPropertyChanged
-  {
+    {
         /// <summary>
-        /// Gets whether this operand is a constant value
+        /// Gets the channel for this operand
+        /// For constants, this returns a Channel backed by ConstantDataStream
         /// </summary>
-        bool IsConstant { get; }
-
-     /// <summary>
-        /// Gets the constant value if this is a constant operand
-        /// Returns 0 if this is a channel operand
-     /// </summary>
-        double ConstantValue { get; }
-
-        /// <summary>
-        /// Gets the channel if this is a channel operand
-        /// Returns null if this is a constant operand
-      /// </summary>
         Channel Channel { get; }
 
         /// <summary>
         /// Gets a display string for this operand
-      /// </summary>
+        /// </summary>
         string DisplayString { get; }
     }
 
@@ -37,81 +27,116 @@ namespace PowerScope.Model
     /// </summary>
     public class ChannelOperand : IVirtualSource
     {
-   private Channel _channel;
+        private Channel _channel;
 
-        public bool IsConstant => false;
-  public double ConstantValue => 0.0;
- 
- public Channel Channel
+        public Channel Channel
         {
             get { return _channel; }
             set
             {
-            if (_channel != value)
-  {
-    _channel = value;
-            OnPropertyChanged(nameof(Channel));
-      OnPropertyChanged(nameof(DisplayString));
-    }
-      }
-    }
+                if (_channel != value)
+                {
+                    _channel = value;
+                    OnPropertyChanged(nameof(Channel));
+                    OnPropertyChanged(nameof(DisplayString));
+                }
+            }
+        }
 
-        public string DisplayString => _channel?.Label ?? "(null)";
+        public string DisplayString
+        {
+            get { return _channel?.Label ?? "(null)"; }
+        }
 
         public event PropertyChangedEventHandler PropertyChanged;
 
         public ChannelOperand(Channel channel)
         {
-       _channel = channel ?? throw new ArgumentNullException(nameof(channel));
-   }
-
-        protected virtual void OnPropertyChanged(string propertyName)
-        {
-    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+            _channel = channel ?? throw new ArgumentNullException(nameof(channel));
         }
-
-     public override string ToString() => DisplayString;
-    }
-
-    /// <summary>
-    /// Constant value operand source
-    /// </summary>
-  public class ConstantOperand : IVirtualSource
-    {
-   private double _value;
-
-        public bool IsConstant => true;
- 
- public double ConstantValue
-        {
-            get { return _value; }
-            set
-            {
-    if (Math.Abs(_value - value) > 1e-15)
-     {
-         _value = value;
-                    OnPropertyChanged(nameof(ConstantValue));
-    OnPropertyChanged(nameof(DisplayString));
-          }
-            }
-        }
-
-        public Channel Channel => null;
-
-        public string DisplayString => _value.ToString("G");
-
-        public event PropertyChangedEventHandler PropertyChanged;
-
-        public ConstantOperand(double value = 0.0)
-      {
-   _value = value;
-      }
 
         protected virtual void OnPropertyChanged(string propertyName)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
 
-        public override string ToString() => DisplayString;
+        public override string ToString()
+        {
+            return DisplayString;
+        }
+    }
+
+    /// <summary>
+    /// Constant value operand source
+    /// Creates a hidden Channel backed by ConstantDataStream
+    /// </summary>
+    public class ConstantOperand : IVirtualSource
+    {
+        private double _value;
+        private Channel _constantChannel;
+
+        public Channel Channel
+        {
+            get { return _constantChannel; }
+        }
+
+        public string DisplayString
+        {
+            get { return _value.ToString("G"); }
+        }
+
+        public double ConstantValue
+        {
+            get { return _value; }
+            set
+            {
+                if (Math.Abs(_value - value) > 1e-15)
+                {
+                    _value = value;
+                    RecreateConstantChannel();
+                    OnPropertyChanged(nameof(ConstantValue));
+                    OnPropertyChanged(nameof(DisplayString));
+                    OnPropertyChanged(nameof(Channel));
+                }
+            }
+        }
+
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        public ConstantOperand(double value = 0.0)
+        {
+            _value = value;
+            RecreateConstantChannel();
+        }
+
+        private void RecreateConstantChannel()
+        {
+            if (_constantChannel != null)
+            {
+                _constantChannel.Dispose();
+            }
+
+            ConstantDataStream stream = new ConstantDataStream(_value);
+
+            ChannelSettings settings = new ChannelSettings
+            {
+                Label = $"Constant: {_value:G}",
+                Color = System.Windows.Media.Colors.DarkGray,
+                IsEnabled = true,
+                IsVirtual = false
+            };
+
+            _constantChannel = new Channel(stream, 0, settings);
+        }
+
+        protected virtual void OnPropertyChanged(string propertyName)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+
+        public override string ToString()
+        {
+            return DisplayString;
+        }
     }
 }

@@ -385,6 +385,7 @@ namespace PowerScope.View.UserControls
         /// <summary>
         /// Updates the TopColorBar gradient when Channel or Color changes
         /// Uses the IsVirtual flag from ChannelSettings
+        /// For virtual channels, creates gradient from parent channel color(s) to virtual channel color
         /// </summary>
         private void UpdateTopColorBar()
         {
@@ -394,27 +395,62 @@ namespace PowerScope.View.UserControls
             {
                 if (Settings.IsVirtual)
                 {
-                    // Create gradient from Gray to channel color
-                    LinearGradientBrush gradientBrush = new LinearGradientBrush();
-                    gradientBrush.StartPoint = new Point(0, 0.5);
-                    gradientBrush.EndPoint = new Point(1, 0.5);
+                    Color startColor = Colors.Black;
+                    
+                    Channel parentA = Settings.ParentChannelA;
+                    if (parentA != null)
+                    {
+                        startColor = parentA.Settings.DisplayColor;
+                    }
+                    
+                    Channel parentB = Settings.ParentChannelB;
+                    
+                    if (parentB != null)
+                    {
+                        LinearGradientBrush gradientBrush = new LinearGradientBrush();
+                        gradientBrush.StartPoint = new Point(0, 0.5);
+                        gradientBrush.EndPoint = new Point(1, 0.5);
 
-                    GradientStop greyStop = new GradientStop();
-                    greyStop.Color = Colors.Black;
-                    greyStop.Offset = 0.0;
+                        GradientStop parentAStop = new GradientStop();
+                        parentAStop.Color = parentA.Settings.DisplayColor;
+                        parentAStop.Offset = 0.0;
 
-                    GradientStop channelColorStop = new GradientStop();
-                    channelColorStop.Color = Settings.DisplayColor;
-                    channelColorStop.Offset = 1.0;
+                        GradientStop parentBStop = new GradientStop();
+                        parentBStop.Color = parentB.Settings.DisplayColor;
+                        parentBStop.Offset = 0.5;
 
-                    gradientBrush.GradientStops.Add(greyStop);
-                    gradientBrush.GradientStops.Add(channelColorStop);
+                        GradientStop virtualStop = new GradientStop();
+                        virtualStop.Color = Settings.DisplayColor;
+                        virtualStop.Offset = 1.0;
 
-                    topColorBar.Background = gradientBrush;
+                        gradientBrush.GradientStops.Add(parentAStop);
+                        gradientBrush.GradientStops.Add(parentBStop);
+                        gradientBrush.GradientStops.Add(virtualStop);
+
+                        topColorBar.Background = gradientBrush;
+                    }
+                    else
+                    {
+                        LinearGradientBrush gradientBrush = new LinearGradientBrush();
+                        gradientBrush.StartPoint = new Point(0, 0.5);
+                        gradientBrush.EndPoint = new Point(1, 0.5);
+
+                        GradientStop sourceStop = new GradientStop();
+                        sourceStop.Color = startColor;
+                        sourceStop.Offset = 0.0;
+
+                        GradientStop virtualStop = new GradientStop();
+                        virtualStop.Color = Settings.DisplayColor;
+                        virtualStop.Offset = 1.0;
+
+                        gradientBrush.GradientStops.Add(sourceStop);
+                        gradientBrush.GradientStops.Add(virtualStop);
+
+                        topColorBar.Background = gradientBrush;
+                    }
                 }
                 else
                 {
-                    // Solid color for physical channels
                     SolidColorBrush solidBrush = new SolidColorBrush(Settings.DisplayColor);
                     topColorBar.Background = solidBrush;
                 }

@@ -73,18 +73,14 @@ namespace PowerScope.Model
             _sourceOperands = new List<IVirtualSource> { operandA, operandB };
             _operation = operation;
 
-            // Track unique owner streams from channel operands
             _sourceStreams = new HashSet<IDataStream>();
             foreach (IVirtualSource operand in _sourceOperands)
             {
-                if (!operand.IsConstant)
+                if (operand.Channel != null)
                 {
-                    if (operand.Channel != null)
+                    if (operand.Channel.OwnerStream != null)
                     {
-                        if (operand.Channel.OwnerStream != null)
-                        {
-                            _sourceStreams.Add(operand.Channel.OwnerStream);
-                        }
+                        _sourceStreams.Add(operand.Channel.OwnerStream);
                     }
                 }
             }
@@ -183,40 +179,13 @@ namespace PowerScope.Model
             {
                 if (_sourceOperands.Count == 1)
                 {
-                    string sourceType;
-                    if (_sourceOperands[0].IsConstant)
-                    {
-                        sourceType = "Constant";
-                    }
-                    else
-                    {
-                        sourceType = _sourceOperands[0].Channel.StreamType;
-                    }
+                    string sourceType = _sourceOperands[0].Channel.StreamType;
                     return $"Virtual ({sourceType})";
                 }
                 else
                 {
-                    // Show operation between source types
-                    string source1Type;
-                    if (_sourceOperands[0].IsConstant)
-                    {
-                        source1Type = "Constant";
-                    }
-                    else
-                    {
-                        source1Type = _sourceOperands[0].Channel.StreamType;
-                    }
-
-                    string source2Type;
-                    if (_sourceOperands[1].IsConstant)
-                    {
-                        source2Type = "Constant";
-                    }
-                    else
-                    {
-                        source2Type = _sourceOperands[1].Channel.StreamType;
-                    }
-
+                    string source1Type = _sourceOperands[0].Channel.StreamType;
+                    string source2Type = _sourceOperands[1].Channel.StreamType;
                     return $"Virtual ({source1Type} {GetOperationSymbol()} {source2Type})";
                 }
             }
@@ -226,10 +195,9 @@ namespace PowerScope.Model
         {
             get
             {
-                // Virtual stream is "connected" if all channel operands are connected
                 foreach (IVirtualSource operand in _sourceOperands)
                 {
-                    if (!operand.IsConstant && !operand.Channel.IsStreamConnected)
+                    if (!operand.Channel.IsStreamConnected)
                         return false;
                 }
                 return true;
@@ -240,10 +208,9 @@ namespace PowerScope.Model
         {
             get
             {
-                // Virtual stream is "streaming" if any channel operand is streaming
                 foreach (IVirtualSource operand in _sourceOperands)
                 {
-                    if (!operand.IsConstant && operand.Channel.IsStreamStreaming)
+                    if (operand.Channel.IsStreamStreaming)
                         return true;
                 }
                 return false;
@@ -254,11 +221,9 @@ namespace PowerScope.Model
         {
             get
             {
-                // Return total samples from first channel operand
-                // (all sources should have same sample count for valid operations)
                 for (int i = 0; i < _sourceOperands.Count; i++)
                 {
-                    if (!_sourceOperands[i].IsConstant && _sourceOperands[i].Channel.OwnerStream != null)
+                    if (_sourceOperands[i].Channel.OwnerStream != null)
                         return _sourceOperands[i].Channel.OwnerStream.TotalSamples;
                 }
                 return 0;
@@ -269,10 +234,9 @@ namespace PowerScope.Model
         {
             get
             {
-                // Virtual streams don't generate new bits, return source bits from first channel operand
                 for (int i = 0; i < _sourceOperands.Count; i++)
                 {
-                    if (!_sourceOperands[i].IsConstant && _sourceOperands[i].Channel.OwnerStream != null)
+                    if (_sourceOperands[i].Channel.OwnerStream != null)
                         return _sourceOperands[i].Channel.OwnerStream.TotalBits;
                 }
                 return 0;
@@ -292,14 +256,10 @@ namespace PowerScope.Model
         {
             get
             {
-                // Use sample rate from first channel operand
                 for (int i = 0; i < _sourceOperands.Count; i++)
                 {
-                    if (!_sourceOperands[i].IsConstant)
-                    {
-                        if (_sourceOperands[i].Channel.OwnerStream != null)
-                            return _sourceOperands[i].Channel.OwnerStream.SampleRate;
-                    }
+                    if (_sourceOperands[i].Channel.OwnerStream != null)
+                        return _sourceOperands[i].Channel.OwnerStream.SampleRate;
                 }
                 return 1000.0; // Default fallback
             }
@@ -331,11 +291,11 @@ namespace PowerScope.Model
 
         /// <summary>
         /// The core method: computes virtual channel data ON-DEMAND without storing in ring buffer
-        /// Reads from source operands (channels or constants), applies operation, applies virtual channel processing
+        /// Reads from source operands, applies operation, applies virtual channel processing
         /// </summary>
         public int CopyLatestTo(int channel, double[] destination, int n)
         {
-            if (channel != 0) // Virtual streams only have channel 0
+            if (channel != 0)
                 return 0;
 
             if (_disposed)
@@ -344,44 +304,25 @@ namespace PowerScope.Model
             if (destination == null || n <= 0)
                 return 0;
 
-            // Check if source channels are available
             if (!IsConnected || !IsStreaming)
                 return 0;
 
             lock (_computeLock)
             {
-                // Step 1: Get data from source operand(s)
                 int actualSamples;
 
                 if (_sourceOperands.Count == 1)
                 {
-                    // Single source: copy directly then apply virtual processing
-                    if (_sourceOperands[0].IsConstant)
-                    {
-                        // Fill destination with constant value
-                        double constantValue = _sourceOperands[0].ConstantValue;
-                        int samplesToFill = Math.Min(n, destination.Length);
-                        for (int i = 0; i < samplesToFill; i++)
-                        {
-                            destination[i] = constantValue;
-                        }
-                        actualSamples = samplesToFill;
-                    }
-                    else
-                    {
-                        actualSamples = _sourceOperands[0].Channel.CopyLatestDataTo(destination, n);
-                    }
+                    actualSamples = _sourceOperands[0].Channel.CopyLatestDataTo(destination, n);
                 }
                 else
                 {
-                    // Two operands: perform mathematical operation
                     actualSamples = ComputeBinaryOperation(destination, n);
                 }
 
                 if (actualSamples <= 0)
                     return 0;
 
-                // Step 2: Apply virtual channel processing (gain, offset, filtering)
                 ApplyVirtualChannelProcessing(destination, actualSamples);
 
                 return actualSamples;
@@ -389,109 +330,38 @@ namespace PowerScope.Model
         }
 
         /// <summary>
-        /// Computes binary operation between two source operands (channels and/or constants)
-        /// Optimized to handle constant operands inline without buffer allocation
+        /// Computes binary operation between two source operands
+        /// All operands are now channels (constants wrapped in ConstantDataStream)
         /// </summary>
         private int ComputeBinaryOperation(double[] destination, int n)
         {
-            // Ensure compute buffers are large enough for this computation
             EnsureComputeBuffersAllocated(n);
 
-            // Optimize for constants - detect which operands are constants
-            bool operand1IsConstant = _sourceOperands[0].IsConstant;
-            bool operand2IsConstant = _sourceOperands[1].IsConstant;
+            int samples1 = _sourceOperands[0].Channel.CopyLatestDataTo(_computeBuffer1, n);
+            int samples2 = _sourceOperands[1].Channel.CopyLatestDataTo(_computeBuffer2, n);
 
-            // Get constant values (if applicable) and fetch channel data
-            double constant1 = operand1IsConstant ? _sourceOperands[0].ConstantValue : 0.0;
-            double constant2 = operand2IsConstant ? _sourceOperands[1].ConstantValue : 0.0;
-
-            int samples1 = operand1IsConstant ? n : _sourceOperands[0].Channel.CopyLatestDataTo(_computeBuffer1, n);
-            int samples2 = operand2IsConstant ? n : _sourceOperands[1].Channel.CopyLatestDataTo(_computeBuffer2, n);
-
-            // Use the minimum sample count (both sources must have data)
             int actualSamples = Math.Min(samples1, samples2);
             if (actualSamples <= 0)
                 return 0;
 
-            // Perform the operation sample-by-sample with optimized paths for constants
-            if (operand1IsConstant && operand2IsConstant)
+            for (int i = 0; i < actualSamples; i++)
             {
-                // Both constant - compute once and fill entire destination
+                double sample1 = _computeBuffer1[i];
+                double sample2 = _computeBuffer2[i];
+
                 double result = _operation switch
                 {
-                    VirtualChannelOperationType.Add => constant1 + constant2,
-                    VirtualChannelOperationType.Subtract => constant1 - constant2,
-                    VirtualChannelOperationType.Multiply => constant1 * constant2,
-                    VirtualChannelOperationType.Divide => Math.Abs(constant2) > 1e-10 ? constant1 / constant2 : 0.0,
-                    _ => constant1
+                    VirtualChannelOperationType.Add => sample1 + sample2,
+                    VirtualChannelOperationType.Subtract => sample1 - sample2,
+                    VirtualChannelOperationType.Multiply => sample1 * sample2,
+                    VirtualChannelOperationType.Divide => Math.Abs(sample2) > 1e-10 ? sample1 / sample2 : 0.0,
+                    _ => sample1
                 };
 
                 if (!double.IsFinite(result))
                     result = 0.0;
 
-                for (int i = 0; i < actualSamples; i++)
-                    destination[i] = result;
-            }
-            else if (operand1IsConstant)
-            {
-                // Operand 1 is constant, operand 2 is channel - avoid buffer for constant1
-                for (int i = 0; i < actualSamples; i++)
-                {
-                    double sample2 = _computeBuffer2[i];
-
-                    destination[i] = _operation switch
-                    {
-                        VirtualChannelOperationType.Add => constant1 + sample2,
-                        VirtualChannelOperationType.Subtract => constant1 - sample2,
-                        VirtualChannelOperationType.Multiply => constant1 * sample2,
-                        VirtualChannelOperationType.Divide => Math.Abs(sample2) > 1e-10 ? constant1 / sample2 : 0.0,
-                        _ => constant1
-                    };
-
-                    if (!double.IsFinite(destination[i]))
-                        destination[i] = 0.0;
-                }
-            }
-            else if (operand2IsConstant)
-            {
-                // Operand 1 is channel, operand 2 is constant - avoid buffer for constant2
-                for (int i = 0; i < actualSamples; i++)
-                {
-                    double sample1 = _computeBuffer1[i];
-
-                    destination[i] = _operation switch
-                    {
-                        VirtualChannelOperationType.Add => sample1 + constant2,
-                        VirtualChannelOperationType.Subtract => sample1 - constant2,
-                        VirtualChannelOperationType.Multiply => sample1 * constant2,
-                        VirtualChannelOperationType.Divide => Math.Abs(constant2) > 1e-10 ? sample1 / constant2 : 0.0,
-                        _ => sample1
-                    };
-
-                    if (!double.IsFinite(destination[i]))
-                        destination[i] = 0.0;
-                }
-            }
-            else
-            {
-                // Both are channels - standard operation path
-                for (int i = 0; i < actualSamples; i++)
-                {
-                    double sample1 = _computeBuffer1[i];
-                    double sample2 = _computeBuffer2[i];
-
-                    destination[i] = _operation switch
-                    {
-                        VirtualChannelOperationType.Add => sample1 + sample2,
-                        VirtualChannelOperationType.Subtract => sample1 - sample2,
-                        VirtualChannelOperationType.Multiply => sample1 * sample2,
-                        VirtualChannelOperationType.Divide => Math.Abs(sample2) > 1e-10 ? sample1 / sample2 : 0.0,
-                        _ => sample1
-                    };
-
-                    if (!double.IsFinite(destination[i]))
-                        destination[i] = 0.0;
-                }
+                destination[i] = result;
             }
 
             return actualSamples;
@@ -626,39 +496,13 @@ namespace PowerScope.Model
         {
             if (_sourceOperands.Count == 1)
             {
-                string sourceName;
-                if (_sourceOperands[0].IsConstant)
-                {
-                    sourceName = _sourceOperands[0].ConstantValue.ToString("G");
-                }
-                else
-                {
-                    sourceName = _sourceOperands[0].Channel.Label;
-                }
+                string sourceName = _sourceOperands[0].Channel.Label;
                 return $"Virtual copy of {sourceName}";
             }
             else
             {
-                string source1Name;
-                if (_sourceOperands[0].IsConstant)
-                {
-                    source1Name = _sourceOperands[0].ConstantValue.ToString("G");
-                }
-                else
-                {
-                    source1Name = _sourceOperands[0].Channel.Label;
-                }
-
-                string source2Name;
-                if (_sourceOperands[1].IsConstant)
-                {
-                    source2Name = _sourceOperands[1].ConstantValue.ToString("G");
-                }
-                else
-                {
-                    source2Name = _sourceOperands[1].Channel.Label;
-                }
-
+                string source1Name = _sourceOperands[0].Channel.Label;
+                string source2Name = _sourceOperands[1].Channel.Label;
                 string opSymbol = GetOperationSymbol();
                 return $"{source1Name} {opSymbol} {source2Name}";
             }
@@ -666,14 +510,13 @@ namespace PowerScope.Model
 
         /// <summary>
         /// Gets all source channels (useful for UI display and dependency tracking)
-        /// Returns only channel operands, not constant operands
         /// </summary>
         public IReadOnlyList<Channel> GetSourceChannels()
         {
             List<Channel> channels = new List<Channel>();
             foreach (IVirtualSource operand in _sourceOperands)
             {
-                if (!operand.IsConstant && operand.Channel != null)
+                if (operand.Channel != null)
                 {
                     channels.Add(operand.Channel);
                 }
@@ -684,18 +527,61 @@ namespace PowerScope.Model
         /// <summary>
         /// Gets the primary (first) source channel for this virtual stream
         /// Useful for inheriting color and display properties from the source
-        /// Returns null if no channel operands are present (all constant operands)
         /// </summary>
         public Channel GetPrimarySourceChannel()
         {
-            foreach (IVirtualSource operand in _sourceOperands)
+            if (_sourceOperands.Count > 0 && _sourceOperands[0].Channel != null)
             {
-                if (!operand.IsConstant && operand.Channel != null)
-                {
-                    return operand.Channel;
-                }
+                return _sourceOperands[0].Channel;
             }
             return null;
+        }
+
+        /// <summary>
+        /// Gets the first parent channel (Parent A) for this virtual stream
+        /// </summary>
+        public Channel GetParentChannelA()
+        {
+            if (_sourceOperands.Count > 0 && _sourceOperands[0].Channel != null)
+            {
+                return _sourceOperands[0].Channel;
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Gets the second parent channel (Parent B) for this virtual stream
+        /// Returns null if no second operand exists or single-source virtual
+        /// </summary>
+        public Channel GetParentChannelB()
+        {
+            if (_sourceOperands.Count > 1 && _sourceOperands[1].Channel != null)
+            {
+                return _sourceOperands[1].Channel;
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Checks if this virtual channel has two parents (binary operation)
+        /// </summary>
+        public bool IsBinaryOperation
+        {
+            get { return _sourceOperands.Count == 2; }
+        }
+
+        /// <summary>
+        /// Gets the operation type for binary operations
+        /// Returns null for single-source virtual channels
+        /// </summary>
+        public VirtualChannelOperationType? OperationType
+        {
+            get 
+            { 
+                if (IsBinaryOperation)
+                    return _operation;
+                return null;
+            }
         }
 
         #endregion
