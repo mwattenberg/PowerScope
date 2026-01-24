@@ -96,15 +96,10 @@ namespace PowerScope.Model
         private int _triggerPosition = 100;
         private double _triggerHoldoffSeconds = 0.0;
         private DateTime _lastTriggerTime = DateTime.MinValue;
-        private bool _singleShotTriggered = false;
 
         // Working buffer for over-fetching (allows shifting for trigger alignment)
         private double[] _triggerWorkBuffer;
         private int _triggerWorkBufferSize = 0;
-
-        // Cached trigger channel data to avoid double-copying
-        private int _cachedTriggerChannelIndex = -1;
-        private int _cachedSamplesCopied = 0;
 
         // Debug output throttling (reduces overhead at high FPS)
         private int _triggerDebugCounter = 0;
@@ -148,7 +143,7 @@ namespace PowerScope.Model
 
         /// <summary>
         /// Single-shot trigger mode
-        /// When true, trigger fires once and requires manual re-arm
+        /// When true, trigger fires once and system stops
         /// When false (default), trigger continuously
         /// </summary>
         public bool SingleShotMode
@@ -163,29 +158,9 @@ namespace PowerScope.Model
             }
         }
 
-        /// <summary>
-        /// Whether a single-shot trigger has been activated
-        /// </summary>
-        public bool SingleShotTriggered
-        {
-            get { return _singleShotTriggered; }
-        }
-
         #endregion
 
         #region Trigger Public Methods
-
-        /// <summary>
-        /// Manually re-arm the trigger (for single-shot mode)
-        /// </summary>
-        public void RearmTrigger()
-        {
-            _singleShotTriggered = false;
-            _triggerArmed = true;
-            _lastCheckedTotalSamples = 0;
-            System.Diagnostics.Debug.WriteLine("Trigger manually re-armed");
-            OnPropertyChanged(nameof(SingleShotTriggered));
-        }
 
         /// <summary>
         /// Shows the trigger level line at the current trigger level
@@ -203,7 +178,6 @@ namespace PowerScope.Model
             // Reset trigger tracking when showing trigger line
             _triggerArmed = true;
             _lastCheckedTotalSamples = 0;
-            _singleShotTriggered = false;
             _lastTriggerTime = DateTime.MinValue;
 
             // Create trigger level line with label
@@ -291,8 +265,6 @@ namespace PowerScope.Model
         internal void HandleTriggerLevelDrag(HorizontalLine line)
         {
             _triggerLevel = line.Y;
-            line.Text = $"Trigger: {_triggerLevel:F1}";
-            System.Diagnostics.Debug.WriteLine($"Trigger level adjusted to: {_triggerLevel:F3}");
         }
 
         /// <summary>
@@ -306,7 +278,6 @@ namespace PowerScope.Model
             int maxPosition = (int)(0.95 * Settings.Xmax);
             _triggerPosition = (int)Math.Clamp(line.X, minPosition, maxPosition);
             line.X = _triggerPosition;
-            System.Diagnostics.Debug.WriteLine($"Trigger position adjusted to: {_triggerPosition}");
         }
 
         #endregion
@@ -361,22 +332,33 @@ namespace PowerScope.Model
 
             Channel triggerChannel = GetCurrentTriggerChannel();
 
-            if (triggerChannel != null && triggerChannel != _lastTriggerChannel)
+            // Determine color
+            ScottPlot.Color newColor;
+            if (triggerChannel != null)
             {
-                _lastTriggerChannel = triggerChannel;
-
-                // Convert WPF color to ScottPlot color
-                ScottPlot.Color channelColor = new ScottPlot.Color(
+                newColor = new ScottPlot.Color(
                     triggerChannel.Color.R,
                     triggerChannel.Color.G,
                     triggerChannel.Color.B);
-
-                _triggerLevelLine.Color = channelColor;
-                _triggerPositionLine.Color = channelColor;
-
-                System.Diagnostics.Debug.WriteLine($"Trigger line color updated to match channel: {triggerChannel.Label}");
-                _plot.Refresh();
             }
+            else
+            {
+                newColor = ScottPlot.Color.FromHex("#808080");  // Gray fallback
+            }
+
+            // ALWAYS update colors, don't check _lastTriggerChannel
+            _triggerLevelLine.Color = newColor;
+            _triggerPositionLine.Color = newColor;
+            
+            // Track for future reference
+            _lastTriggerChannel = triggerChannel;
+
+            if (triggerChannel != null)
+                System.Diagnostics.Debug.WriteLine($"Trigger lines: {triggerChannel.Label}");
+            else
+                System.Diagnostics.Debug.WriteLine($"Trigger lines: no channel (gray)");
+
+            _plot.Refresh();
         }
 
         /// <summary>
@@ -426,49 +408,16 @@ namespace PowerScope.Model
         /// <summary>
         /// Checks if trigger condition is met for edge trigger mode.
         /// Uses over-fetch approach: fetches extra samples, finds trigger, stores index for alignment.
-        /// Caches the trigger channel data to avoid re-fetching in CopyChannelDataWithTriggerAlignment.
+        /// Only triggers on the explicitly selected trigger channel - does not auto-fallback to other channels.
         /// </summary>
         private bool CheckTriggerCondition()
         {
-            // Need at least one enabled channel to trigger on
-            if (_channels == null || _channels.Count == 0)
-                return false;
-
-            // Use configured trigger channel, or fall back to first enabled channel
+            // Get the explicitly selected trigger channel
             Channel triggerChannel = Settings.TriggerSourceChannel;
-            int triggerChannelIndex = -1;
 
+            // If no channel selected or channel is disabled, stop triggering
+            // (plot freezes on last valid frame)
             if (triggerChannel == null || !triggerChannel.IsEnabled)
-            {
-                // Fallback: use first enabled channel
-                for (int i = 0; i < _channels.Count; i++)
-                {
-                    if (_channels[i].IsEnabled)
-                    {
-                        triggerChannel = _channels[i];
-                        triggerChannelIndex = i;
-                        break;
-                    }
-                }
-            }
-            else
-            {
-                // Find the index of the configured trigger channel
-                for (int i = 0; i < _channels.Count; i++)
-                {
-                    if (_channels[i] == triggerChannel)
-                    {
-                        triggerChannelIndex = i;
-                        break;
-                    }
-                }
-            }
-
-            if (triggerChannel == null)
-                return false;
-
-            // Single-shot mode: if already triggered, don't trigger again
-            if (Settings.SingleShotMode && _singleShotTriggered)
                 return false;
 
             // Trigger holdoff: check if we're still in holdoff period
@@ -493,6 +442,15 @@ namespace PowerScope.Model
                 return false;
             }
 
+            // Throttled debug output - sample arrival rate
+            _triggerDebugCounter++;
+            bool shouldLogDebug = (_triggerDebugCounter % TriggerDebugInterval == 0);
+            
+            if (shouldLogDebug)
+            {
+                System.Diagnostics.Debug.WriteLine($"NewSampleCount: {newSampleCount} (per frame, every {TriggerDebugInterval} frames logged)");
+            }
+
             // Ensure working buffer is properly sized
             EnsureTriggerWorkBufferSize();
 
@@ -512,10 +470,6 @@ namespace PowerScope.Model
                 return false;
             }
 
-            // Cache the trigger channel info for CopyChannelDataWithTriggerAlignment to reuse
-            _cachedTriggerChannelIndex = triggerChannelIndex;
-            _cachedSamplesCopied = samplesCopied;
-
             // Define the search window for the trigger
             int searchStart = Math.Max(1, preTriggerSamples);
             int searchEnd = Math.Min(samplesCopied - 1, samplesCopied - postTriggerSamples);
@@ -526,9 +480,9 @@ namespace PowerScope.Model
             // newSampleCount = samples arrived since last frame = SampleRate / FPS
             // 
             // The search window is bounded by:
-            //   - searchStart = max(1, preTriggerSamples) ? where trigger can validly occur
-            //   - searchEnd = samplesCopied - postTriggerSamples ? must have room for post-trigger data
-            //   - newSamplesStart = samplesCopied - newSampleCount ? only scan new data
+            //   - searchStart = max(1, preTriggerSamples) where trigger can validly occur
+            //   - searchEnd = samplesCopied - postTriggerSamples must have room for post-trigger data
+            //   - newSamplesStart = samplesCopied - newSampleCount only scan new data
             // 
             // TRIGGER POSITION MATTERS:
             // When trigger is at LEFT (small preTriggerSamples, large postTriggerSamples):
@@ -550,10 +504,6 @@ namespace PowerScope.Model
             // See class-level documentation for detailed analysis and recommendations.
             int newSamplesStart = Math.Max(searchStart, samplesCopied - (int)newSampleCount);
 
-            // Throttled debug output
-            _triggerDebugCounter++;
-            bool shouldLogDebug = (_triggerDebugCounter % TriggerDebugInterval == 0);
-            
             if (shouldLogDebug)
             {
                 System.Diagnostics.Debug.WriteLine($"Trigger search: buffer has {samplesCopied} samples, searching [{newSamplesStart}..{searchEnd}], triggerPos={_triggerPosition}");
@@ -590,8 +540,9 @@ namespace PowerScope.Model
 
                         if (Settings.SingleShotMode)
                         {
-                            _singleShotTriggered = true;
-                            OnPropertyChanged(nameof(SingleShotTriggered));
+                            // Auto-stop the update timer when trigger fires in single-shot mode
+                            // This makes IsRunning the single source of truth for system state
+                            StopUpdates();
                         }
 
                         // Always log trigger detection (important event)
@@ -628,25 +579,21 @@ namespace PowerScope.Model
 
         /// <summary>
         /// Copies channel data aligned to trigger point using over-fetch and shift approach.
-        /// Fetches extra data, then copies the window that places trigger at _triggerPosition.
+        /// Fetches data, then copies the window that places trigger at _triggerPosition.
         /// Works with ALL stream types using only CopyLatestTo().
-        /// Reuses cached trigger channel data from CheckTriggerCondition to avoid double-copying.
         /// </summary>
         private void CopyChannelDataWithTriggerAlignment()
         {
             if (_channels == null || _triggerSampleIndex < 0)
                 return;
 
-            // Ensure working buffer is properly sized
             EnsureTriggerWorkBufferSize();
 
-            // Calculate fetch and alignment parameters
             int preTriggerSamples = _triggerPosition;
             int postTriggerSamples = Settings.Xmax - _triggerPosition;
             int fetchCount = Settings.Xmax + Math.Max(preTriggerSamples, postTriggerSamples);
             fetchCount = Math.Min(fetchCount, _triggerWorkBufferSize);
 
-            // Throttled debug output
             bool shouldLogDebug = (_triggerDebugCounter % TriggerDebugInterval == 0);
 
             for (int i = 0; i < _channels.Count && i < _maxChannels; i++)
@@ -654,21 +601,15 @@ namespace PowerScope.Model
                 Channel channel = _channels[i];
 
                 if (!channel.IsEnabled)
+                {
+                    // Clear data for disabled channels
+                    if (_data[i] != null)
+                        Array.Clear(_data[i], 0, _data[i].Length);
                     continue;
-
-                int samplesCopied;
-
-                // Optimization: Reuse cached data for the trigger channel (already fetched in CheckTriggerCondition)
-                if (i == _cachedTriggerChannelIndex && _cachedSamplesCopied > 0)
-                {
-                    // Data is already in _triggerWorkBuffer from CheckTriggerCondition
-                    samplesCopied = _cachedSamplesCopied;
                 }
-                else
-                {
-                    // Fetch data for non-trigger channels
-                    samplesCopied = channel.CopyLatestDataTo(_triggerWorkBuffer, fetchCount);
-                }
+
+                // Fetch fresh data for each channel
+                int samplesCopied = channel.CopyLatestDataTo(_triggerWorkBuffer, fetchCount);
 
                 if (samplesCopied < Settings.Xmax)
                 {
@@ -678,25 +619,23 @@ namespace PowerScope.Model
                 }
 
                 // Calculate the start index in the working buffer for the display window
+                // This places the trigger at _triggerPosition on the display
                 int displayStart = _triggerSampleIndex - preTriggerSamples;
                 
                 // Clamp to valid range
                 displayStart = Math.Max(0, displayStart);
                 displayStart = Math.Min(displayStart, samplesCopied - Settings.Xmax);
 
-                // Copy the aligned window to plot data
+                // Copy the trigger-aligned window to plot data
                 Array.Copy(_triggerWorkBuffer, displayStart, _data[i], 0, Settings.Xmax);
 
                 if (shouldLogDebug)
                 {
-                    string cacheStatus = (i == _cachedTriggerChannelIndex) ? " (cached)" : "";
-                    System.Diagnostics.Debug.WriteLine($"Channel {i}{cacheStatus}: copied window [{displayStart}..{displayStart + Settings.Xmax}] from {samplesCopied} samples");
+                    System.Diagnostics.Debug.WriteLine(
+                        $"Channel {i}: copied window [{displayStart}..{displayStart + Settings.Xmax}] from {samplesCopied} samples, " +
+                        $"trigger at buffer[{_triggerSampleIndex}] displayed at [{preTriggerSamples}]");
                 }
             }
-
-            // Clear cache after use
-            _cachedTriggerChannelIndex = -1;
-            _cachedSamplesCopied = 0;
         }
 
         /// <summary>
@@ -717,7 +656,7 @@ namespace PowerScope.Model
                 {
                     _triggerPositionLine.X = _triggerPosition;
                     _triggerPositionLine.Text = $"Trig Pos: {_triggerPosition}";
-                    System.Diagnostics.Debug.WriteLine($"Trigger position clamped from {oldTriggerPosition} to {_triggerPosition} due to Xmax change to {Settings.Xmax}");
+                    
                 }
             }
 
@@ -737,7 +676,6 @@ namespace PowerScope.Model
             // Reset trigger state when mode changes
             _triggerArmed = true;
             _lastCheckedTotalSamples = 0;
-            _singleShotTriggered = false;
             _triggerSampleIndex = -1;
             
             // Update trigger line color when mode changes (in case channels changed while disabled)

@@ -123,13 +123,6 @@ namespace PowerScope.View.UserControls
 
         private void RunButton_Click(object sender, RoutedEventArgs e)
         {
-            // If in single-shot mode and trigger has already fired, re-arm for next capture
-            if (_plotManager != null && _plotManager.SingleShotMode && _plotManager.SingleShotTriggered)
-            {
-                _plotManager.RearmTrigger();
-                return;
-            }
-
             // Normal behavior: toggle between Running and Stopped states
             if(RunState == RunStates.Running)
                 this.RunState = RunStates.Stopped;
@@ -163,16 +156,7 @@ namespace PowerScope.View.UserControls
             if (RunButton == null || _plotManager == null)
                 return;
 
-            // If in single-shot mode and trigger has fired, show green Run button (ready for next capture)
-            if (_plotManager.SingleShotMode && _plotManager.SingleShotTriggered)
-            {
-                RunButton.Content = "Run 🏃‍♂️‍➡️";
-                RunButton.Background = new SolidColorBrush(Colors.LimeGreen);
-                RunButton.Tag = "LimeGreen";
-                return;
-            }
-
-            // Otherwise, show normal state based on RunState
+            // Show state based on RunState
             if (RunState == RunStates.Running)
             {
                 RunButton.Content = "Stop";
@@ -240,13 +224,14 @@ namespace PowerScope.View.UserControls
         }
 
         /// <summary>
-        /// Handles property changes from PlotManager, specifically SingleShotTriggered state
+        /// Handles property changes from PlotManager
         /// </summary>
         private void PlotManager_PropertyChanged(object sender, PropertyChangedEventArgs e)
         {
-            if (e.PropertyName == nameof(PlotManager.SingleShotTriggered))
+            if (e.PropertyName == nameof(PlotManager.IsRunning))
             {
-                UpdateRunButtonUI();
+                // Sync RunControl state with PlotManager state (needed for auto-stop from trigger)
+                RunState = _plotManager.IsRunning ? RunStates.Running : RunStates.Stopped;
             }
         }
     }

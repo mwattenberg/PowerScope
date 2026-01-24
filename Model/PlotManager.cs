@@ -522,6 +522,8 @@ namespace PowerScope.Model
                     }
                 }
             }
+            //Not sure about this. I think Claude misunderstanded the logic here.
+            //_triggerSampleIndex = -1;
         }
 
         #endregion

@@ -254,7 +254,7 @@
 					  Style="{StaticResource TriggerComboBoxStyle}"
 					  ItemContainerStyle="{StaticResource TriggerComboBoxItemStyle}"
 					  SelectionChanged="TriggerChannelComboBox_SelectionChanged"
-					  ToolTip="Select channel to trigger on (Auto = first enabled channel)"
+					  ToolTip="Select trigger channel (empty = first enabled channel)"
 					  HorizontalAlignment="Stretch"
 					  Height="24"/>
 			</Grid>
