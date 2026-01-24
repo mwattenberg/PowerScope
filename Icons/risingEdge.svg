@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title">
+  <title>Rising edge (simplified)</title>
+  <!-- Low level (neutral) -->
+  <path d="M8 30 H22" stroke="#E6EAF2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <!-- Rising edge (accent) -->
+  <path d="M22 30 L30 16" stroke="#22D3EE" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <!-- High level (neutral) -->
+  <path d="M30 16 H40" stroke="#E6EAF2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>

@@ -2,6 +2,8 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.ComponentModel;
+using PowerScope.Model;
 
 namespace PowerScope.View.UserControls
 {
@@ -21,10 +23,40 @@ namespace PowerScope.View.UserControls
 
         private RunStates _runstate;
         private RecordStates _recordstate;
+        private PlotManager _plotManager;
+
         public event EventHandler<RunStates> RunStateChanged;
         public event EventHandler<RecordStates> RecordStateChanged;
         public event EventHandler ClearClicked;
         public event EventHandler LoadClicked;
+
+        /// <summary>
+        /// Reference to PlotManager for trigger state monitoring
+        /// </summary>
+        public PlotManager PlotManager
+        {
+            get { return _plotManager; }
+            set
+            {
+                if (_plotManager != value)
+                {
+                    // Unsubscribe from old PlotManager
+                    if (_plotManager != null)
+                    {
+                        _plotManager.PropertyChanged -= PlotManager_PropertyChanged;
+                    }
+
+                    _plotManager = value;
+
+                    // Subscribe to new PlotManager
+                    if (_plotManager != null)
+                    {
+                        _plotManager.PropertyChanged += PlotManager_PropertyChanged;
+                        UpdateRunButtonUI();
+                    }
+                }
+            }
+        }
 
         public RunStates RunState
         {
@@ -91,6 +123,14 @@ namespace PowerScope.View.UserControls
 
         private void RunButton_Click(object sender, RoutedEventArgs e)
         {
+            // If in single-shot mode and trigger has already fired, re-arm for next capture
+            if (_plotManager != null && _plotManager.SingleShotMode && _plotManager.SingleShotTriggered)
+            {
+                _plotManager.RearmTrigger();
+                return;
+            }
+
+            // Normal behavior: toggle between Running and Stopped states
             if(RunState == RunStates.Running)
                 this.RunState = RunStates.Stopped;
             else
@@ -120,20 +160,30 @@ namespace PowerScope.View.UserControls
 
         private void UpdateRunButtonUI()
         {
-            if (RunButton == null) 
+            if (RunButton == null || _plotManager == null)
                 return;
-                
+
+            // If in single-shot mode and trigger has fired, show green Run button (ready for next capture)
+            if (_plotManager.SingleShotMode && _plotManager.SingleShotTriggered)
+            {
+                RunButton.Content = "Run 🏃‍♂️‍➡️";
+                RunButton.Background = new SolidColorBrush(Colors.LimeGreen);
+                RunButton.Tag = "LimeGreen";
+                return;
+            }
+
+            // Otherwise, show normal state based on RunState
             if (RunState == RunStates.Running)
             {
                 RunButton.Content = "Stop";
                 RunButton.Background = new SolidColorBrush(Colors.Red);
-                RunButton.Tag = "Red"; // Update Tag for hover effects
+                RunButton.Tag = "Red";
             }
             else
             {
                 RunButton.Content = "Run 🏃‍♂️‍➡️";
                 RunButton.Background = new SolidColorBrush(Colors.LimeGreen);
-                RunButton.Tag = "LimeGreen"; // Update Tag for hover effects
+                RunButton.Tag = "LimeGreen";
             }
         }
 
@@ -187,6 +237,17 @@ namespace PowerScope.View.UserControls
         private void ClearButton_Click(object sender, RoutedEventArgs e)
         {
             ClearClicked?.Invoke(this, EventArgs.Empty);
+        }
+
+        /// <summary>
+        /// Handles property changes from PlotManager, specifically SingleShotTriggered state
+        /// </summary>
+        private void PlotManager_PropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(PlotManager.SingleShotTriggered))
+            {
+                UpdateRunButtonUI();
+            }
         }
     }
 }

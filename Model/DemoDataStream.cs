@@ -430,7 +430,7 @@ namespace PowerScope.Model
 
         private double GenerateSampleForChannel(int channel, double time)
         {
-            double baseFrequency = 1.0 + channel * 0.5; // Different frequency for each channel
+            double baseFrequency = 60.0 + channel * 0.5; // Different frequency for each channel
             double amplitude = 1000; // Amplitude to make signals visible
 
             return DemoSettings.SignalType switch

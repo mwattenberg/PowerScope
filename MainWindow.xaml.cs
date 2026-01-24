@@ -175,68 +175,76 @@ namespace PowerScope
         void InitializeControls()
         {
             // Set PlotSettings as DataContext for controls
-  HorizontalControl.Settings = _plotManager.Settings;
-  HorizontalControl.PlotManager = _plotManager;
-            VerticalControl.Settings = _plotManager.Settings;
+            HorizontalControl.Settings = _plotManager.Settings;
+            HorizontalControl.PlotManager = _plotManager;
+      
+            TriggerControl.Settings = _plotManager.Settings;
+            TriggerControl.AvailableChannels = DataStreamBar.Channels;
+            TriggerControl.PlotManager = _plotManager;
+
+        VerticalControl.Settings = _plotManager.Settings;
 
             // Set dependencies for MeasurementBar - now gets channels from ChannelControlBar!
             MeasurementBar.ChannelControlBar = ChannelControlBar;
-            // Pass PlotManager for plot data access and plot control
+       // Pass PlotManager for plot data access and plot control
             MeasurementBar.PlotManager = _plotManager;
 
-            // Set PlotManager as DataContext for RunControl (it now handles its own running state)
-            RunControl.DataContext = _plotManager;
+            // Set PlotManager for RunControl to monitor trigger state
+ RunControl.PlotManager = _plotManager;
 
-            // Initialize default values through PlotSettings
-            _plotManager.Settings.Xmax = DisplayElements; // Set initial window size
-            _plotManager.Settings.Ymax = 4000;
-            _plotManager.Settings.Ymin = 0;
+     // Initialize default values through PlotSettings
+   _plotManager.Settings.Xmax = DisplayElements; // Set initial window size
+   _plotManager.Settings.Ymax = 4000;
+          _plotManager.Settings.Ymin = 0;
 
-            // Set initial buffer size in PlotSettings (automatically propagates to UI via data binding)
-            _plotManager.Settings.BufferSize = 5000000;
+   // Set initial buffer size in PlotSettings (automatically propagates to UI via data binding)
+    _plotManager.Settings.BufferSize = 5000000;
         }
 
         private void InitializeEventHandlers()
         {
-            RunControl.RunStateChanged += RunControl_RunStateChanged;
+RunControl.RunStateChanged += RunControl_RunStateChanged;
             RunControl.RecordStateChanged += RunControl_RecordStateChanged;
             RunControl.ClearClicked += RunControl_ClearClicked;
-            RunControl.LoadClicked += RunControl_LoadClicked;
+         RunControl.LoadClicked += RunControl_LoadClicked;
 
-            // Subscribe directly to ObservableCollection.CollectionChanged for automatic notifications
+      // Subscribe directly to ObservableCollection.CollectionChanged for automatic notifications
             DataStreamBar.Channels.CollectionChanged += OnChannelsCollectionChanged;
 
-            // Subscribe to MenuBar events
+        // Subscribe to MenuBar events
             MainMenuBar.PreferencesClicked += MenuBar_PreferencesClicked;
-            MainMenuBar.SaveSettingsClicked += (s, e) => SaveSettings();
+        MainMenuBar.SaveSettingsClicked += (s, e) => SaveSettings();
             MainMenuBar.LoadSettingsClicked += (s, e) => LoadSettings();
-            MainMenuBar.ExportPlotClicked += (s, e) => ExportPlot();
+     MainMenuBar.ExportPlotClicked += (s, e) => ExportPlot();
             MainMenuBar.AboutClicked += (s, e) => ShowAboutWindow();
         }
 
         private void ShowAboutWindow()
-        {
-            var aboutWindow = new View.UserForms.AboutWindow();
-            aboutWindow.Owner = this;
-            aboutWindow.ShowDialog();
+    {
+         var aboutWindow = new View.UserForms.AboutWindow();
+      aboutWindow.Owner = this;
+    aboutWindow.ShowDialog();
         }
 
         private void MenuBar_PreferencesClicked(object sender, EventArgs e)
         {
-            OpenPreferences();
+    OpenPreferences();
         }
 
         private void OnChannelsCollectionChanged(object sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
-        {
-            // Channel-centric approach: simply pass the channels collection to PlotManager
-            _plotManager.SetChannels(DataStreamBar.Channels);
+   {
+     // Channel-centric approach: simply pass the channels collection to PlotManager
+   _plotManager.SetChannels(DataStreamBar.Channels);
 
-            // Update ChannelControlBar from DataStreamBar
-            ChannelControlBar.UpdateFromDataStreamBar(DataStreamBar);
+      // Update ChannelControlBar from DataStreamBar
+ChannelControlBar.UpdateFromDataStreamBar(DataStreamBar);
 
-            // Refresh measurements when channels change
-            MeasurementBar.RefreshMeasurements();
-        }
+          // Update TriggerControl's available channels for trigger selection
+  TriggerControl.AvailableChannels = DataStreamBar.Channels;
+
+   // Refresh measurements when channels change
+    MeasurementBar.RefreshMeasurements();
+   }
 
         private void RunControl_RunStateChanged(object sender, RunControl.RunStates newState)
         {

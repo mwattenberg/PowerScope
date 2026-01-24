@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
@@ -64,102 +65,102 @@ namespace PowerScope.View.UserControls
                 oldSettings.PropertyChanged -= Settings_PropertyChanged;
             }
 
-            // Subscribe to new settings
+        // Subscribe to new settings
             if (e.NewValue is PlotSettings newSettings)
-            {
-                newSettings.PropertyChanged += Settings_PropertyChanged;
-                UpdateModeButtonAppearance(); // Update buttons when DataContext changes
-            }
+       {
+          newSettings.PropertyChanged += Settings_PropertyChanged;
+          UpdateModeButtonAppearance(); // Update buttons when DataContext changes
+       }
         }
 
         private void Settings_PropertyChanged(object sender, PropertyChangedEventArgs e)
         {
-            if (e.PropertyName == nameof(PlotSettings.EnableEdgeTrigger))
-            {
-                UpdateModeButtonAppearance();
-                UpdateTriggerLineVisibility();
+   if (e.PropertyName == nameof(PlotSettings.EnableEdgeTrigger))
+        {
+          UpdateModeButtonAppearance();
+          UpdateTriggerLineVisibility();
             }
-        }
+     }
 
-        private void UpdateModeButtonAppearance()
+      private void UpdateModeButtonAppearance()
         {
             if (Settings != null && RollButton != null && TriggerButton != null)
             {
-                if (Settings.EnableEdgeTrigger)
-                {
-                    // Trigger mode is active
-                    RollButton.Background = InactiveBrush;
-                    TriggerButton.Background = ActiveBrush;
-                }
-                else
-                {
-                    // Roll mode is active (default)
-                    RollButton.Background = ActiveBrush;
-                    TriggerButton.Background = InactiveBrush;
-                }
-            }
+       if (Settings.EnableEdgeTrigger)
+ {
+           // Trigger mode is active
+         RollButton.Background = InactiveBrush;
+  TriggerButton.Background = ActiveBrush;
+    }
+    else
+           {
+      // Roll mode is active (default)
+ RollButton.Background = ActiveBrush;
+            TriggerButton.Background = InactiveBrush;
+    }
+      }
         }
 
-        /// <summary>
+ /// <summary>
         /// Updates trigger line visibility based on trigger mode
         /// </summary>
         private void UpdateTriggerLineVisibility()
         {
-            if (_plotManager == null)
-                return;
+    if (_plotManager == null)
+    return;
 
-            if (Settings != null && Settings.EnableEdgeTrigger)
-            {
-                _plotManager.ShowTriggerLine();
-            }
+  if (Settings != null && Settings.EnableEdgeTrigger)
+  {
+       _plotManager.ShowTriggerLine();
+   }
             else
-            {
+   {
                 _plotManager.HideTriggerLine();
             }
         }
 
         private void ButtonGrow_Click(object sender, RoutedEventArgs e)
-        {
+   {
             if (Settings != null)
-                Settings.Xmax = Math.Min(Settings.Xmax * 2, Settings.BufferSize);
+  Settings.Xmax = Math.Min(Settings.Xmax * 2, Settings.BufferSize);
         }
 
         private void ButtonShrink_Click(object sender, RoutedEventArgs e)
         {
             if (Settings != null)
-                Settings.Xmax = Math.Max(Settings.Xmax / 2, 128);
+  Settings.Xmax = Math.Max(Settings.Xmax / 2, 128);
         }
 
         private void BufferSizeTextBox_TextChanged(object sender, TextChangedEventArgs e)
         {
-            if (int.TryParse(BufferSizeTextBox.Text, out int bufferSize) && Settings != null && bufferSize != Settings.BufferSize)
-            {
-                Settings.BufferSize = Math.Clamp(bufferSize, 1000, 100000000);
+         if (int.TryParse(BufferSizeTextBox.Text, out int bufferSize) && Settings != null && bufferSize != Settings.BufferSize)
+       {
+       Settings.BufferSize = Math.Clamp(bufferSize, 1000, 100000000);
             }
-        }
+    }
 
         private void SamplesTextBox_TextChanged(object sender, TextChangedEventArgs e)
         {
             if (int.TryParse(SamplesTextBox.Text, out int samples) && Settings != null && samples != Settings.Xmax)
-                Settings.Xmax = Math.Max(samples, 1);
+          Settings.Xmax = Math.Max(samples, 1);
         }
 
         private void RollButton_Click(object sender, RoutedEventArgs e)
-        {
+    {
             if (Settings != null)
-            {
-                Settings.EnableEdgeTrigger = false; // Roll mode means trigger is disabled
-                // UpdateModeButtonAppearance() and UpdateTriggerLineVisibility() will be called automatically via PropertyChanged
-            }
-        }
+    {
+    Settings.EnableEdgeTrigger = false; // Roll mode means trigger is disabled
+        // UpdateModeButtonAppearance() and UpdateTriggerLineVisibility() will be called automatically via PropertyChanged
+    }
+    }
 
         private void TriggerButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (Settings != null)
-            {
-                Settings.EnableEdgeTrigger = true; // Enable trigger mode
-                // UpdateModeButtonAppearance() and UpdateTriggerLineVisibility() will be called automatically via PropertyChanged
-            }
+    {
+       if (Settings != null)
+     {
+            Settings.EnableEdgeTrigger = true; // Enable trigger mode
+         // UpdateModeButtonAppearance() and UpdateTriggerLineVisibility() will be called automatically via PropertyChanged
+   }
         }
     }
 }

@@ -88,6 +88,15 @@ namespace PowerScope.Model
     }
 
     /// <summary>
+    /// Trigger edge type for edge trigger mode
+    /// </summary>
+    public enum TriggerEdgeType
+    {
+        Rising,
+        Falling
+    }
+
+    /// <summary>
     /// Model class that holds all plot-related settings and configuration
     /// </summary>
     public class PlotSettings : INotifyPropertyChanged
@@ -103,6 +112,9 @@ namespace PowerScope.Model
         private bool _yAutoScale = true;
         private int _bufferSize = 50000;
         private bool _enableEdgeTrigger = false;
+        private Channel _triggerSourceChannel = null;
+        private TriggerEdgeType _triggerEdge = TriggerEdgeType.Rising;
+        private bool _singleShotMode = false;
 
         /// <summary>
         /// Plot refresh rate option (enum-based)
@@ -302,6 +314,75 @@ namespace PowerScope.Model
                 {
                     _enableEdgeTrigger = value;
                     OnPropertyChanged(nameof(EnableEdgeTrigger));
+                    // Notify button color properties
+                    OnPropertyChanged(nameof(NormalModeButtonBackground));
+                    OnPropertyChanged(nameof(SingleModeButtonBackground));
+                }
+            }
+        }
+
+        /// <summary>
+        /// The channel to use as trigger source
+        /// Null means use first enabled channel (default behavior)
+        /// </summary>
+        public Channel TriggerSourceChannel
+        {
+            get { return _triggerSourceChannel; }
+            set
+            {
+                if (_triggerSourceChannel != value)
+                {
+                    _triggerSourceChannel = value;
+                    OnPropertyChanged(nameof(TriggerSourceChannel));
+                }
+            }
+        }
+
+        /// <summary>
+        /// Trigger edge type (Rising or Falling)
+        /// </summary>
+        public TriggerEdgeType TriggerEdge
+        {
+            get { return _triggerEdge; }
+            set
+            {
+                if (_triggerEdge != value)
+                {
+                    _triggerEdge = value;
+                    OnPropertyChanged(nameof(TriggerEdge));
+                    OnPropertyChanged(nameof(TriggerOnRisingEdge)); // Notify backward-compatible property
+                }
+            }
+        }
+
+        /// <summary>
+        /// Backward-compatible boolean property for rising edge trigger
+        /// True = Rising edge, False = Falling edge
+        /// </summary>
+        public bool TriggerOnRisingEdge
+        {
+            get { return _triggerEdge == TriggerEdgeType.Rising; }
+            set
+            {
+                TriggerEdge = value ? TriggerEdgeType.Rising : TriggerEdgeType.Falling;
+            }
+        }
+
+        /// <summary>
+        /// Single-shot trigger mode - when true, trigger fires once then requires re-arm
+        /// </summary>
+        public bool SingleShotMode
+        {
+            get { return _singleShotMode; }
+            set
+            {
+                if (_singleShotMode != value)
+                {
+                    _singleShotMode = value;
+                    OnPropertyChanged(nameof(SingleShotMode));
+                    // Notify button color properties
+                    OnPropertyChanged(nameof(NormalModeButtonBackground));
+                    OnPropertyChanged(nameof(SingleModeButtonBackground));
                 }
             }
         }
@@ -311,9 +392,57 @@ namespace PowerScope.Model
         /// </summary>
         public double TimerInterval => 1000.0 / PlotUpdateRateFPS;
 
+        #region Trigger Mode Button Colors (Computed Properties for MVVM)
+
+        /// <summary>
+        /// Gets the background brush for the Normal trigger mode button.
+        /// LimeGreen when NOT single-shot AND trigger enabled, DarkGray otherwise.
+        /// </summary>
+        public System.Windows.Media.Brush NormalModeButtonBackground
+        {
+            get
+            {
+                if (!_enableEdgeTrigger)
+                {
+                    // Return the default button background from global style
+                    return (System.Windows.Media.Brush)System.Windows.Application.Current.Resources["PlotSettings_TitleBarBrush"] 
+                        ?? new System.Windows.Media.SolidColorBrush(System.Windows.Media.Colors.DarkGray);
+                }
+
+                return !_singleShotMode
+                    ? new System.Windows.Media.SolidColorBrush(System.Windows.Media.Colors.LimeGreen)
+                    : (System.Windows.Media.Brush)System.Windows.Application.Current.Resources["PlotSettings_TitleBarBrush"]
+                        ?? new System.Windows.Media.SolidColorBrush(System.Windows.Media.Colors.DarkGray);
+            }
+        }
+
+        /// <summary>
+        /// Gets the background brush for the Single trigger mode button.
+        /// LimeGreen when single-shot AND trigger enabled, DarkGray otherwise.
+        /// </summary>
+        public System.Windows.Media.Brush SingleModeButtonBackground
+        {
+            get
+            {
+                if (!_enableEdgeTrigger)
+                {
+                    // Return the default button background from global style
+                    return (System.Windows.Media.Brush)System.Windows.Application.Current.Resources["PlotSettings_TitleBarBrush"]
+                        ?? new System.Windows.Media.SolidColorBrush(System.Windows.Media.Colors.DarkGray);
+                }
+
+                return _singleShotMode
+                    ? new System.Windows.Media.SolidColorBrush(System.Windows.Media.Colors.LimeGreen)
+                    : (System.Windows.Media.Brush)System.Windows.Application.Current.Resources["PlotSettings_TitleBarBrush"]
+                        ?? new System.Windows.Media.SolidColorBrush(System.Windows.Media.Colors.DarkGray);
+            }
+        }
+
+        #endregion
+
         public event PropertyChangedEventHandler PropertyChanged;
 
-        protected virtual void OnPropertyChanged(string propertyName)
+        public virtual void OnPropertyChanged(string propertyName)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
