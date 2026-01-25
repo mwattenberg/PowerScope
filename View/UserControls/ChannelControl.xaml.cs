@@ -386,6 +386,7 @@ namespace PowerScope.View.UserControls
         /// Updates the TopColorBar gradient when Channel or Color changes
         /// Uses the IsVirtual flag from ChannelSettings
         /// For virtual channels, creates gradient from parent channel color(s) to virtual channel color
+        /// Constants are shown in neutral gray to indicate they're not visible user channels
         /// </summary>
         private void UpdateTopColorBar()
         {
@@ -400,28 +401,45 @@ namespace PowerScope.View.UserControls
                     Channel parentA = Settings.ParentChannelA;
                     if (parentA != null)
                     {
-                        startColor = parentA.Settings.DisplayColor;
+                        if (parentA.OwnerStream is ConstantDataStream)
+                        {
+                            startColor = Colors.DimGray;
+                        }
+                        else
+                        {
+                            startColor = parentA.Settings.DisplayColor;
+                        }
                     }
                     
                     Channel parentB = Settings.ParentChannelB;
                     
                     if (parentB != null)
                     {
+                        Color parentBColor;
+                        if (parentB.OwnerStream is ConstantDataStream)
+                        {
+                            parentBColor = Colors.DimGray;
+                        }
+                        else
+                        {
+                            parentBColor = parentB.Settings.DisplayColor;
+                        }
+                        
                         LinearGradientBrush gradientBrush = new LinearGradientBrush();
                         gradientBrush.StartPoint = new Point(0, 0.5);
                         gradientBrush.EndPoint = new Point(1, 0.5);
 
                         GradientStop parentAStop = new GradientStop();
-                        parentAStop.Color = parentA.Settings.DisplayColor;
+                        parentAStop.Color = startColor;
                         parentAStop.Offset = 0.0;
 
                         GradientStop parentBStop = new GradientStop();
-                        parentBStop.Color = parentB.Settings.DisplayColor;
-                        parentBStop.Offset = 0.5;
+                        parentBStop.Color = parentBColor;
+                        parentBStop.Offset = 0.25;
 
                         GradientStop virtualStop = new GradientStop();
                         virtualStop.Color = Settings.DisplayColor;
-                        virtualStop.Offset = 1.0;
+                        virtualStop.Offset = 0.5;
 
                         gradientBrush.GradientStops.Add(parentAStop);
                         gradientBrush.GradientStops.Add(parentBStop);
@@ -441,7 +459,7 @@ namespace PowerScope.View.UserControls
 
                         GradientStop virtualStop = new GradientStop();
                         virtualStop.Color = Settings.DisplayColor;
-                        virtualStop.Offset = 1.0;
+                        virtualStop.Offset = 0.5;
 
                         gradientBrush.GradientStops.Add(sourceStop);
                         gradientBrush.GradientStops.Add(virtualStop);

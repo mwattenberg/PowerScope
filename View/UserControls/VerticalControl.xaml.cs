@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
 using PowerScope.Model;
 
 namespace PowerScope.View.UserControls
@@ -23,25 +24,22 @@ namespace PowerScope.View.UserControls
         {
             InitializeComponent();
             
-            //// Subscribe to DataContext changes
-            //DataContextChanged += VerticalControl_DataContextChanged;
+            DataContextChanged += VerticalControl_DataContextChanged;
         }
 
-        //private void VerticalControl_DataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
-        //{
-        //    // Unsubscribe from old settings
-        //    if (e.OldValue is PlotSettings oldSettings)
-        //    {
-        //        oldSettings.PropertyChanged -= Settings_PropertyChanged;
-        //    }
+        private void VerticalControl_DataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
+        {
+            if (e.OldValue is PlotSettings oldSettings)
+            {
+                oldSettings.PropertyChanged -= Settings_PropertyChanged;
+            }
 
-        //    // Subscribe to new settings
-        //    if (e.NewValue is PlotSettings newSettings)
-        //    {
-        //        newSettings.PropertyChanged += Settings_PropertyChanged;
-        //        UpdateUIFromSettings();
-        //    }
-        //}
+            if (e.NewValue is PlotSettings newSettings)
+            {
+                newSettings.PropertyChanged += Settings_PropertyChanged;
+                UpdateAutoScaleButtonStyle();
+            }
+        }
 
         private void Settings_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
         {
@@ -49,21 +47,30 @@ namespace PowerScope.View.UserControls
                 e.PropertyName == nameof(PlotSettings.Ymax) || 
                 e.PropertyName == nameof(PlotSettings.YAutoScale))
             {
-                Dispatcher.BeginInvoke(() => UpdateUIFromSettings());
+                Dispatcher.BeginInvoke(() => UpdateAutoScaleButtonStyle());
             }
         }
 
-        private void UpdateUIFromSettings()
+        private void UpdateAutoScaleButtonStyle()
         {
-            if (Settings != null)
+            if (AutoScaleButton != null && Settings != null)
             {
-                // Update text boxes without triggering change events
-                if (MaxTextBox != null)
-                    MaxTextBox.Text = Settings.Ymax.ToString();
-                if (MinTextBox != null)
-                    MinTextBox.Text = Settings.Ymin.ToString();
-                if (AutoScaleCheckBox != null)
-                    AutoScaleCheckBox.IsChecked = Settings.YAutoScale;
+                if (Settings.YAutoScale)
+                {
+                    AutoScaleButton.Background = new SolidColorBrush(Colors.LimeGreen);
+                }
+                else
+                {
+                    object defaultBrush = Application.Current.Resources["PlotSettings_TextBoxBackgroundBrush"];
+                    if (defaultBrush != null)
+                    {
+                        AutoScaleButton.Background = (Brush)defaultBrush;
+                    }
+                    else
+                    {
+                        AutoScaleButton.Background = new SolidColorBrush(Colors.Gray);
+                    }
+                }
             }
         }
 
@@ -73,7 +80,7 @@ namespace PowerScope.View.UserControls
             {
                 if (minValue != Settings.Ymin)
                 {
-                    Settings.Ymin = Math.Min(minValue, Settings.Ymax - 1); // Ensure Min is less than Max
+                    Settings.Ymin = Math.Min(minValue, Settings.Ymax - 1);
                 }
             }
         }
@@ -84,20 +91,38 @@ namespace PowerScope.View.UserControls
             {
                 if (maxValue != Settings.Ymax)
                 {
-                    Settings.Ymax = Math.Max(maxValue, Settings.Ymin + 1); // Ensure Max is greater than Min
+                    Settings.Ymax = Math.Max(maxValue, Settings.Ymin + 1);
                 }
             }
         }
 
-        private void AutoScaleCheckBox_CheckedChanged(object sender, RoutedEventArgs e)
+        private void AutoScaleButton_Click(object sender, RoutedEventArgs e)
         {
             if (Settings != null)
             {
-                bool isChecked = AutoScaleCheckBox.IsChecked ?? false;
-                if (isChecked != Settings.YAutoScale)
-                {
-                    Settings.YAutoScale = isChecked;
-                }
+                Settings.YAutoScale = !Settings.YAutoScale;
+            }
+        }
+
+        private void RefreshButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (Settings != null)
+            {
+                int currentMin = Settings.Ymin;
+                int currentMax = Settings.Ymax;
+
+                //This is a dirty hack to force the UI to refresh
+                //We like it dirty
+                Settings.Ymin = currentMin + 1;
+                Settings.Ymax = currentMax + 1;
+
+                Settings.Ymin = currentMin - 1;
+                Settings.Ymax = currentMax - 1;
+
+                if (MinTextBox != null)
+                    MinTextBox.Text = currentMin.ToString();
+                if (MaxTextBox != null)
+                    MaxTextBox.Text = currentMax.ToString();
             }
         }
 
@@ -105,11 +130,9 @@ namespace PowerScope.View.UserControls
         {
             if (Settings != null)
             {
-                // Calculate the current range center
                 int center = (Settings.Ymax + Settings.Ymin) / 2;
                 int halfRange = (Settings.Ymax - Settings.Ymin) / 2;
                 
-                // Double the range while keeping the center the same
                 int newHalfRange = halfRange * 2;
                 Settings.Ymin = center - newHalfRange;
                 Settings.Ymax = center + newHalfRange;
@@ -120,11 +143,9 @@ namespace PowerScope.View.UserControls
         {
             if (Settings != null)
             {
-                // Calculate the current range center
                 int center = (Settings.Ymax + Settings.Ymin) / 2;
                 int halfRange = (Settings.Ymax - Settings.Ymin) / 2;
                 
-                // Halve the range while keeping the center the same (minimum range of 2)
                 int newHalfRange = Math.Max(halfRange / 2, 1);
                 Settings.Ymin = center - newHalfRange;
                 Settings.Ymax = center + newHalfRange;

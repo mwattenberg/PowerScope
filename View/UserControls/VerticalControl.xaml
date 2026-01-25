@@ -177,19 +177,30 @@
                          TextChanged="MinTextBox_TextChanged"/>
             </Grid>
             
-            <!-- Auto Scale row -->
+            <!-- Auto Scale row with two buttons -->
             <Grid Grid.Row="4" Margin="5,2,5,2">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
-                <TextBlock Grid.Column="0" Text="Auto Scale" Style="{StaticResource LabelTextStyle}" VerticalAlignment="Center"/>
-                <CheckBox Grid.Column="1" x:Name="AutoScaleCheckBox" 
-                          Style="{StaticResource VerticalCheckBoxStyle}"
-                          HorizontalAlignment="Right" 
-                          Margin="5,0,0,0" 
-                          IsChecked="{Binding YAutoScale}"
-                          Click="AutoScaleCheckBox_CheckedChanged"/>
+                
+                <Button x:Name="AutoScaleButton" Grid.Column="0" 
+                        Style="{StaticResource SmallVerticalButtonStyle}"
+                        Height="28"
+                        Margin="0,0,2,0"
+                        Click="AutoScaleButton_Click"
+                        ToolTip="Toggles between auto scaling and fixed scaling">
+                    <TextBlock Text="Auto" FontSize="12" FontWeight="Bold"/>
+                </Button>
+                
+                <Button x:Name="RefreshButton" Grid.Column="1"
+                        Style="{StaticResource SmallVerticalButtonStyle}"
+                        Height="28"
+                        Margin="2,0,0,0"
+                        Click="RefreshButton_Click"
+                        ToolTip="Resets the Y axis to the given defaults">
+                    <TextBlock Text="Reset" FontSize="12" FontWeight="Bold"/>
+                </Button>
             </Grid>
         </Grid>
     </Border>
