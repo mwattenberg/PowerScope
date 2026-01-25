@@ -37,7 +37,7 @@
     <PackageReference Include="SharpVectors.Wpf" Version="1.8.5" />
     <PackageReference Include="System.IO.Ports" Version="10.0.0-preview.6.25358.103" />
     <PackageReference Include="System.Management" Version="9.0.7" />
-	<ProjectReference Include="C:\Users\wattenberg\source\repos\mwattenberg\FtdiSharp\src\FtdiSharp\FtdiSharp.csproj"/>
+	<ProjectReference Include="FtdiSharp\src\FtdiSharp\FtdiSharp.csproj"/>
   </ItemGroup>
 
   <ItemGroup>
