@@ -66,7 +66,7 @@ jobs:
 
     - name: Publish
       run: |
-        dotnet publish -c Release -r win-x64 --self-contained true -p:PublishTrimmed=false -p:PublishReadyToRun=true -o ./publish
+        dotnet publish PowerScope.csproj -c Release -r win-x64 --self-contained true -p:PublishTrimmed=false -p:PublishReadyToRun=true -o ./publish
 
     - name: Create Zip Archive
       shell: pwsh
