@@ -107,8 +107,7 @@ namespace PowerScope.View.UserControls
                     Color = PlotManager.GetColor(globalIndex),
                     IsEnabled = true,
                     Gain = 1.0,
-                    Offset = 0.0,
-                    IsVirtual = true
+                    Offset = 0.0
                 };
 
                 // Create the virtual channel using operands (channels or constants)

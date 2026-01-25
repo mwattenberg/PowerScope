@@ -20,23 +20,14 @@ namespace PowerScope.Model
         private double _gain = 1.0;
         private double _offset = 0.0;
         private IDigitalFilter? _filter = null;
-        private bool _isVirtual = false;
         private Channel _ownerChannel;
 
-        /// <summary>
-        /// Event raised when a measurement is requested for this channel
-        /// Channel subscribes to this and handles the measurement creation
-        /// </summary>
         public event EventHandler<MeasurementType> MeasurementRequested;
-
         public event PropertyChangedEventHandler PropertyChanged;
 
         public string Label
         {
-            get 
-            { 
-                return _label; 
-            }
+            get { return _label; }
             set
             {
                 if (_label != value)
@@ -49,10 +40,7 @@ namespace PowerScope.Model
 
         public Color Color
         {
-            get 
-            { 
-                return _color; 
-            }
+            get { return _color; }
             set
             {
                 if (_color != value)
@@ -66,10 +54,7 @@ namespace PowerScope.Model
 
         public bool IsEnabled
         {
-            get 
-            { 
-                return _isEnabled; 
-            }
+            get { return _isEnabled; }
             set
             {
                 if (_isEnabled != value)
@@ -83,10 +68,7 @@ namespace PowerScope.Model
 
         public double Gain
         {
-            get 
-            { 
-                return _gain; 
-            }
+            get { return _gain; }
             set
             {
                 if (Math.Abs(_gain - value) > 1e-9)
@@ -99,10 +81,7 @@ namespace PowerScope.Model
 
         public double Offset
         {
-            get 
-            { 
-                return _offset; 
-            }
+            get { return _offset; }
             set
             {
                 if (Math.Abs(_offset - value) > 1e-9)
@@ -115,10 +94,7 @@ namespace PowerScope.Model
 
         public IDigitalFilter Filter
         {
-            get 
-            { 
-                return _filter; 
-            }
+            get { return _filter; }
             set
             {
                 if (_filter != value)
@@ -129,20 +105,14 @@ namespace PowerScope.Model
             }
         }
 
+        /// <summary>
+        /// Gets whether this channel is backed by a VirtualDataStream.
+        /// Computed property - automatically correct based on the underlying stream type.
+        /// No manual setting required, eliminating possibility of desynchronization.
+        /// </summary>
         public bool IsVirtual
         {
-            get 
-            { 
-                return _isVirtual; 
-            }
-            set
-            {
-                if (_isVirtual != value)
-                {
-                    _isVirtual = value;
-                    OnPropertyChanged(nameof(IsVirtual));
-                }
-            }
+            get { return _ownerChannel?.OwnerStream is VirtualDataStream; }
         }
 
         public Color DisplayColor
@@ -156,10 +126,6 @@ namespace PowerScope.Model
             }
         }
 
-        /// <summary>
-        /// Gets the owner Channel that this ChannelSettings belongs to.
-        /// Useful for accessing the underlying stream (e.g., VirtualDataStream source channels).
-        /// </summary>
         public Channel OwnerChannel
         {
             get { return _ownerChannel; }
@@ -173,11 +139,7 @@ namespace PowerScope.Model
         {
             get
             {
-                if (_ownerChannel == null || !_isVirtual)
-                    return null;
-                    
-                VirtualDataStream virtualStream = _ownerChannel.OwnerStream as VirtualDataStream;
-                if (virtualStream != null)
+                if (_ownerChannel?.OwnerStream is VirtualDataStream virtualStream)
                 {
                     return virtualStream.GetParentChannelA();
                 }
@@ -193,11 +155,7 @@ namespace PowerScope.Model
         {
             get
             {
-                if (_ownerChannel == null || !_isVirtual)
-                    return null;
-                    
-                VirtualDataStream virtualStream = _ownerChannel.OwnerStream as VirtualDataStream;
-                if (virtualStream != null)
+                if (_ownerChannel?.OwnerStream is VirtualDataStream virtualStream)
                 {
                     return virtualStream.GetParentChannelB();
                 }
@@ -212,11 +170,7 @@ namespace PowerScope.Model
         {
             get
             {
-                if (_ownerChannel == null || !_isVirtual)
-                    return false;
-                    
-                VirtualDataStream virtualStream = _ownerChannel.OwnerStream as VirtualDataStream;
-                if (virtualStream != null)
+                if (_ownerChannel?.OwnerStream is VirtualDataStream virtualStream)
                 {
                     return virtualStream.IsBinaryOperation;
                 }
@@ -224,11 +178,6 @@ namespace PowerScope.Model
             }
         }
 
-        /// <summary>
-        /// Gets the measurements collection from the owner channel.
-        /// Returns an empty collection if no owner channel is set.
-        /// This enables UI binding without creating circular dependencies.
-        /// </summary>
         public ObservableCollection<Measurement> Measurements
         {
             get
@@ -241,11 +190,6 @@ namespace PowerScope.Model
             }
         }
 
-        /// <summary>
-        /// Gets the count of active measurements.
-        /// Raises PropertyChanged when measurements are added/removed.
-        /// Used for UI button styling (e.g., highlight when count > 0).
-        /// </summary>
         public int MeasurementCount
         {
             get
@@ -258,21 +202,11 @@ namespace PowerScope.Model
             }
         }
 
-        /// <summary>
-        /// Gets whether any measurements are active.
-        /// Useful for boolean binding in XAML (e.g., button styling).
-        /// </summary>
         public bool HasMeasurements
         {
             get { return MeasurementCount > 0; }
         }
 
-        /// <summary>
-        /// Adds a measurement of the specified type to this channel.
-        /// Direct method call (not event-based) for clean architecture.
-        /// Delegates to the owner channel if available.
-        /// </summary>
-        /// <param name="measurementType">Type of measurement to add</param>
         public void AddMeasurement(MeasurementType measurementType)
         {
             if (_ownerChannel != null)
@@ -281,37 +215,19 @@ namespace PowerScope.Model
             }
         }
 
-        /// <summary>
-        /// Removes a specific measurement from this channel.
-        /// Direct method call (not event-based) for clean architecture.
-        /// Delegates to the owner channel if available.
-        /// </summary>
-        /// <param name="measurement">The measurement to remove</param>
         public void RemoveMeasurement(Measurement measurement)
         {
-      if (_ownerChannel != null && measurement != null)
-  {
-        _ownerChannel.RemoveMeasurement(measurement);
- }
+            if (_ownerChannel != null && measurement != null)
+            {
+                _ownerChannel.RemoveMeasurement(measurement);
+            }
         }
 
-   /// <summary>
-        /// Requests a measurement of the specified type to be added to this channel.
-        /// Called by UI controls, handled by the Channel that owns these settings.
-        /// DEPRECATED: Use AddMeasurement() instead for cleaner event-free architecture.
-        /// </summary>
-        /// <param name="measurementType">Type of measurement to add</param>
-    public void RequestMeasurement(MeasurementType measurementType)
-  {
+        public void RequestMeasurement(MeasurementType measurementType)
+        {
             MeasurementRequested?.Invoke(this, measurementType);
         }
 
-        /// <summary>
-        /// Internal method called by Channel to establish the back-reference.
-        /// This is set during Channel construction and never changes.
-        /// Ensures ChannelSettings can access its owner Channel's Measurements.
-        /// </summary>
-        /// <param name="ownerChannel">The Channel that owns this ChannelSettings</param>
         internal void SetOwnerChannel(Channel ownerChannel)
         {
             if (_ownerChannel != null)
@@ -327,10 +243,6 @@ namespace PowerScope.Model
             }
         }
 
-        /// <summary>
-        /// Called when measurements are added or removed.
-        /// Raises PropertyChanged for MeasurementCount and HasMeasurements.
-        /// </summary>
         private void OnMeasurementsCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
         {
             OnPropertyChanged(nameof(MeasurementCount));

@@ -2,18 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Windows.Media;
-using PowerScope.Model;
 
 namespace PowerScope.Model
 {
-    /// <summary>
-    /// View model for virtual channel configuration
-    /// Manages the state and operations for creating/editing virtual channels
-    /// Stores configuration data to be used later for actual data computation
-    /// Supports both Channel and constant operands
-    /// </summary>
-    /// 
-
     public enum VirtualChannelOperationType
     {
         Add,
@@ -22,16 +13,22 @@ namespace PowerScope.Model
         Divide
     }
 
+    /// <summary>
+    /// View model for virtual channel configuration
+    /// Manages the state and operations for creating/editing virtual channels
+    /// Stores configuration data to be used later for actual data computation
+    /// InputA and InputB are now direct Channel references (constants wrapped in ConstantDataStream)
+    /// </summary>
     public class VirtualChannelConfig : INotifyPropertyChanged
     {
-        private IVirtualSource _inputA;
-        private IVirtualSource _inputB;
+        private Channel _inputA;
+        private Channel _inputB;
         private VirtualChannelOperationType _operation;
         private string _label;
         private ChannelSettings _targetChannelSettings;
         private List<Channel> _availableChannels;
 
-        public IVirtualSource InputA
+        public Channel InputA
         {
             get { return _inputA; }
             set
@@ -44,7 +41,7 @@ namespace PowerScope.Model
             }
         }
 
-        public IVirtualSource InputB
+        public Channel InputB
         {
             get { return _inputB; }
             set
@@ -83,9 +80,6 @@ namespace PowerScope.Model
             }
         }
 
-        /// <summary>
-        /// Reference to the ChannelSettings this virtual channel will update
-        /// </summary>
         public ChannelSettings TargetChannelSettings
         {
             get { return _targetChannelSettings; }
@@ -99,9 +93,6 @@ namespace PowerScope.Model
             }
         }
 
-        /// <summary>
-        /// List of available channels for input selection
-        /// </summary>
         public List<Channel> AvailableChannels
         {
             get { return _availableChannels; }
@@ -123,10 +114,6 @@ namespace PowerScope.Model
             AvailableChannels = availableChannels ?? new List<Channel>();
         }
 
-        /// <summary>
-        /// Validates the current configuration
-        /// </summary>
-        /// <returns>Validation error message, or empty string if valid</returns>
         public string Validate()
         {
             if (InputA == null)
@@ -135,12 +122,12 @@ namespace PowerScope.Model
             if (InputB == null)
                 return "Please select Input B channel or enter a constant.";
 
-            if (InputA.Channel != null && InputB.Channel != null)
+            if (InputA != null && InputB != null)
             {
-                if (InputA.Channel.OwnerStream is ConstantDataStream && InputB.Channel.OwnerStream is ConstantDataStream)
+                if (InputA.OwnerStream is ConstantDataStream && InputB.OwnerStream is ConstantDataStream)
                 {
                 }
-                else if (InputA.Channel == InputB.Channel)
+                else if (InputA == InputB)
                 {
                     return "Input A and Input B cannot be the same channel.";
                 }

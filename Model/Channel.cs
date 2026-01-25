@@ -6,13 +6,14 @@ namespace PowerScope.Model
 {
     /// <summary>
     /// Represents a single channel that encapsulates both the data source and settings
+    /// The stream can have multiple channels, each represented by a Channel instance
     /// This eliminates the need for global channel indices and complex resolution logic
     /// Now also manages its own measurements
     /// Supports both physical channels (backed by IDataStream) and virtual channels (VirtualDataStream)
     /// </summary>
     public class Channel : INotifyPropertyChanged
     {
-        private readonly IDataStream _ownerStream;
+        private readonly IDataStream _stream;
         private readonly int _indexWithinDatastream;
         private ChannelSettings _settings;
         private bool _disposed = false;
@@ -27,15 +28,15 @@ namespace PowerScope.Model
         /// <summary>
         /// Creates a new Channel instance (physical channel backed by IDataStream)
         /// </summary>
-        /// <param name="ownerStream">The data stream that owns this channel</param>
+        /// <param name="stream">The data stream that owns this channel</param>
         /// <param name="localChannelIndex">The local index within the owner stream (0-based)</param>
         /// <param name="settings">Channel settings for display and processing</param>
-        public Channel(IDataStream ownerStream, int localChannelIndex, ChannelSettings settings)
+        public Channel(IDataStream stream, int localChannelIndex, ChannelSettings settings)
         {
-            if (localChannelIndex < 0 || localChannelIndex >= ownerStream.ChannelCount)
+            if (localChannelIndex < 0 || localChannelIndex >= stream.ChannelCount)
                 throw new ArgumentOutOfRangeException(nameof(localChannelIndex));
 
-            _ownerStream = ownerStream;
+            _stream = stream;
             _indexWithinDatastream = localChannelIndex;
             _settings = settings;
 
@@ -53,7 +54,7 @@ namespace PowerScope.Model
                 throw new ArgumentNullException(nameof(sourceChannel));
 
             // Create virtual data stream
-            _ownerStream = new VirtualDataStream(sourceChannel);
+            _stream = new VirtualDataStream(sourceChannel);
             _indexWithinDatastream = 0; // Virtual streams always use channel 0
             _settings = settings;
 
@@ -70,31 +71,8 @@ namespace PowerScope.Model
             if (sourceChannel2 == null)
                 throw new ArgumentNullException(nameof(sourceChannel2));
 
-            // Create virtual data stream with operation
-            _ownerStream = new VirtualDataStream(
-                new ChannelOperand(sourceChannel1),
-                new ChannelOperand(sourceChannel2),
-                operation);
-            _indexWithinDatastream = 0; // Virtual streams always use channel 0
-            _settings = settings;
-
-            InitializeChannel();
-        }
-
-        /// <summary>
-        /// Creates a new virtual Channel from two operand sources with mathematical operation
-        /// Supports both channels and constants as operands
-        /// </summary>
-        public Channel(IVirtualSource operandA, IVirtualSource operandB, VirtualChannelOperationType operation, ChannelSettings settings)
-        {
-            if (operandA == null)
-                throw new ArgumentNullException(nameof(operandA));
-            if (operandB == null)
-                throw new ArgumentNullException(nameof(operandB));
-
-            // Create virtual data stream with operands (channels or constants)
-            _ownerStream = new VirtualDataStream(operandA, operandB, operation);
-            _indexWithinDatastream = 0; // Virtual streams always use channel 0
+            _stream = new VirtualDataStream(sourceChannel1, sourceChannel2, operation);
+            _indexWithinDatastream = 0;
             _settings = settings;
 
             InitializeChannel();
@@ -112,7 +90,7 @@ namespace PowerScope.Model
             _settings.PropertyChanged += OnSettingsChanged;
 
             // Apply settings to the stream if it supports channel configuration
-            if (_ownerStream is IChannelConfigurable configurableStream)
+            if (_stream is IChannelConfigurable configurableStream)
             {
                 configurableStream.SetChannelSetting(_indexWithinDatastream, _settings);
             }
@@ -123,7 +101,7 @@ namespace PowerScope.Model
         /// </summary>
         public IDataStream OwnerStream 
         { 
-            get { return _ownerStream; } 
+            get { return _stream; } 
         }
 
         /// <summary>
@@ -156,7 +134,7 @@ namespace PowerScope.Model
                     _settings.PropertyChanged += OnSettingsChanged;
 
                     // Apply new settings to the stream
-                    if (_ownerStream is IChannelConfigurable configurableStream)
+                    if (_stream is IChannelConfigurable configurableStream)
                     {
                         configurableStream.SetChannelSetting(_indexWithinDatastream, _settings);
                     }
@@ -201,7 +179,7 @@ namespace PowerScope.Model
             if (_disposed)
                 return 0;
 
-            return _ownerStream.CopyLatestTo(_indexWithinDatastream, destination, requestedSamples);
+            return _stream.CopyLatestTo(_indexWithinDatastream, destination, requestedSamples);
         }
 
         /// <summary>
@@ -209,7 +187,7 @@ namespace PowerScope.Model
         /// </summary>
         public bool IsStreamConnected 
         { 
-            get { return _ownerStream.IsConnected; } 
+            get { return _stream.IsConnected; } 
         }
 
         /// <summary>
@@ -217,7 +195,7 @@ namespace PowerScope.Model
         /// </summary>
         public bool IsStreamStreaming 
         { 
-            get { return _ownerStream.IsStreaming; } 
+            get { return _stream.IsStreaming; } 
         }
 
         /// <summary>
@@ -225,7 +203,7 @@ namespace PowerScope.Model
         /// </summary>
         public string StreamType 
         { 
-            get { return _ownerStream.StreamType; } 
+            get { return _stream.StreamType; } 
         }
 
         /// <summary>
@@ -237,7 +215,7 @@ namespace PowerScope.Model
             if (!IsStreamConnected)
                 return;
 
-            Measurement measurement = new Measurement(measurementType, _ownerStream, _indexWithinDatastream, _settings);
+            Measurement measurement = new Measurement(measurementType, _stream, _indexWithinDatastream, _settings);
             
             // Subscribe to removal request
             measurement.RemoveRequested += OnMeasurementRemoveRequested;
@@ -283,7 +261,7 @@ namespace PowerScope.Model
         /// </summary>
         public string GetChannelId()
         {
-            return $"{_ownerStream.GetHashCode()}_{_indexWithinDatastream}";
+            return $"{_stream.GetHashCode()}_{_indexWithinDatastream}";
         }
 
         private void OnMeasurementRemoveRequested(object sender, EventArgs e)
@@ -314,7 +292,7 @@ namespace PowerScope.Model
             }
 
             // Apply updated settings to the stream
-            if (_ownerStream is IChannelConfigurable configurableStream)
+            if (_stream is IChannelConfigurable configurableStream)
             {
                 configurableStream.SetChannelSetting(_indexWithinDatastream, _settings);
             }

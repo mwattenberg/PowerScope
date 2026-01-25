@@ -106,7 +106,7 @@ namespace PowerScope.View.UserControls
         /// <summary>
         /// Event raised when a channel or constant is selected
         /// </summary>
-        public event EventHandler<IVirtualSource> SelectionChanged;
+        public event EventHandler<Channel> SelectionChanged;
 
         public VirtualChannelSelectionBar()
         {
@@ -127,47 +127,62 @@ namespace PowerScope.View.UserControls
         }
 
         /// <summary>
-        /// Gets the currently selected source (channel or constant)
+        /// Gets the currently selected source as a Channel
+        /// Converts constant input to a ConstantDataStream-backed channel
         /// </summary>
-        public IVirtualSource SelectedSource
+        public Channel GetSelectedChannel()
         {
-            get
+            var selectedChannel = _selectableChannels.FirstOrDefault(sc => sc.IsSelected);
+            if (selectedChannel != null)
+                return selectedChannel.Channel;
+
+            if (_constantOption.IsSelected)
             {
-                // Check if a channel is selected
-                var selectedChannel = _selectableChannels.FirstOrDefault(sc => sc.IsSelected);
-                if (selectedChannel != null)
-                    return new ChannelOperand(selectedChannel.Channel);
-
-                // Check if constant is selected
-                if (_constantOption.IsSelected)
-                    return new ConstantOperand(_constantOption.ConstantValue);
-
-                return null;
+                ConstantDataStream stream = new ConstantDataStream(_constantOption.ConstantValue);
+                ChannelSettings settings = new ChannelSettings
+                {
+                    Label = $"Constant: {_constantOption.ConstantValue:G}",
+                    Color = System.Windows.Media.Colors.DarkGray,
+                    IsEnabled = true
+                };
+                return new Channel(stream, 0, settings);
             }
+
+            return null;
         }
 
         /// <summary>
         /// Sets the selected source programmatically
+        /// Supports both regular channels and constant-backed channels
         /// </summary>
-        public void SetSelectedSource(IVirtualSource source)
+        public void SetSelectedChannel(Channel channel)
         {
             ClearAllSelections();
 
-            if (source == null)
+            if (channel == null)
             {
                 UpdateConstantButtonStyle();
                 return;
             }
 
-            if (source is ConstantOperand constantOperand)
+            if (channel.OwnerStream is ConstantDataStream constantStream)
             {
                 _constantOption.IsSelected = true;
-                _constantOption.ConstantValue = constantOperand.ConstantValue;
-                ConstantButton.Content = constantOperand.ConstantValue.ToString("G4", System.Globalization.CultureInfo.InvariantCulture);
+                string label = channel.Label;
+                if (label.StartsWith("Constant: "))
+                {
+                    label = label.Substring("Constant: ".Length);
+                }
+                if (double.TryParse(label, System.Globalization.NumberStyles.Float, 
+                    System.Globalization.CultureInfo.InvariantCulture, out double value))
+                {
+                    _constantOption.ConstantValue = value;
+                    ConstantButton.Content = value.ToString("G4", System.Globalization.CultureInfo.InvariantCulture);
+                }
             }
             else
             {
-                var matchingChannel = _selectableChannels.FirstOrDefault(sc => sc.Channel == source.Channel);
+                var matchingChannel = _selectableChannels.FirstOrDefault(sc => sc.Channel == channel);
                 if (matchingChannel != null)
                     matchingChannel.IsSelected = true;
             }
@@ -204,26 +219,18 @@ namespace PowerScope.View.UserControls
         {
             if (sender is FrameworkElement element && element.DataContext is SelectableChannel selectableChannel)
             {
-                // Clear all other selections
                 ClearAllSelections();
-
-                // Select this channel
                 selectableChannel.IsSelected = true;
-
-                // Update constant button styling
                 UpdateConstantButtonStyle();
-
-                // Raise event
-                SelectionChanged?.Invoke(this, new ChannelOperand(selectableChannel.Channel));
+                SelectionChanged?.Invoke(this, selectableChannel.Channel);
             }
         }
 
         /// <summary>
-        /// Handles constant box click
+        /// Handles constant box click - removed, use inline editing instead
         /// </summary>
         public void SelectConstant()
         {
-            // Show input dialog
             var dialog = new ConstantValueInputDialog(_constantOption.ConstantValue);
             dialog.Owner = Window.GetWindow(this);
 
@@ -233,8 +240,8 @@ namespace PowerScope.View.UserControls
                 _constantOption.IsSelected = true;
                 _constantOption.ConstantValue = dialog.ConstantValue;
 
-                // Raise event
-                SelectionChanged?.Invoke(this, new ConstantOperand(_constantOption.ConstantValue));
+                Channel constantChannel = GetSelectedChannel();
+                SelectionChanged?.Invoke(this, constantChannel);
             }
         }
 
@@ -285,8 +292,8 @@ namespace PowerScope.View.UserControls
                 ConstantButton.BorderBrush = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Colors.LimeGreen);
                 ConstantButton.BorderThickness = new Thickness(3);
 
-                // Raise event
-                SelectionChanged?.Invoke(this, new ConstantOperand(_constantOption.ConstantValue));
+                Channel constantChannel = GetSelectedChannel();
+                SelectionChanged?.Invoke(this, constantChannel);
             }
             else
             {

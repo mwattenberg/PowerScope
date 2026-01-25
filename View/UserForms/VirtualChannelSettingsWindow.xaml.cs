@@ -36,12 +36,12 @@ namespace PowerScope.View.UserForms
             // Set initial selections if config already has values
             if (_config.InputA != null)
             {
-                InputASelector.SetSelectedSource(_config.InputA);
+                InputASelector.SetSelectedChannel(_config.InputA);
             }
 
             if (_config.InputB != null)
             {
-                InputBSelector.SetSelectedSource(_config.InputB);
+                InputBSelector.SetSelectedChannel(_config.InputB);
             }
 
             // Set initial operation selection
@@ -135,9 +135,8 @@ namespace PowerScope.View.UserForms
 
         private void ApplyButton_Click(object sender, RoutedEventArgs e)
         {
-            // Get inputs directly from SelectionBars (they return channel OR constant)
-            IVirtualSource inputA = InputASelector.SelectedSource;
-            IVirtualSource inputB = InputBSelector.SelectedSource;
+            Channel inputA = InputASelector.GetSelectedChannel();
+            Channel inputB = InputBSelector.GetSelectedChannel();
 
             // Validate selections
             if (inputA == null)

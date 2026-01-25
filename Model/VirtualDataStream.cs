@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
-using System.Linq;
 
 namespace PowerScope.Model
 {
@@ -10,46 +9,35 @@ namespace PowerScope.Model
     /// WITHOUT creating duplicate ring buffers - computes on-demand when data is requested
     /// Supports mathematical operations (add, subtract, multiply, divide) and filtering
     /// Can operate on physical channels OR other virtual channels (chaining supported)
-    /// Also supports constant values as operands
+    /// Constants are supported via ConstantDataStream-backed channels
     /// </summary>
     public class VirtualDataStream : IDataStream, IChannelConfigurable
     {
-        private readonly List<IVirtualSource> _sourceOperands;
-        private readonly HashSet<IDataStream> _sourceStreams; // Track unique source streams
+        private readonly List<Channel> _sourceChannels;
+        private readonly HashSet<IDataStream> _sourceStreams;
         private readonly VirtualChannelOperationType _operation;
         private bool _disposed = false;
 
-        // Virtual channel settings (gain, offset, filtering)
         private ChannelSettings _virtualChannelSettings;
         private IDigitalFilter _virtualFilter;
         private readonly object _settingsLock = new object();
 
-        // Temporary buffers for computation (reused to avoid allocations)
         private double[] _computeBuffer1;
         private double[] _computeBuffer2;
-        private int _allocatedSize = 0;  // Track currently allocated size
+        private int _allocatedSize = 0;
         private readonly object _computeLock = new object();
 
         public event PropertyChangedEventHandler PropertyChanged;
-
-        /// <summary>
-        /// Raised when this virtual data stream is being disposed
-        /// Allows cascading disposal to dependent virtual channels
-        /// </summary>
         public event EventHandler Disposing;
 
-        /// <summary>
-        /// Creates a virtual data stream from a single source channel (for filtering/transformation)
-        /// </summary>
         public VirtualDataStream(Channel sourceChannel)
         {
             if (sourceChannel == null)
                 throw new ArgumentNullException(nameof(sourceChannel));
 
-            _sourceOperands = new List<IVirtualSource> { new ChannelOperand(sourceChannel) };
-            _operation = VirtualChannelOperationType.Add; // Default, not used for single source
+            _sourceChannels = new List<Channel> { sourceChannel };
+            _operation = VirtualChannelOperationType.Add;
 
-            // Track unique owner streams
             _sourceStreams = new HashSet<IDataStream>();
             if (sourceChannel.OwnerStream != null)
             {
@@ -60,28 +48,22 @@ namespace PowerScope.Model
             SubscribeToSourceStreams();
         }
 
-        /// <summary>
-        /// Creates a virtual data stream from two source operands (channels or constants) with a mathematical operation
-        /// </summary>
-        public VirtualDataStream(IVirtualSource operandA, IVirtualSource operandB, VirtualChannelOperationType operation)
+        public VirtualDataStream(Channel channelA, Channel channelB, VirtualChannelOperationType operation)
         {
-            if (operandA == null)
-                throw new ArgumentNullException(nameof(operandA));
-            if (operandB == null)
-                throw new ArgumentNullException(nameof(operandB));
+            if (channelA == null)
+                throw new ArgumentNullException(nameof(channelA));
+            if (channelB == null)
+                throw new ArgumentNullException(nameof(channelB));
 
-            _sourceOperands = new List<IVirtualSource> { operandA, operandB };
+            _sourceChannels = new List<Channel> { channelA, channelB };
             _operation = operation;
 
             _sourceStreams = new HashSet<IDataStream>();
-            foreach (IVirtualSource operand in _sourceOperands)
+            foreach (Channel channel in _sourceChannels)
             {
-                if (operand.Channel != null)
+                if (channel != null && channel.OwnerStream != null)
                 {
-                    if (operand.Channel.OwnerStream != null)
-                    {
-                        _sourceStreams.Add(operand.Channel.OwnerStream);
-                    }
+                    _sourceStreams.Add(channel.OwnerStream);
                 }
             }
 
@@ -89,10 +71,6 @@ namespace PowerScope.Model
             SubscribeToSourceStreams();
         }
 
-        /// <summary>
-        /// Subscribe to Disposing events from all source streams
-        /// When any source stream disposes, this virtual stream must dispose too
-        /// </summary>
         private void SubscribeToSourceStreams()
         {
             foreach (IDataStream stream in _sourceStreams)
@@ -101,9 +79,6 @@ namespace PowerScope.Model
             }
         }
 
-        /// <summary>
-        /// Unsubscribe from all source stream Disposing events
-        /// </summary>
         private void UnsubscribeFromSourceStreams()
         {
             foreach (IDataStream stream in _sourceStreams)
@@ -112,42 +87,27 @@ namespace PowerScope.Model
             }
         }
 
-        /// <summary>
-        /// Called when any source stream is being disposed
-        /// This virtual stream must dispose itself to prevent accessing dead streams
-        /// </summary>
         private void OnSourceStreamDisposing(object sender, EventArgs e)
         {
-            // Source stream is dying - we must dispose ourselves
             Dispose();
         }
 
         private void InitializeComputeBuffers()
         {
-            // Start with a small initial allocation - grow on demand
             int initialSize = 10000;
             _computeBuffer1 = new double[initialSize];
             _computeBuffer2 = new double[initialSize];
             _allocatedSize = initialSize;
         }
 
-        /// <summary>
-        /// Ensures compute buffers are large enough for the requested size
-        /// Grows buffers lazily only when needed, avoiding unnecessary allocations
-        /// Maximum allocation is capped at 50 million samples to prevent excessive memory use
-        /// </summary>
         private void EnsureComputeBuffersAllocated(int requiredSize)
         {
-            // Cap maximum size at 50 million samples
             int maxAllowedSize = 50_000_000;
             int clampedSize = Math.Min(requiredSize, maxAllowedSize);
 
-            // Check if buffers are already large enough
             if (clampedSize <= _allocatedSize)
                 return;
 
-            // Allocate with 50% overhead to amortize allocation costs
-            // This minimizes reallocations while being memory-conscious
             int newSize = (int)(clampedSize * 1.5);
 
             _computeBuffer1 = new double[newSize];
@@ -161,7 +121,6 @@ namespace PowerScope.Model
         {
             get
             {
-                // Virtual stream status depends on source channels
                 bool allConnected = IsConnected;
                 bool anyStreaming = IsStreaming;
 
@@ -177,15 +136,15 @@ namespace PowerScope.Model
         {
             get
             {
-                if (_sourceOperands.Count == 1)
+                if (_sourceChannels.Count == 1)
                 {
-                    string sourceType = _sourceOperands[0].Channel.StreamType;
+                    string sourceType = _sourceChannels[0].StreamType;
                     return $"Virtual ({sourceType})";
                 }
                 else
                 {
-                    string source1Type = _sourceOperands[0].Channel.StreamType;
-                    string source2Type = _sourceOperands[1].Channel.StreamType;
+                    string source1Type = _sourceChannels[0].StreamType;
+                    string source2Type = _sourceChannels[1].StreamType;
                     return $"Virtual ({source1Type} {GetOperationSymbol()} {source2Type})";
                 }
             }
@@ -195,9 +154,9 @@ namespace PowerScope.Model
         {
             get
             {
-                foreach (IVirtualSource operand in _sourceOperands)
+                foreach (Channel channel in _sourceChannels)
                 {
-                    if (!operand.Channel.IsStreamConnected)
+                    if (!channel.IsStreamConnected)
                         return false;
                 }
                 return true;
@@ -208,9 +167,9 @@ namespace PowerScope.Model
         {
             get
             {
-                foreach (IVirtualSource operand in _sourceOperands)
+                foreach (Channel channel in _sourceChannels)
                 {
-                    if (operand.Channel.IsStreamStreaming)
+                    if (channel.IsStreamStreaming)
                         return true;
                 }
                 return false;
@@ -221,10 +180,10 @@ namespace PowerScope.Model
         {
             get
             {
-                for (int i = 0; i < _sourceOperands.Count; i++)
+                for (int i = 0; i < _sourceChannels.Count; i++)
                 {
-                    if (_sourceOperands[i].Channel.OwnerStream != null)
-                        return _sourceOperands[i].Channel.OwnerStream.TotalSamples;
+                    if (_sourceChannels[i].OwnerStream != null)
+                        return _sourceChannels[i].OwnerStream.TotalSamples;
                 }
                 return 0;
             }
@@ -234,10 +193,10 @@ namespace PowerScope.Model
         {
             get
             {
-                for (int i = 0; i < _sourceOperands.Count; i++)
+                for (int i = 0; i < _sourceChannels.Count; i++)
                 {
-                    if (_sourceOperands[i].Channel.OwnerStream != null)
-                        return _sourceOperands[i].Channel.OwnerStream.TotalBits;
+                    if (_sourceChannels[i].OwnerStream != null)
+                        return _sourceChannels[i].OwnerStream.TotalBits;
                 }
                 return 0;
             }
@@ -245,54 +204,38 @@ namespace PowerScope.Model
 
         public int ChannelCount
         {
-            get
-            {
-                // Virtual streams always have 1 output channel
-                return 1;
-            }
+            get { return 1; }
         }
 
         public double SampleRate
         {
             get
             {
-                for (int i = 0; i < _sourceOperands.Count; i++)
+                for (int i = 0; i < _sourceChannels.Count; i++)
                 {
-                    if (_sourceOperands[i].Channel.OwnerStream != null)
-                        return _sourceOperands[i].Channel.OwnerStream.SampleRate;
+                    if (_sourceChannels[i].OwnerStream != null)
+                        return _sourceChannels[i].OwnerStream.SampleRate;
                 }
-                return 1000.0; // Default fallback
+                return 1000.0;
             }
         }
 
         public void Connect()
         {
-            // Virtual streams don't connect - they depend on source channels
-            // No-op
         }
 
         public void Disconnect()
         {
-            // Virtual streams don't disconnect
-            // No-op
         }
 
         public void StartStreaming()
         {
-            // Virtual streams don't start streaming - they follow source channels
-            // No-op
         }
 
         public void StopStreaming()
         {
-            // Virtual streams don't stop streaming
-            // No-op
         }
 
-        /// <summary>
-        /// The core method: computes virtual channel data ON-DEMAND without storing in ring buffer
-        /// Reads from source operands, applies operation, applies virtual channel processing
-        /// </summary>
         public int CopyLatestTo(int channel, double[] destination, int n)
         {
             if (channel != 0)
@@ -311,9 +254,9 @@ namespace PowerScope.Model
             {
                 int actualSamples;
 
-                if (_sourceOperands.Count == 1)
+                if (_sourceChannels.Count == 1)
                 {
-                    actualSamples = _sourceOperands[0].Channel.CopyLatestDataTo(destination, n);
+                    actualSamples = _sourceChannels[0].CopyLatestDataTo(destination, n);
                 }
                 else
                 {
@@ -329,16 +272,12 @@ namespace PowerScope.Model
             }
         }
 
-        /// <summary>
-        /// Computes binary operation between two source operands
-        /// All operands are now channels (constants wrapped in ConstantDataStream)
-        /// </summary>
         private int ComputeBinaryOperation(double[] destination, int n)
         {
             EnsureComputeBuffersAllocated(n);
 
-            int samples1 = _sourceOperands[0].Channel.CopyLatestDataTo(_computeBuffer1, n);
-            int samples2 = _sourceOperands[1].Channel.CopyLatestDataTo(_computeBuffer2, n);
+            int samples1 = _sourceChannels[0].CopyLatestDataTo(_computeBuffer1, n);
+            int samples2 = _sourceChannels[1].CopyLatestDataTo(_computeBuffer2, n);
 
             int actualSamples = Math.Min(samples1, samples2);
             if (actualSamples <= 0)
@@ -367,10 +306,6 @@ namespace PowerScope.Model
             return actualSamples;
         }
 
-        /// <summary>
-        /// Applies virtual channel processing: gain, offset, and filtering
-        /// This allows filtering on top of already-filtered source channels!
-        /// </summary>
         private void ApplyVirtualChannelProcessing(double[] data, int count)
         {
             ChannelSettings settings;
@@ -385,19 +320,15 @@ namespace PowerScope.Model
             if (settings == null)
                 return;
 
-            // Apply gain and offset, then filtering
             for (int i = 0; i < count; i++)
             {
-                // Apply gain and offset
                 double processed = settings.Gain * (data[i] + settings.Offset);
 
-                // Apply filter if configured
                 if (filter != null)
                 {
                     processed = filter.Filter(processed);
                 }
 
-                // Safety check
                 if (!double.IsFinite(processed))
                 {
                     processed = 0.0;
@@ -409,7 +340,6 @@ namespace PowerScope.Model
 
         public void clearData()
         {
-            // Virtual streams don't own data - clear filters only
             lock (_settingsLock)
             {
                 if (_virtualFilter != null)
@@ -425,14 +355,13 @@ namespace PowerScope.Model
 
         public void SetChannelSetting(int channelIndex, ChannelSettings settings)
         {
-            if (channelIndex != 0) // Virtual streams only have channel 0
+            if (channelIndex != 0)
                 return;
 
             lock (_settingsLock)
             {
                 _virtualChannelSettings = settings;
 
-                // Update filter reference and reset if filter type changed
                 IDigitalFilter newFilter;
                 if (settings != null)
                 {
@@ -489,91 +418,59 @@ namespace PowerScope.Model
             };
         }
 
-        /// <summary>
-        /// Gets description of the virtual channel operation
-        /// </summary>
         public string GetOperationDescription()
         {
-            if (_sourceOperands.Count == 1)
+            if (_sourceChannels.Count == 1)
             {
-                string sourceName = _sourceOperands[0].Channel.Label;
+                string sourceName = _sourceChannels[0].Label;
                 return $"Virtual copy of {sourceName}";
             }
             else
             {
-                string source1Name = _sourceOperands[0].Channel.Label;
-                string source2Name = _sourceOperands[1].Channel.Label;
+                string source1Name = _sourceChannels[0].Label;
+                string source2Name = _sourceChannels[1].Label;
                 string opSymbol = GetOperationSymbol();
                 return $"{source1Name} {opSymbol} {source2Name}";
             }
         }
 
-        /// <summary>
-        /// Gets all source channels (useful for UI display and dependency tracking)
-        /// </summary>
         public IReadOnlyList<Channel> GetSourceChannels()
         {
-            List<Channel> channels = new List<Channel>();
-            foreach (IVirtualSource operand in _sourceOperands)
-            {
-                if (operand.Channel != null)
-                {
-                    channels.Add(operand.Channel);
-                }
-            }
-            return channels.AsReadOnly();
+            return _sourceChannels.AsReadOnly();
         }
 
-        /// <summary>
-        /// Gets the primary (first) source channel for this virtual stream
-        /// Useful for inheriting color and display properties from the source
-        /// </summary>
         public Channel GetPrimarySourceChannel()
         {
-            if (_sourceOperands.Count > 0 && _sourceOperands[0].Channel != null)
+            if (_sourceChannels.Count > 0)
             {
-                return _sourceOperands[0].Channel;
+                return _sourceChannels[0];
             }
             return null;
         }
 
-        /// <summary>
-        /// Gets the first parent channel (Parent A) for this virtual stream
-        /// </summary>
         public Channel GetParentChannelA()
         {
-            if (_sourceOperands.Count > 0 && _sourceOperands[0].Channel != null)
+            if (_sourceChannels.Count > 0)
             {
-                return _sourceOperands[0].Channel;
+                return _sourceChannels[0];
             }
             return null;
         }
 
-        /// <summary>
-        /// Gets the second parent channel (Parent B) for this virtual stream
-        /// Returns null if no second operand exists or single-source virtual
-        /// </summary>
         public Channel GetParentChannelB()
         {
-            if (_sourceOperands.Count > 1 && _sourceOperands[1].Channel != null)
+            if (_sourceChannels.Count > 1)
             {
-                return _sourceOperands[1].Channel;
+                return _sourceChannels[1];
             }
             return null;
         }
 
-        /// <summary>
-        /// Checks if this virtual channel has two parents (binary operation)
-        /// </summary>
         public bool IsBinaryOperation
         {
-            get { return _sourceOperands.Count == 2; }
+            get { return _sourceChannels.Count == 2; }
         }
 
-        /// <summary>
-        /// Gets the operation type for binary operations
-        /// Returns null for single-source virtual channels
-        /// </summary>
         public VirtualChannelOperationType? OperationType
         {
             get 
@@ -596,10 +493,8 @@ namespace PowerScope.Model
             if (_disposed)
                 return;
 
-            // Notify dependents FIRST - this allows cascading disposal
             Disposing?.Invoke(this, EventArgs.Empty);
 
-            // Unsubscribe from source streams
             UnsubscribeFromSourceStreams();
 
             lock (_settingsLock)
