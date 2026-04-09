@@ -264,20 +264,29 @@
 				<StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
 					<Button x:Name="RisingEdgeButton"
 						Style="{StaticResource WideButtonStyle}"
-						MinWidth="50" Height="50"
-						Margin="2,0,5,0"
+						Width="25" Height="50"
+						Margin="2,0,2,0"
 						Click="RisingEdgeButton_Click"
 						ToolTip="Trigger on rising edge (signal crosses level upward)">
-						<svgc:SvgViewbox Source="/Icons/risingEdge.svg" Width="42" Height="42" />
+						<svgc:SvgViewbox Source="/Icons/risingEdge.svg" Width="18" Height="40" />
+					</Button>
+
+					<Button x:Name="AlternatingEdgeButton"
+						Style="{StaticResource WideButtonStyle}"
+						Width="25" Height="50"
+						Margin="2,0,2,0"
+						Click="AlternatingEdgeButton_Click"
+						ToolTip="Trigger on alternating edges (rising and falling)">
+						<svgc:SvgViewbox Source="/Icons/alternatingEdge.svg" Width="18" Height="40" />
 					</Button>
 
 					<Button x:Name="FallingEdgeButton"
 						Style="{StaticResource WideButtonStyle}"
-						MinWidth="50" Height="50"
-						Margin="5,0,2,0"
+						Width="25" Height="50"
+						Margin="2,0,2,0"
 						Click="FallingEdgeButton_Click"
 						ToolTip="Trigger on falling edge (signal crosses level downward)">
-						<svgc:SvgViewbox Source="/Icons/fallingEdge.svg" Width="42" Height="42" />
+						<svgc:SvgViewbox Source="/Icons/fallingEdge.svg" Width="18" Height="40" />
 					</Button>
 				</StackPanel>
 			</Grid>
