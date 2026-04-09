@@ -88,6 +88,10 @@ namespace PowerScope.View.UserControls
             {
                 UpdateTriggerChannelSelection();
             }
+            else if (e.PropertyName == nameof(PlotSettings.EnableEdgeTrigger))
+            {
+                UpdateTriggerEdgeSelection();
+            }
         }
 
         /// <summary>
@@ -125,6 +129,7 @@ namespace PowerScope.View.UserControls
         /// Updates the button selection based on trigger edge type
         /// Only one button can be active at a time (radio-button style)
         /// Active button is lime green, inactive buttons use default style
+        /// When trigger is disabled (Roll mode), no buttons are highlighted
         /// </summary>
         private void UpdateTriggerEdgeSelection()
         {
@@ -132,6 +137,15 @@ namespace PowerScope.View.UserControls
             {
                 System.Windows.Media.Brush activeBrush = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Colors.LimeGreen);
                 System.Windows.Media.Brush inactiveBrush = (System.Windows.Media.Brush)FindResource("PlotSettings_TitleBarBrush");
+
+                if (!Settings.EnableEdgeTrigger)
+                {
+                    // Trigger mode is disabled (Roll mode active), no buttons should be highlighted
+                    RisingEdgeButton.Background = inactiveBrush;
+                    AlternatingEdgeButton.Background = inactiveBrush;
+                    FallingEdgeButton.Background = inactiveBrush;
+                    return;
+                }
 
                 switch (Settings.TriggerEdge)
                 {
