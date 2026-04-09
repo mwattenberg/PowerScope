@@ -93,7 +93,8 @@ namespace PowerScope.Model
     public enum TriggerEdgeType
     {
         Rising,
-        Falling
+        Falling,
+        Alternating
     }
 
     /// <summary>

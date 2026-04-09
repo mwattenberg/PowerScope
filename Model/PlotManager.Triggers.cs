@@ -56,6 +56,11 @@ namespace PowerScope.Model
         // without causing a "rolling trigger" effect.
         private long _lastTriggeredEdgeAbsoluteIndex = -1;
 
+        // For alternating trigger mode: tracks which edge type we last triggered on
+        // Rising = triggered on rising edge, next should look for falling
+        // Falling = triggered on falling edge, next should look for rising
+        private TriggerEdgeType _lastTriggeredEdgeType = TriggerEdgeType.Rising;
+
         // Working buffer for over-fetching (allows shifting for trigger alignment)
         private double[] _triggerWorkBuffer;
         private int _triggerWorkBufferSize = 0;
@@ -128,6 +133,7 @@ namespace PowerScope.Model
             _lastCheckedTotalSamples = 0;
             _lastTriggerTime = DateTime.MinValue;
             _lastTriggeredEdgeAbsoluteIndex = -1;
+            _lastTriggeredEdgeType = TriggerEdgeType.Rising;
 
             // Create trigger level line with label
             // Uses Settings.TriggerLevel as-is (loaded from settings or default 0.0)
@@ -317,10 +323,12 @@ namespace PowerScope.Model
         /// Checks if trigger condition is met for edge trigger mode.
         /// Uses over-fetch approach: fetches extra samples, finds trigger, stores index for alignment.
         /// 
-        /// EXPERIMENTAL: Edge ID Tracking
-        /// We scan the ENTIRE valid search window and use absolute sample indices to track
-        /// which edges we've already triggered on. This prevents the "rolling trigger" problem
-        /// while allowing the trigger to be placed anywhere.
+        /// Supports three trigger modes:
+        /// - Rising: triggers only on rising edges
+        /// - Falling: triggers only on falling edges
+        /// - Alternating: triggers on rising AND falling edges alternately
+        /// 
+        /// For alternating mode, tracks which edge type was last triggered to find the opposite next.
         /// </summary>
         private bool CheckTriggerCondition()
         {
@@ -375,11 +383,37 @@ namespace PowerScope.Model
                 double previousSample = _triggerWorkBuffer[i - 1];
                 double currentSample = _triggerWorkBuffer[i];
 
-                bool edgeDetected;
+                // Determine which edges to look for based on trigger mode
+                bool risingEdgeDetected = previousSample < Settings.TriggerLevel && currentSample >= Settings.TriggerLevel;
+                bool fallingEdgeDetected = previousSample >= Settings.TriggerLevel && currentSample < Settings.TriggerLevel;
+
+                bool edgeDetected = false;
+                TriggerEdgeType detectedEdgeType = TriggerEdgeType.Rising;
+
                 if (Settings.TriggerEdge == TriggerEdgeType.Rising)
-                    edgeDetected = previousSample < Settings.TriggerLevel && currentSample >= Settings.TriggerLevel;
-                else
-                    edgeDetected = previousSample >= Settings.TriggerLevel && currentSample < Settings.TriggerLevel;
+                {
+                    edgeDetected = risingEdgeDetected;
+                    detectedEdgeType = TriggerEdgeType.Rising;
+                }
+                else if (Settings.TriggerEdge == TriggerEdgeType.Falling)
+                {
+                    edgeDetected = fallingEdgeDetected;
+                    detectedEdgeType = TriggerEdgeType.Falling;
+                }
+                else if (Settings.TriggerEdge == TriggerEdgeType.Alternating)
+                {
+                    // In alternating mode, look for the opposite edge from the last trigger
+                    if (_lastTriggeredEdgeType == TriggerEdgeType.Rising)
+                    {
+                        edgeDetected = fallingEdgeDetected;
+                        detectedEdgeType = TriggerEdgeType.Falling;
+                    }
+                    else
+                    {
+                        edgeDetected = risingEdgeDetected;
+                        detectedEdgeType = TriggerEdgeType.Rising;
+                    }
+                }
 
                 if (edgeDetected)
                 {
@@ -398,6 +432,7 @@ namespace PowerScope.Model
                             triggerDetected = true;
                             triggerBufferIndex = i;
                             _lastTriggeredEdgeAbsoluteIndex = absoluteEdgeIndex;
+                            _lastTriggeredEdgeType = detectedEdgeType;
                             _lastTriggerTime = DateTime.Now;
 
                             if (Settings.SingleShotMode)
@@ -491,6 +526,7 @@ namespace PowerScope.Model
             _lastCheckedTotalSamples = 0;
             _triggerSampleIndex = -1;
             _lastTriggeredEdgeAbsoluteIndex = -1;
+            _lastTriggeredEdgeType = TriggerEdgeType.Rising;
             
             UpdateTriggerLineColor();
         }

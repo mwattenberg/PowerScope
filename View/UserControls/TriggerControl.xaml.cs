@@ -123,20 +123,33 @@ namespace PowerScope.View.UserControls
 
         /// <summary>
         /// Updates the button selection based on trigger edge type
+        /// Rising = only rising button active (lime green)
+        /// Falling = only falling button active (lime green)
+        /// Alternating = both buttons active (lime green)
         /// </summary>
         private void UpdateTriggerEdgeSelection()
         {
             if (Settings != null && RisingEdgeButton != null && FallingEdgeButton != null)
             {
-                if (Settings.TriggerEdge == TriggerEdgeType.Rising)
+                System.Windows.Media.Brush activeBrush = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Colors.LimeGreen);
+                System.Windows.Media.Brush inactiveBrush = (System.Windows.Media.Brush)FindResource("PlotSettings_TitleBarBrush");
+
+                switch (Settings.TriggerEdge)
                 {
-                    RisingEdgeButton.Background = (System.Windows.Media.Brush)FindResource("PlotSettings_ButtonPressedBrush");
-                    FallingEdgeButton.Background = (System.Windows.Media.Brush)FindResource("PlotSettings_TitleBarBrush");
-                }
-                else
-                {
-                    RisingEdgeButton.Background = (System.Windows.Media.Brush)FindResource("PlotSettings_TitleBarBrush");
-                    FallingEdgeButton.Background = (System.Windows.Media.Brush)FindResource("PlotSettings_ButtonPressedBrush");
+                    case TriggerEdgeType.Rising:
+                        RisingEdgeButton.Background = activeBrush;
+                        FallingEdgeButton.Background = inactiveBrush;
+                        break;
+
+                    case TriggerEdgeType.Falling:
+                        RisingEdgeButton.Background = inactiveBrush;
+                        FallingEdgeButton.Background = activeBrush;
+                        break;
+
+                    case TriggerEdgeType.Alternating:
+                        RisingEdgeButton.Background = activeBrush;
+                        FallingEdgeButton.Background = activeBrush;
+                        break;
                 }
             }
         }
@@ -154,7 +167,21 @@ namespace PowerScope.View.UserControls
         {
             if (Settings != null)
             {
-                Settings.TriggerEdge = TriggerEdgeType.Rising;
+                if (Settings.TriggerEdge == TriggerEdgeType.Rising)
+                {
+                    // Already rising, clicking again does nothing (can't deselect)
+                    return;
+                }
+                else if (Settings.TriggerEdge == TriggerEdgeType.Alternating)
+                {
+                    // In alternating mode, remove rising (leave falling)
+                    Settings.TriggerEdge = TriggerEdgeType.Falling;
+                }
+                else
+                {
+                    // In falling mode, add rising (enter alternating)
+                    Settings.TriggerEdge = TriggerEdgeType.Alternating;
+                }
             }
         }
 
@@ -162,7 +189,21 @@ namespace PowerScope.View.UserControls
         {
             if (Settings != null)
             {
-                Settings.TriggerEdge = TriggerEdgeType.Falling;
+                if (Settings.TriggerEdge == TriggerEdgeType.Falling)
+                {
+                    // Already falling, clicking again does nothing (can't deselect)
+                    return;
+                }
+                else if (Settings.TriggerEdge == TriggerEdgeType.Alternating)
+                {
+                    // In alternating mode, remove falling (leave rising)
+                    Settings.TriggerEdge = TriggerEdgeType.Rising;
+                }
+                else
+                {
+                    // In rising mode, add falling (enter alternating)
+                    Settings.TriggerEdge = TriggerEdgeType.Alternating;
+                }
             }
         }
 
