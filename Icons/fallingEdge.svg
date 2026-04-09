@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title">
   <title>Falling edge (simplified)</title>
-  <!-- High level (neutral) -->
-  <path d="M8 16 H22" stroke="#E6EAF2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-  <!-- Falling edge (accent) -->
-  <path d="M22 16 L30 30" stroke="#22D3EE" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-  <!-- Low level (neutral) -->
-  <path d="M30 30 H40" stroke="#E6EAF2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <!-- High level -->
+  <path d="M8 16 H22" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <!-- Falling edge -->
+  <path d="M22 16 L30 30" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <!-- Low level -->
+  <path d="M30 30 H40" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
 </svg>

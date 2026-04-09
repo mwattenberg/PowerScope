@@ -2,13 +2,13 @@
 <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title">
   <title>Alternating edge (rising and falling)</title>
   <!-- First rising edge -->
-  <path d="M4 28 L8 28" stroke="#E6EAF2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-  <path d="M8 28 L14 18" stroke="#22D3EE" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-  <path d="M14 18 L18 18" stroke="#E6EAF2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <path d="M4 28 L8 28" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <path d="M8 28 L14 18" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <path d="M14 18 L18 18" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
   <!-- Falling edge -->
-  <path d="M18 18 L24 28" stroke="#22D3EE" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-  <path d="M24 28 L28 28" stroke="#E6EAF2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <path d="M18 18 L24 28" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <path d="M24 28 L28 28" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
   <!-- Rising edge again -->
-  <path d="M28 28 L34 18" stroke="#22D3EE" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-  <path d="M34 18 H44" stroke="#E6EAF2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <path d="M28 28 L34 18" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <path d="M34 18 H44" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
 </svg>
