@@ -23,7 +23,7 @@ namespace PowerScope.View.UserControls
         // Events for menu actions
         public event EventHandler LoadSettingsClicked;
         public event EventHandler SaveSettingsClicked;
-        public event EventHandler ExportPlotClicked;
+        public event EventHandler OpenWaveformClicked;
         public event EventHandler PreferencesClicked;
         public event EventHandler AboutClicked;
         public event EventHandler ExitClicked;
@@ -43,9 +43,9 @@ namespace PowerScope.View.UserControls
             SaveSettingsClicked?.Invoke(this, EventArgs.Empty);
         }
 
-        private void MenuItem_ExportPlot_Click(object sender, RoutedEventArgs e)
+        private void MenuItem_OpenWaveform_Click(object sender, RoutedEventArgs e)
         {
-            ExportPlotClicked?.Invoke(this, EventArgs.Empty);
+            OpenWaveformClicked?.Invoke(this, EventArgs.Empty);
         }
 
         private void MenuItem_Preferences_Click(object sender, RoutedEventArgs e)

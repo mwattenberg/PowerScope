@@ -13,6 +13,12 @@ namespace PowerScope.Model
     /// <summary>
     /// FTDI data stream implementation using FtdiSharp library
     /// Provides high-speed data acquisition with improved reliability and maintainability
+    /// 
+    /// Architecture Notes:
+    /// - FTDI chip acts as SPI master
+    /// - Slave ensures only complete data frames are sent
+    /// - No residue handling needed - frames are complete or not present
+    /// - Clock frequency parameter is in Hz, SPI class expects frequency divisor
     /// </summary>
     public class FTDI_SerialDataStream : IDataStream, IChannelConfigurable, IBufferResizable, IUpDownSampling
     {
@@ -21,6 +27,7 @@ namespace PowerScope.Model
         private FtdiDevice? _ftdiDevice;
         private SPI? _spi;
         private Thread? _readThread;
+        private CancellationTokenSource? _readThreadCancellation;
         private bool _disposed = false;
         private bool _isConnected;
         private bool _isStreaming;
@@ -30,7 +37,13 @@ namespace PowerScope.Model
         private uint _deviceIndex;
         private string? _deviceSerialNumber;
         private int _channelCount;
-        private uint _clockFrequency;  // Store the clock frequency for SPI configuration
+        private uint _clockFrequency;
+        private int _spiMode;
+
+        // SPI clock frequency configuration
+        // FtdiSharp's SPI class expects a frequency divisor (1000 = 15MHz at 15000000 Hz input)
+        // This will be refined when we address FtdiSharp library shortcomings
+        private const uint ClockFrequencyDivisor = 1000;
 
         // Sample rate calculation
         private long _totalSamplesAtLastCalculation = 0;
@@ -51,6 +64,16 @@ namespace PowerScope.Model
         private ChannelSettings[] _channelSettings;
         private IDigitalFilter?[] _channelFilters;
         private readonly object _channelConfigLock = new object();
+
+        // FT2232H has 4096-byte RX buffer per channel.
+        // The MPSSE command itself consumes 3 bytes of the TX buffer (opcode + 2 length bytes),
+        // but the received SPI data goes into the RX buffer.
+        // Requesting more than 4096 bytes in a single ReadWrite() causes the FTDI chip to
+        // pause SPI clocking mid-transfer while it flushes the RX buffer over USB.
+        // This works but adds an extra USB round-trip per 4K chunk, reducing throughput.
+        // Clamping to 4094 bytes of data + 2 bytes next-count = 4096 total keeps it in one flush.
+        private const int FTDI_RX_BUFFER_SIZE = 4096;
+        private const int MAX_TRANSFER_DATA_BYTES = FTDI_RX_BUFFER_SIZE - NEXT_COUNT_LENGTH;
 
         #endregion
 
@@ -132,31 +155,27 @@ namespace PowerScope.Model
         /// <param name="clockFrequency">SPI clock frequency in Hz (e.g., 15000000 for 15MHz)</param>
         /// <param name="channelCount">Number of data channels</param>
         /// <param name="parser">Data parser for processing incoming data</param>
-        public FTDI_SerialDataStream(uint deviceIndex, uint clockFrequency, int channelCount, DataParser parser)
+        /// <param name="spiMode">SPI mode (0 or 2, as only these are supported by FTDI MPSSE)</param>
+        public FTDI_SerialDataStream(uint deviceIndex, uint clockFrequency, int channelCount, DataParser parser, int spiMode = 0)
         {
             _deviceIndex = deviceIndex;
-            _clockFrequency = clockFrequency;  // Store the clock frequency
+            _clockFrequency = clockFrequency;
             _channelCount = channelCount;
             _parser = parser;
+            _spiMode = spiMode;
 
-            // Initialize up/down sampling
             _upDownSampling = new UpDownSampling(1);
             _upDownSampling.PropertyChanged += OnUpDownSamplingPropertyChanged;
 
-            // Initialize with default buffer size
             int defaultBufferSize = 500000;
             InitializeRingBuffers(defaultBufferSize);
 
-            // Initialize channel processing arrays
             _channelSettings = new ChannelSettings[channelCount];
             _channelFilters = new IDigitalFilter?[channelCount];
 
-            // Get device serial number for the specified index
             _deviceSerialNumber = GetDeviceSerialNumberByIndex(deviceIndex);
 
             StatusMessage = "Ready";
-
-            // Initialize connection state
             _isConnected = false;
             _isStreaming = false;
         }
@@ -165,10 +184,6 @@ namespace PowerScope.Model
 
         #region FTDI Device Management
 
-        /// <summary>
-        /// Gets a list of available FTDI devices with their serial numbers and descriptions
-        /// </summary>
-        /// <returns>Array of device descriptions with serial numbers</returns>
         public static string[] GetAvailableDevices()
         {
             try
@@ -190,10 +205,6 @@ namespace PowerScope.Model
             }
         }
 
-        /// <summary>
-        /// Gets detailed information about available FTDI devices
-        /// </summary>
-        /// <returns>Array of FtdiDevice objects with device details</returns>
         public static FtdiDevice[] GetAvailableDeviceDetails()
         {
             try
@@ -207,17 +218,11 @@ namespace PowerScope.Model
             }
         }
 
-        /// <summary>
-        /// Extracts the serial number from a device string returned by GetAvailableDevices()
-        /// </summary>
-        /// <param name="deviceString">Device string in format "SerialNumber - Description"</param>
-        /// <returns>Serial number or null if not found</returns>
         public static string? ExtractSerialNumber(string deviceString)
         {
             if (string.IsNullOrEmpty(deviceString))
                 return null;
 
-            // Format: "SerialNumber - Description"
             int separatorIndex = deviceString.IndexOf(" - ");
             if (separatorIndex > 0)
             {
@@ -227,11 +232,6 @@ namespace PowerScope.Model
             return null;
         }
 
-        /// <summary>
-        /// Gets device information by index (0-based)
-        /// </summary>
-        /// <param name="deviceIndex">Zero-based device index</param>
-        /// <returns>Device information or null if not found</returns>
         public static FtdiDevice? GetDeviceInfo(uint deviceIndex)
         {
             try
@@ -250,21 +250,14 @@ namespace PowerScope.Model
             return null;
         }
 
-        /// <summary>
-        /// Creates a user-friendly display name for FTDI devices
-        /// </summary>
-        /// <param name="device">FtdiDevice object</param>
-        /// <returns>Formatted display string</returns>
         public static string CreateDeviceDisplayName(FtdiDevice device)
         {
             string serialNumber = device.SerialNumber ?? "Unknown";
             string description = device.Description ?? "FTDI Device";
             
-            // Clean up the description by removing redundant information
             string cleanDescription = description;
             if (cleanDescription.Contains("(") && cleanDescription.Contains(")"))
             {
-                // Remove serial number from description if it's already there
                 int parenIndex = cleanDescription.LastIndexOf('(');
                 if (parenIndex > 0)
                 {
@@ -276,30 +269,18 @@ namespace PowerScope.Model
                 }
             }
             
-            // Format: "SerialNumber - CleanDescription"
             return $"{serialNumber} - {cleanDescription}";
         }
 
-        /// <summary>
-        /// Gets a shortened device identifier for logging or status display
-        /// </summary>
-        /// <param name="deviceString">Full device string from GetAvailableDevices()</param>
-        /// <returns>Short identifier</returns>
         public static string GetDeviceShortName(string deviceString)
         {
             if (string.IsNullOrEmpty(deviceString))
                 return "Unknown";
                 
-            // Extract just the serial number for short identification
             string? serialNumber = ExtractSerialNumber(deviceString);
             return string.IsNullOrEmpty(serialNumber) ? "Unknown" : serialNumber;
         }
 
-        /// <summary>
-        /// Gets device serial number by index for backward compatibility
-        /// </summary>
-        /// <param name="deviceIndex">Zero-based device index</param>
-        /// <returns>Device serial number or null if not found</returns>
         private static string? GetDeviceSerialNumberByIndex(uint deviceIndex)
         {
             try
@@ -326,37 +307,31 @@ namespace PowerScope.Model
         {
             try
             {
-                // Find the device by serial number or index
                 var devices = FtdiDevices.Scan();
                 
-                if (!string.IsNullOrEmpty(_deviceSerialNumber))
+                if (devices.Length == 0)
                 {
-                    var foundDevice = devices.FirstOrDefault(d => d.SerialNumber == _deviceSerialNumber);
-                    if (!string.IsNullOrEmpty(foundDevice.SerialNumber))
-                    {
-                        _ftdiDevice = foundDevice;
-                    }
-                }
-                else if (_deviceIndex < devices.Length)
-                {
-                    _ftdiDevice = devices[_deviceIndex];
-                }
-                
-                if (_ftdiDevice == null || string.IsNullOrEmpty(_ftdiDevice.Value.SerialNumber))
-                {
-                    StatusMessage = $"FTDI device not found (index: {_deviceIndex}, serial: {_deviceSerialNumber})";
+                    StatusMessage = "No FTDI devices found";
                     IsConnected = false;
                     return;
                 }
 
-            
-
-                // Create SPI protocol handler with calculated slowDownFactor
-                _spi = new SPI(_ftdiDevice.Value, spiMode: 1, _clockFrequency / 1000);
-                //_spi = new SPI(_ftdiDevice.Value, spiMode: 1);
-
+                if (_deviceIndex < devices.Length)
+                {
+                    _ftdiDevice = devices[_deviceIndex];
+                }
+                else
+                {
+                    StatusMessage = $"FTDI device at index {_deviceIndex} not found";
+                    IsConnected = false;
+                    return;
+                }
+                
+                _spi = new SPI(_ftdiDevice.Value, spiMode: _spiMode, _clockFrequency / ClockFrequencyDivisor, latencyMs: 2);
+                _spi.UseFastCsMethods = true;
+                
                 IsConnected = true;
-                StatusMessage = $"Connected to {_ftdiDevice.Value.SerialNumber}";
+                StatusMessage = "Connected to FTDI device";
             }
             catch (Exception ex)
             {
@@ -397,25 +372,36 @@ namespace PowerScope.Model
 
             IsStreaming = true;
             
-            // Reset filters when starting streaming
             ResetChannelFilters();
             
-            // Initialize up/down sampling for current channel configuration
             _upDownSampling.InitializeChannels(ChannelCount);
             _upDownSampling.Reset();
 
-            // Stop any existing thread
+            // Stop any existing thread gracefully
             if (_readThread != null && _readThread.IsAlive)
             {
                 IsStreaming = false;
-                _readThread.Join(1000);
+                _readThreadCancellation?.Cancel();
+                if (!_readThread.Join(2000))
+                {
+                    System.Diagnostics.Debug.WriteLine("WARNING: Previous read thread did not stop gracefully");
+                }
             }
 
+            // Pull CS LOW at start of streaming session (stays LOW until StopStreaming)
+            _spi.CsLow();
+
+            // Start new read thread with cancellation token
             IsStreaming = true;
-            _readThread = new Thread(ReadFTDIData) { IsBackground = true };
+            _readThreadCancellation = new CancellationTokenSource();
+            _readThread = new Thread(() => ReadFTDIData(_readThreadCancellation.Token))
+            { 
+                IsBackground = true,
+                Name = "FTDI_ReadThread"
+            };
             _readThread.Start();
 
-            StatusMessage = "Streaming";
+            StatusMessage = "Streaming - CS held LOW, ready for data";
         }
 
         public void StopStreaming()
@@ -425,8 +411,25 @@ namespace PowerScope.Model
 
             IsStreaming = false;
             
+            _readThreadCancellation?.Cancel();
+            
             if (_readThread != null && _readThread.IsAlive)
-                _readThread.Join(1000);
+            {
+                if (!_readThread.Join(2000))
+                {
+                    System.Diagnostics.Debug.WriteLine("WARNING: Read thread did not stop gracefully within timeout");
+                }
+            }
+
+            // Release CS HIGH at end of streaming session
+            try
+            {
+                _spi?.CsHigh();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[FTDI] Error releasing CS: {ex.Message}");
+            }
 
             if (_isConnected)
             {
@@ -464,7 +467,6 @@ namespace PowerScope.Model
             TotalSamples = 0;
             TotalBits = 0;
             
-            // Reset sample rate calculation
             lock (_sampleRateCalculationLock)
             {
                 _calculatedSampleRate = 0.0;
@@ -480,46 +482,207 @@ namespace PowerScope.Model
 
         #region Data Reading and Processing
 
-        private void ReadFTDIData()
+        /// <summary>
+        /// Queries the slave device to determine how many bytes are available.
+        /// Used only for the initial bootstrap cycle. During steady-state streaming,
+        /// the slave piggybacks the next byte count at the end of each data transfer.
+        /// </summary>
+        /// <returns>Number of bytes available from slave (0 to 65535), or -1 on error</returns>
+        private int QuerySlaveByteCount()
         {
-            const int readSize = 1024; // Adjust based on your needs
+            try
+            {
+                // Step 1: Send query command (master asks "how many bytes do you have?")
+                byte[] queryCmd = new byte[QUERY_CMD_LENGTH]
+                {
+                    QUERY_CMD_BYTE1,
+                    QUERY_CMD_BYTE2,
+                    QUERY_CMD_BYTE3,
+                    QUERY_CMD_BYTE4
+                };
+                _spi.ReadWrite(queryCmd);
+                
+                // Step 2: Read the count response (slave sends 2 bytes: count_high, count_low)
+                byte[] countRequest = new byte[COUNT_RESPONSE_LENGTH];
+                byte[] countResponse = _spi.ReadWrite(countRequest);
+
+                if (countResponse == null || countResponse.Length < COUNT_RESPONSE_LENGTH)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[FTDI] Invalid count response length: {countResponse?.Length ?? 0}");
+                    return -1;
+                }
+                
+                // Convert response to uint16 (big-endian: high byte first)
+                ushort availableBytes = (ushort)((countResponse[0] << 8) | countResponse[1]);
+
+                return availableBytes;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[FTDI] Query failed: {ex.Message}");
+                return -1;
+            }
+        }
+
+        /// <summary>
+        /// Reads data from the slave and extracts the piggybacked next byte count.
+        /// The slave appends 2 bytes (big-endian uint16) at the end of every data transfer
+        /// indicating how many bytes it will have ready for the next request.
+        /// This eliminates the need for a separate query on subsequent cycles.
+        /// Uses ReadWriteNoFlush for maximum throughput — the piggybacked protocol
+        /// guarantees we always read exactly what is produced, so no stale data accumulates.
+        /// </summary>
+        /// <param name="dataLength">Number of data bytes expected (not including the 2-byte next count)</param>
+        /// <param name="nextByteCount">Output: the next transfer size reported by the slave</param>
+        /// <returns>Byte array containing only the frame data (next count stripped), or null on error</returns>
+        private byte[] ReadDataWithNextCount(int dataLength, out int nextByteCount)
+        {
+            nextByteCount = 0;
+
+            if (dataLength <= 0)
+                return null;
+
+            // Clamp to FT2232H RX buffer size to avoid mid-transfer USB flushes.
+            // The slave may have promised more, but we only read up to MAX_TRANSFER_DATA_BYTES.
+            // Remaining data stays in the slave's ring buffer and will be picked up next cycle
+            // via the piggybacked next-count (which reflects actual remaining data).
+            if (dataLength > MAX_TRANSFER_DATA_BYTES)
+                dataLength = MAX_TRANSFER_DATA_BYTES;
+
+            try
+            {
+                // Request data bytes + 2 piggybacked next-count bytes in a single USB round-trip.
+                // Uses ReadWriteNoFlush to skip the defensive FlushBuffer() call — in steady-state
+                // streaming the RX buffer is always clean because we read exactly what we request.
+                int totalBytes = dataLength + NEXT_COUNT_LENGTH;
+                byte[] dummyData = new byte[totalBytes];
+                byte[] response = _spi.ReadWriteNoFlush(dummyData);
+
+                if (response == null || response.Length != totalBytes)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[FTDI] Response length mismatch: expected {totalBytes}, got {response?.Length ?? 0}");
+                    return null;
+                }
+
+                // Extract piggybacked next count from the last 2 bytes (big-endian)
+                nextByteCount = (response[dataLength] << 8) | response[dataLength + 1];
+
+                // Return only the frame data (strip the next count bytes)
+                byte[] frameData = new byte[dataLength];
+                Array.Copy(response, 0, frameData, 0, dataLength);
+
+                return frameData;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[FTDI] ReadDataWithNextCount failed: {ex.Message}");
+                return null;
+            }
+        }
+
+        private void ReadFTDIData(CancellationToken cancellation)
+        {
             int consecutiveErrorCount = 0;
             const int maxConsecutiveErrors = 5;
+            
+            System.Diagnostics.Debug.WriteLine("[FTDI] Read thread started, CS is held LOW for entire session");
 
-            while (_isStreaming && _spi != null)
+            long cycleCount = 0;
+            Stopwatch cycleTimer = Stopwatch.StartNew();
+
+            // Bootstrap: initial query to get the first byte count (costs 2 USB round-trips)
+            int nextByteCount = 0;
+
+            while (!cancellation.IsCancellationRequested && _spi != null)
             {
                 try
                 {
-                    // Use FtdiSharp SPI to read data
-                    byte[] readData = _spi.ReadBytes(readSize);
-                    
-                    if (readData.Length > 0)
+                    // If we have no promised byte count, fall back to query (bootstrap or recovery)
+                    if (nextByteCount <= 0)
                     {
-                        TotalBits += readData.Length * 8;
-                        ProcessReceivedData(readData);
+                        nextByteCount = QuerySlaveByteCount();
+
+                        if (nextByteCount < 0)
+                        {
+                            consecutiveErrorCount++;
+                            if (consecutiveErrorCount >= maxConsecutiveErrors)
+                            {
+                                HandleRuntimeDisconnection("Query failed after multiple retries");
+                                break;
+                            }
+                            Thread.Sleep(1);
+                            continue;
+                        }
+
+                        if (nextByteCount == 0)
+                        {
+                            // Slave has no data yet, wait and re-query
+                            Thread.Sleep(1);
+                            continue;
+                        }
+                    }
+
+                    // Steady-state: single USB round-trip for data + piggybacked next count
+                    int requestedBytes = nextByteCount;
+                    int nextCount = 0;
+                    byte[] rxData = ReadDataWithNextCount(requestedBytes, out nextCount);
+
+                    if (rxData == null || rxData.Length == 0)
+                    {
+                        consecutiveErrorCount++;
+                        nextByteCount = 0; // Force re-query on next cycle
+
+                        if (consecutiveErrorCount >= maxConsecutiveErrors)
+                        {
+                            HandleRuntimeDisconnection("Data request failed after multiple retries");
+                            break;
+                        }
+                    }
+                    else
+                    {
+                        TotalBits += rxData.Length * 8;
+                        ProcessReceivedData(rxData);
+
+                        // Use piggybacked count for next cycle
+                        nextByteCount = nextCount;
+
                         consecutiveErrorCount = 0;
+                    }
+
+                    cycleCount++;
+                    if (cycleCount % 100 == 0)
+                    {
+                        double cyclesPerSecond = cycleCount / cycleTimer.Elapsed.TotalSeconds;
+                        System.Diagnostics.Debug.WriteLine($"[FTDI] Cycle rate: {cyclesPerSecond:F1}/sec, Data: {requestedBytes} bytes, Next: {nextByteCount} bytes");
                     }
                 }
                 catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[FTDI] Read thread exception: {ex.Message}");
                     consecutiveErrorCount++;
+                    nextByteCount = 0; // Force re-query on next cycle
+
                     if (consecutiveErrorCount >= maxConsecutiveErrors)
                     {
                         HandleRuntimeDisconnection($"Read error: {ex.Message}");
                         break;
                     }
-                    
                 }
-                
-                Thread.Sleep(50);
+
+                // No Thread.Sleep here in steady-state: the USB round-trip in ReadWrite()
+                // already provides the necessary pacing. Adding Thread.Sleep(1) on Windows
+                // actually sleeps 1-15ms due to the default timer resolution (15.6ms),
+                // which is the dominant bottleneck when cycle rates drop below ~250/sec.
+                // Only sleep when we have no data to request (bootstrap/recovery).
             }
+            
+            System.Diagnostics.Debug.WriteLine("[FTDI] Read thread stopped");
         }
 
         private void ProcessReceivedData(byte[] readBuffer)
         {
             try
             {
-                // Parse the data using the configured parser
                 ParsedData parsedData = _parser.ParseData(readBuffer.AsSpan());
                 
                 if (parsedData.Data != null)
@@ -529,7 +692,6 @@ namespace PowerScope.Model
             }
             catch (Exception ex)
             {
-                // Log parsing error but continue processing
                 System.Diagnostics.Debug.WriteLine($"Data parsing error: {ex.Message}");
             }
         }
@@ -538,21 +700,17 @@ namespace PowerScope.Model
         {
             int channelsToProcess = Math.Min(parsedData.Length, ChannelCount);
             
-            // Pre-allocate arrays for parallel processing
             double[][] finalData = new double[channelsToProcess][];
             
-            // Process all channels in parallel
             Parallel.For(0, channelsToProcess, channel =>
             {
                 if (parsedData[channel] != null && parsedData[channel].Length > 0)
                 {
-                    // Apply channel processing (gain, offset, filtering)
                     double[] channelProcessedSamples = new double[parsedData[channel].Length];
                     for (int sample = 0; sample < parsedData[channel].Length; sample++)
                     {
                         double processedSample = ApplyChannelProcessing(channel, parsedData[channel][sample]);
                         
-                        // Safety check for invalid values
                         if (!double.IsFinite(processedSample))
                         {
                             processedSample = 0.0;
@@ -561,7 +719,6 @@ namespace PowerScope.Model
                         channelProcessedSamples[sample] = processedSample;
                     }
                     
-                    // Apply up/down sampling if enabled
                     double[] channelFinalData = channelProcessedSamples;
                     if (_upDownSampling.IsEnabled)
                     {
@@ -569,7 +726,6 @@ namespace PowerScope.Model
                         {
                             channelFinalData = _upDownSampling.ProcessChannelData(channel, channelProcessedSamples);
                             
-                            // Safety check for up/down sampled data
                             for (int i = 0; i < channelFinalData.Length; i++)
                             {
                                 if (!double.IsFinite(channelFinalData[i]))
@@ -588,7 +744,6 @@ namespace PowerScope.Model
                 }
             });
             
-            // Add processed data to ring buffers
             for (int channel = 0; channel < channelsToProcess; channel++)
             {
                 if (finalData[channel] != null && _receivedData != null)
@@ -620,10 +775,8 @@ namespace PowerScope.Model
             if (settings == null)
                 return rawSample;
             
-            // Apply gain and offset
             double processed = settings.Gain * (rawSample + settings.Offset);
             
-            // Apply filter if configured
             if (filter != null)
             {
                 processed = filter.Filter(processed);
@@ -837,18 +990,14 @@ namespace PowerScope.Model
 
         public event PropertyChangedEventHandler? PropertyChanged;
     
-      /// <summary>
-   /// Raised when the data stream is being disposed
-      /// Allows dependent virtual streams to clean up automatically
-   /// </summary>
-      public event EventHandler Disposing;
+        public event EventHandler Disposing;
 
-   protected virtual void OnPropertyChanged(string propertyName)
+        protected virtual void OnPropertyChanged(string propertyName)
         {
-     PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-   }
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
 
- #endregion
+        #endregion
 
         #region IDisposable Implementation
 
@@ -857,8 +1006,7 @@ namespace PowerScope.Model
             if (_disposed)
                 return;
 
-            // Raise Disposing event BEFORE disposing to notify virtual channels
-      Disposing?.Invoke(this, EventArgs.Empty);
+            Disposing?.Invoke(this, EventArgs.Empty);
 
             if (_isStreaming)
                 StopStreaming();
@@ -882,10 +1030,24 @@ namespace PowerScope.Model
                 _upDownSampling.PropertyChanged -= OnUpDownSamplingPropertyChanged;
             }
             
+            _readThreadCancellation?.Dispose();
+            
             _disposed = true;
             GC.SuppressFinalize(this);
         }
 
+        #endregion
+
+        #region SPI Protocol Commands
+        private const byte QUERY_CMD_BYTE1 = 0xFF;
+        private const byte QUERY_CMD_BYTE2 = 0x00;
+        private const byte QUERY_CMD_BYTE3 = 0xFF;
+        private const byte QUERY_CMD_BYTE4 = 0xFF;
+        
+        private const int QUERY_CMD_LENGTH = 4;
+        private const int COUNT_RESPONSE_LENGTH = 2;
+        private const int NEXT_COUNT_LENGTH = 2;
+        private const int MAX_RETRIES = 3;
         #endregion
     }
 }

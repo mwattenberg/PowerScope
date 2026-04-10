@@ -162,6 +162,20 @@ namespace PowerScope.Model
             }
         }
 
+        /// <summary>
+        /// Exports a snapshot of the currently visible plot data to a CSV file
+        /// using the standard PowerScope format.
+        /// </summary>
+        public void ExportSnapshot(string filePath, PlotSnapshot snapshot)
+        {
+            using (StreamWriter writer = new StreamWriter(filePath))
+            {
+                FileIOManager.WriteFileHeader(writer, snapshot.Channels, snapshot.SampleRate);
+                FileIOManager.AppendDataRows(writer, snapshot.Data);
+                writer.Flush();
+            }
+        }
+
         public void Dispose()
         {
             StopRecording();

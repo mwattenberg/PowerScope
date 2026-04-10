@@ -59,10 +59,10 @@
             Panel.ZIndex="1000">
         <Menu Height="26" VerticalAlignment="Stretch" HorizontalAlignment="Stretch" Menu.Background ="{DynamicResource PlotSettings_BackgroundBrush}">
             <MenuItem Header="File">
-                <MenuItem Header="Load Settings                    Ctrl+O" Click="MenuItem_LoadSettings_Click"/>
+                <MenuItem Header="Load Settings                    Ctrl+L" Click="MenuItem_LoadSettings_Click"/>
                 <MenuItem Header="Save Settings                     Ctrl+S" Click="MenuItem_SaveSettings_Click"/>
                 <Separator/>
-                <MenuItem Header="Export Waveform             Ctrl+E" Click="MenuItem_ExportPlot_Click"/>
+                <MenuItem Header="Open Waveform...           Ctrl+O" Click="MenuItem_OpenWaveform_Click"/>
                 <Separator/>
                 <MenuItem Header="Exit" Click="MenuItem_Exit_Click"/>
             </MenuItem>

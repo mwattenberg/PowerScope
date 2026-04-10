@@ -62,9 +62,9 @@
         <Style x:Key="RecordButtonStyle" TargetType="Button">
             <Setter Property="Foreground" Value="White"/>
             <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="Height" Value="41"/>
+            <Setter Property="Height" Value="42"/>
             <Setter Property="Width" Value="90"/>
-            <Setter Property="Margin" Value="0,0,0,2"/>
+            <Setter Property="Margin" Value="0,2,0,2"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
@@ -136,19 +136,18 @@
                     ToolTip="Writes the incoming data stream to a file">
                 <Button.Content>
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
-                        <TextBlock Text="⬤ Record" Foreground="White" VerticalAlignment="Center"/>
+                        <TextBlock Text="Record ⬤" Foreground="White" VerticalAlignment="Center"/>
                     </StackPanel>
                 </Button.Content>
             </Button>
             
-            <Button x:Name="LoadButton" 
-                    Content="Load 📁" 
-                    Background="#FF008CF9" 
-                    Tag="#FF008CF9"
+            <Button x:Name="ExportButton" 
+                    Content="Export ↪" 
+                    Background="#FF6A0DAD" 
+                    Tag="#FF6A0DAD"
                     Style="{StaticResource HoverButtonStyle}"
-                    Margin="0"
-                    Click="LoadButton_Click"
-                    ToolTip="Opens a *.csv file and adds it as a new data stream"/>
+                    Click="ExportButton_Click"
+                    ToolTip="Export the current waveform view as PNG, SVG or CSV"/>
         </StackPanel>
     </Grid>
 </UserControl>

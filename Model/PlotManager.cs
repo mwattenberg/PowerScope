@@ -36,6 +36,11 @@ namespace PowerScope.Model
         // Recording functionality
         private readonly PlotFileWriter _fileWriter;
 
+        internal PlotFileWriter FileWriter
+        {
+            get { return _fileWriter; }
+        }
+
         // DPI scaling for mouse handling
         private DpiScale _dpi;
 
@@ -168,6 +173,29 @@ namespace PowerScope.Model
                 return;
 
             _fileWriter.StopRecording();
+        }
+
+        /// <summary>
+        /// Returns a snapshot of the data currently visible on the plot.
+        /// Returns null if no channels are available.
+        /// </summary>
+        public PlotSnapshot GetSnapshot()
+        {
+            if (_channels == null || _channels.Count == 0)
+                return null;
+
+            int count = Math.Min(_channels.Count, _maxChannels);
+            double[][] data = new double[count][];
+
+            for (int i = 0; i < count; i++)
+            {
+                data[i] = new double[Settings.Xmax];
+                if (_channels[i].IsEnabled && _data[i] != null)
+                    Array.Copy(_data[i], data[i], Settings.Xmax);
+            }
+
+            double sampleRate = _channels[0].OwnerStream.SampleRate;
+            return new PlotSnapshot(data, _channels, sampleRate, DateTime.Now);
         }
         #endregion
 

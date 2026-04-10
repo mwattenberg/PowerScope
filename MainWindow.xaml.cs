@@ -33,8 +33,8 @@ namespace PowerScope
         // Commands for keyboard shortcuts
         public ICommand SaveSettingsCommand { get; private set; }
         public ICommand LoadSettingsCommand { get; private set; }
+        public ICommand OpenWaveformCommand { get; private set; }
         public ICommand PreferencesCommand { get; private set; }
-        public ICommand ExportPlotCommand { get; private set; }
 
         public MainWindow()
         {
@@ -79,8 +79,8 @@ namespace PowerScope
         {
             SaveSettingsCommand = new RelayCommand(SaveSettings);
             LoadSettingsCommand = new RelayCommand(LoadSettings);
+            OpenWaveformCommand = new RelayCommand(OpenWaveform);
             PreferencesCommand = new RelayCommand(OpenPreferences);
-            ExportPlotCommand = new RelayCommand(ExportPlot);
         }
 
         private void SaveSettings()
@@ -140,35 +140,78 @@ namespace PowerScope
             {
                 SaveFileDialog saveFileDialog = new SaveFileDialog
                 {
-                    Filter = "PNG files (*.png)|*.png|SVG files (*.svg)|*.svg|All files (*.*)|*.*",
+                    Filter = "PNG files (*.png)|*.png|SVG files (*.svg)|*.svg|CSV files (*.csv)|*.csv",
                     DefaultExt = "png",
-                    FileName = "plot_export"
+                    FileName = $"export_{DateTime.Now:yyyyMMdd_HHmmss}"
                 };
 
-                if (saveFileDialog.ShowDialog() == true)
+                if (saveFileDialog.ShowDialog() != true)
+                    return;
+
+                string extension = Path.GetExtension(saveFileDialog.FileName).ToLower();
+
+                if (extension == ".png")
                 {
-                    string extension = Path.GetExtension(saveFileDialog.FileName).ToLower();
-
-                    if (extension == ".png")
-                    {
-                        WpfPlot1.Plot.SavePng(saveFileDialog.FileName, 1920, 1080);
-                    }
-                    else if (extension == ".svg")
-                    {
-                        WpfPlot1.Plot.SaveSvg(saveFileDialog.FileName, 1920, 1080);
-                    }
-                    else
-                    {
-                        // Default to PNG
-                        WpfPlot1.Plot.SavePng(saveFileDialog.FileName, 1920, 1080);
-                    }
-
-
+                    WpfPlot1.Plot.SavePng(saveFileDialog.FileName, 1920, 1080);
+                }
+                else if (extension == ".svg")
+                {
+                    WpfPlot1.Plot.SaveSvg(saveFileDialog.FileName, 1920, 1080);
+                }
+                else if (extension == ".csv")
+                {
+                    ExportPlotDataToCsv(saveFileDialog.FileName);
+                }
+                else
+                {
+                    WpfPlot1.Plot.SavePng(saveFileDialog.FileName, 1920, 1080);
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error exporting plot: {ex.Message}", "Export Plot Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show($"Error exporting: {ex.Message}", "Export Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void ExportPlotDataToCsv(string filePath)
+        {
+            PlotSnapshot snapshot = _plotManager.GetSnapshot();
+
+            if (snapshot == null)
+            {
+                MessageBox.Show("No data to export.", "Export Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            _plotManager.FileWriter.ExportSnapshot(filePath, snapshot);
+        }
+
+        private void OpenWaveform()
+        {
+            StreamSettings streamSettings = new StreamSettings
+            {
+                StreamSource = StreamSource.File
+            };
+
+            SerialConfigWindow configWindow = new SerialConfigWindow(streamSettings);
+            configWindow.Owner = this;
+
+            if (configWindow.ShowDialog() != true)
+                return;
+
+            try
+            {
+                FileDataStream fileStream = new FileDataStream(streamSettings.FilePath, loopPlayback: streamSettings.FileLoopPlayback);
+                fileStream.Connect();
+                fileStream.StartStreaming();
+
+                DataStreamBar.AddChannelsForStream(fileStream);
+                DataStreamBar.AddStreamInfoPanel(streamSettings, fileStream);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error loading waveform: {ex.Message}", "Open Waveform Error",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -206,7 +249,7 @@ namespace PowerScope
             RunControl.RunStateChanged += RunControl_RunStateChanged;
             RunControl.RecordStateChanged += RunControl_RecordStateChanged;
             RunControl.ClearClicked += RunControl_ClearClicked;
-            RunControl.LoadClicked += RunControl_LoadClicked;
+            RunControl.ExportClicked += (s, e) => ExportPlot();
 
             // Subscribe directly to ObservableCollection.CollectionChanged for automatic notifications
             DataStreamBar.Channels.CollectionChanged += OnChannelsCollectionChanged;
@@ -215,7 +258,7 @@ namespace PowerScope
             MainMenuBar.PreferencesClicked += MenuBar_PreferencesClicked;
             MainMenuBar.SaveSettingsClicked += (s, e) => SaveSettings();
             MainMenuBar.LoadSettingsClicked += (s, e) => LoadSettings();
-            MainMenuBar.ExportPlotClicked += (s, e) => ExportPlot();
+            MainMenuBar.OpenWaveformClicked += (s, e) => OpenWaveform();
             MainMenuBar.AboutClicked += (s, e) => ShowAboutWindow();
         }
 
@@ -293,49 +336,6 @@ namespace PowerScope
         private void RunControl_ClearClicked(object sender, EventArgs e)
         {
             _plotManager.Clear();
-        }
-
-        private void RunControl_LoadClicked(object sender, EventArgs e)
-        {
-            try
-            {
-                // Show file dialog immediately
-                OpenFileDialog openFileDialog = new OpenFileDialog
-                {
-                    Filter = "CSV files (*.csv)|*.csv|Text files (*.txt)|*.txt|All files (*.*)|*.*",
-                    DefaultExt = "csv",
-                    Title = "Select Data File to Load"
-                };
-
-                if (openFileDialog.ShowDialog() == true)
-                {
-                    // Create FileDataStream directly
-                    var fileStream = new FileDataStream(openFileDialog.FileName, loopPlayback: true);
-
-                    // Connect and start streaming
-                    fileStream.Connect();
-                    fileStream.StartStreaming();
-
-                    // Add channels for the file stream
-                    DataStreamBar.AddChannelsForStream(fileStream);
-
-                    // Create StreamSettings for the UI panel
-                    var settings = new StreamSettings
-                    {
-                        StreamSource = StreamSource.File,
-                        FilePath = openFileDialog.FileName,
-                        FileLoopPlayback = true
-                    };
-
-                    // Add UI panel for the stream
-                    DataStreamBar.AddStreamInfoPanel(settings, fileStream);
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Error loading file: {ex.Message}", "Load File Error",
-                    MessageBoxButton.OK, MessageBoxImage.Error);
-            }
         }
 
         /// <summary>

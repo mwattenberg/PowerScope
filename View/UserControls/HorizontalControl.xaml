@@ -6,7 +6,7 @@
              xmlns:local="clr-namespace:PowerScope.View.UserControls"
              xmlns:svgc="http://sharpvectors.codeplex.com/svgc/"
              mc:Ignorable="d" 
-             Width="150" MinHeight="180" Margin="2"
+             MinHeight="180" Margin="2"
              FontFamily="{DynamicResource {x:Static SystemFonts.MessageFontFamily}}"
              FontSize="{DynamicResource {x:Static SystemFonts.MessageFontSize}}">
 

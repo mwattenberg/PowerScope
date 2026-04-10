@@ -28,7 +28,7 @@ namespace PowerScope.View.UserControls
         public event EventHandler<RunStates> RunStateChanged;
         public event EventHandler<RecordStates> RecordStateChanged;
         public event EventHandler ClearClicked;
-        public event EventHandler LoadClicked;
+        public event EventHandler ExportClicked;
 
         /// <summary>
         /// Reference to PlotManager for trigger state monitoring
@@ -146,9 +146,9 @@ namespace PowerScope.View.UserControls
             }
         }
 
-        private void LoadButton_Click(object sender, RoutedEventArgs e)
+        private void ExportButton_Click(object sender, RoutedEventArgs e)
         {
-            LoadClicked?.Invoke(this, EventArgs.Empty);
+            ExportClicked?.Invoke(this, EventArgs.Empty);
         }
 
         private void UpdateRunButtonUI()

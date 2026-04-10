@@ -458,12 +458,10 @@
 
                                 <!-- Clock Polarity and Phase (SPI Mode) -->
                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-                                    <Label Content="SPI Mode:" VerticalAlignment="Center" ToolTip="SPI clock polarity (CPOL) and phase (CPHA) mode." Width="80"/>
+                                    <Label Content="SPI Mode:" VerticalAlignment="Center" ToolTip="SPI clock polarity (CPOL) and phase (CPHA) mode. FTDI MPSSE only supports modes 0 and 2." Width="80"/>
                                     <ComboBox x:Name="ComboBox_SPIMode" Width="200" SelectedValuePath="Tag" SelectedValue="{Binding SpiMode, Mode=TwoWay}">
                                         <ComboBoxItem Content="Mode 0 (CPOL=0, CPHA=0)" Tag="0" IsSelected="True"/>
-                                        <ComboBoxItem Content="Mode 1 (CPOL=0, CPHA=1)" Tag="1"/>
                                         <ComboBoxItem Content="Mode 2 (CPOL=1, CPHA=0)" Tag="2"/>
-                                        <ComboBoxItem Content="Mode 3 (CPOL=1, CPHA=1)" Tag="3"/>
                                     </ComboBox>
                                 </StackPanel>
 

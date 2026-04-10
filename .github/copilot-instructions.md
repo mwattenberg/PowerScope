@@ -5,19 +5,6 @@ PowerScope is a WPF desktop application (.NET 8.0) for real-time plotting and an
 
 ## Architecture
 
-### Channel-Centric Design (Critical Pattern)
-The codebase follows a **channel-centric architecture** where `Channel` objects encapsulate both data sources and display settings:
-
-- **Channel** (`Model/Channel.cs`) - Core abstraction combining:
-  - Reference to owner `IDataStream` 
-  - Local channel index within that stream
-  - `ChannelSettings` for display/processing (color, label, gain, offset, filters)
-  - Collection of `Measurement` objects
-  - Support for both physical and virtual channels
-
-- **Do NOT use global channel indices** - channels are always accessed through their owner stream + local index
-- When adding stream support, work through `Channel` objects rather than raw stream references
-
 ### Data Stream Hierarchy
 All data sources implement `IDataStream` interface (`Model/DataStream.cs`):
 
@@ -36,6 +23,20 @@ All data sources implement `IDataStream` interface (`Model/DataStream.cs`):
 - `IChannelConfigurable` - Per-channel settings (gain/offset/filters)
 - `IBufferResizable` - Runtime buffer size changes
 - `IUpDownSampling` - Upsampling/downsampling support
+
+### Channel-Centric Design (Critical Pattern)
+The codebase follows a **channel-centric architecture** where `Channel` objects encapsulate both data sources and display settings:
+
+- **Channel** (`Model/Channel.cs`) - Core abstraction combining:
+  - Reference to owner `IDataStream` 
+  - Local channel index within that stream
+  - `ChannelSettings` for display/processing (color, label, gain, offset, filters)
+  - Collection of `Measurement` objects
+  - Support for both physical and virtual channels
+
+- **Do NOT use global channel indices** - channels are always accessed through their owner stream + local index
+- When adding stream support, work through `Channel` objects rather than raw stream references
+
 
 ### Core Components
 
@@ -64,11 +65,140 @@ All data sources implement `IDataStream` interface (`Model/DataStream.cs`):
 
 ## Data Flow
 
-1. **Stream Creation**: User adds stream via `DataStreamBar` → creates `IDataStream` implementation
-2. **Channel Registration**: Stream creates `Channel` objects → added to `DataStreamBar.Channels`
-3. **Data Acquisition**: Background thread in stream writes to `RingBuffer`
-4. **Plot Updates**: `PlotManager` timer copies data via `Channel.CopyLatestDataTo()` → ScottPlot arrays
-5. **Rendering**: ScottPlot GPU-accelerated rendering at configured FPS
+PowerScope follows a **channel-centric data flow** where raw data from hardware passes through multiple processing stages before being displayed:
+
+### 1. Stream Creation & Connection
+User adds stream via `DataStreamBar` → creates `IDataStream` implementation (e.g., `SerialDataStream`, `AudioDataStream`, `FTDI_SerialDataStream`).
+
+### 2. Channel Registration  
+Stream creates `Channel` objects → added to `DataStreamBar.Channels` (the single source of truth for all channels in the application).
+
+### 3. Data Acquisition (Background Thread)
+Each `IDataStream` implementation runs a background thread/timer that:
+- Reads raw bytes from hardware (serial port, audio device, FTDI chip, etc.)
+- Parses bytes into samples via `DataParser` (ASCII or binary formats)
+- Writes parsed samples to per-channel `RingBuffer<double>` instances
+
+### 4. Per-Channel Processing (Before RingBuffer Storage)
+**Critical**: All `IDataStream` implementations that support `IChannelConfigurable` apply processing **before** storing to ring buffers:
+
+```csharp
+private double ApplyChannelProcessing(int channel, double rawSample)
+{
+    ChannelSettings settings = _channelSettings[channel];
+    IDigitalFilter filter = _channelFilters[channel];
+    
+    if (settings == null)
+        return rawSample;
+    
+    // Apply gain and offset
+    double processed = settings.Gain * (rawSample + settings.Offset);
+    
+    // Apply digital filter if configured
+    if (filter != null)
+    {
+        processed = filter.Filter(processed);
+    }
+    
+    return processed;
+}
+```
+
+**Processing Order**:
+1. **Offset** - Added to raw sample value
+2. **Gain** - Multiplies the offset-adjusted value  
+3. **Digital Filtering** - Applied to scaled value (see `Model/DigitalFilters.cs`)
+
+**Available Filters** (`IDigitalFilter` implementations):
+- `ExponentialLowPassFilter` - First-order IIR smoothing (alpha parameter)
+- `ExponentialHighPassFilter` - DC removal via complementary low-pass
+- `MovingAverageFilter` - Simple windowed averaging
+- `MedianFilter` - Outlier rejection via median of window
+- `NotchFilter` - Recursive 2nd-order notch (removes specific frequency)
+- `AbsoluteFilter` - Takes absolute value of signal
+- `SquaredFilter` - Squares the signal  
+- `DownsamplingFilter` - Reduces sample rate with interpolation
+- `BiquadFilter` - Generic 2-pole 2-zero IIR (programmable coefficients)
+
+### 5. Up/Down Sampling (Optional Post-Processing)
+If `IUpDownSampling` is supported and enabled, processed samples are resampled **after** gain/offset/filtering but **before** ring buffer storage:
+- **Upsampling** - Interpolates additional samples (increases data rate)
+- **Downsampling** - Decimates samples (reduces data rate)
+
+This affects the reported `SampleRate` and number of samples stored.
+
+### 6. Ring Buffer Storage
+Processed (and optionally resampled) data is stored in lock-free thread-safe `RingBuffer<double>` instances:
+- One ring buffer per channel per stream
+- Fixed capacity (configured via `PlotSettings.BufferSize`)
+- Overwrites oldest data when full (circular buffer behavior)
+
+### 7. Plot Updates (UI Thread Timer)
+`PlotManager` runs a `DispatcherTimer` at configured FPS (`PlotSettings.PlotUpdateRateFPS`):
+
+```csharp
+private void UpdatePlot(object sender, EventArgs e)
+{
+    // Check trigger condition if enabled
+    bool shouldUpdatePlot = Settings.EnableEdgeTrigger 
+        ? CheckTriggerCondition() 
+        : true;
+    
+    if (shouldUpdatePlot)
+    {
+        CopyChannelDataToPlot();  // Pull data from ring buffers
+        
+        if (_fileWriter.IsRecording)
+            _fileWriter.WritePendingSamples();  // Record to CSV
+        
+        if (Settings.YAutoScale)
+            _plot.Plot.Axes.AutoScaleY();
+        
+        _plot.Refresh();  // ScottPlot GPU-accelerated render
+    }
+}
+```
+
+### 8. Data Copy to Plot Arrays
+For each enabled channel, `PlotManager` calls:
+```csharp
+channel.CopyLatestDataTo(_data[i], Settings.Xmax);
+```
+
+This delegates to:
+```csharp
+_stream.CopyLatestTo(_indexWithinDatastream, destination, n);
+```
+
+Which efficiently copies the **latest N samples** from the ring buffer to ScottPlot's display arrays **without locking** (lock-free read).
+
+### 9. GPU-Accelerated Rendering
+ScottPlot renders the data arrays using GPU acceleration (`WpfPlotGL`) at the configured FPS, independent of data acquisition rate.
+
+---
+
+### Key Architectural Points
+
+**Thread Safety**:
+- Data acquisition runs on background threads (per stream)
+- Plot updates run on UI dispatcher thread
+- Ring buffers provide lock-free coordination between threads
+
+**Processing Location**:
+- **All transformations** (gain, offset, filters) happen **in the data acquisition thread** before storage
+- Plot updates only **copy** pre-processed data from ring buffers
+- This keeps the UI thread fast and responsive
+
+**Channel-Centric API**:
+- `Channel` objects abstract away stream/index resolution
+- UI components work with `Channel` objects, not raw stream references
+- Simplifies virtual channel support (filters/math operations create new streams transparently)
+
+**Sample Rate Handling**:
+- Physical streams calculate sample rate dynamically from incoming data
+- Up/down sampling multiplies the base sample rate
+- `IDataStream.SampleRate` property reflects the **final** sample rate after processing
+- Used for time-axis scaling and CSV recording timestamps
 
 ## Settings & Serialization
 
@@ -208,4 +338,3 @@ else
 // Bad
 var stream = channel?.OwnerStream;
 stream?.IsConnected ? stream.StartStreaming() : stream?.Connect()?.StartStreaming();
-```

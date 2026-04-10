@@ -364,7 +364,7 @@ namespace PowerScope.View.UserControls
                         ftdiParser = new DataParser(binaryFormat, vm.NumberOfChannels);
                     
                     // Create FTDI stream with the configured SPI clock frequency
-                    dataStream = new FTDI_SerialDataStream(vm.FtdiDeviceIndex, vm.SpiClockFrequency, vm.NumberOfChannels, ftdiParser);
+                    dataStream = new FTDI_SerialDataStream(vm.FtdiDeviceIndex, vm.SpiClockFrequency, vm.NumberOfChannels, ftdiParser, vm.SpiMode);
                     break;
                 
                 case StreamSource.SerialPort:

@@ -15,9 +15,9 @@
     
     <Window.InputBindings>
         <KeyBinding Command="{Binding SaveSettingsCommand}" Key="S" Modifiers="Ctrl"/>
-        <KeyBinding Command="{Binding LoadSettingsCommand}" Key="O" Modifiers="Ctrl"/>
+        <KeyBinding Command="{Binding LoadSettingsCommand}" Key="L" Modifiers="Ctrl"/>
+        <KeyBinding Command="{Binding OpenWaveformCommand}" Key="O" Modifiers="Ctrl"/>
         <KeyBinding Command="{Binding PreferencesCommand}" Key="P" Modifiers="Ctrl"/>
-        <KeyBinding Command="{Binding ExportPlotCommand}" Key="E" Modifiers="Ctrl"/>
     </Window.InputBindings>
 
     <Grid Background="{DynamicResource PlotSettings_BackgroundBrush}">

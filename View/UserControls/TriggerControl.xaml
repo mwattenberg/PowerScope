@@ -6,7 +6,7 @@
  xmlns:local="clr-namespace:PowerScope.View.UserControls"
              xmlns:svgc="http://sharpvectors.codeplex.com/svgc/"
              mc:Ignorable="d"
-    Width="150" MinHeight="180"
+    MinHeight="180"
      FontFamily="{DynamicResource {x:Static SystemFonts.MessageFontFamily}}"
           FontSize="{DynamicResource {x:Static SystemFonts.MessageFontSize}}">
 	<UserControl.Resources>
@@ -259,54 +259,64 @@
 					  Height="24"/>
 			</Grid>
 
-			<!-- Trigger Edge Selection - Icon buttons centered -->
+			<!-- Trigger Edge Selection - Icon buttons filling full width -->
 			<Grid Grid.Row="2" Margin="5,2,5,2">
-				<StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
-					<Button x:Name="RisingEdgeButton"
-						Style="{StaticResource WideButtonStyle}"
-						Width="25" Height="50"
-						Margin="2,0,2,0"
-						Click="RisingEdgeButton_Click"
-						ToolTip="Trigger on rising edge (signal crosses level upward)">
-						<svgc:SvgViewbox Source="/Icons/risingEdge.svg" Width="18" Height="40" />
-					</Button>
+				<Grid.ColumnDefinitions>
+					<ColumnDefinition Width="*"/>
+					<ColumnDefinition Width="*"/>
+					<ColumnDefinition Width="*"/>
+				</Grid.ColumnDefinitions>
+				<Button x:Name="RisingEdgeButton"
+					Grid.Column="0"
+					Style="{StaticResource WideButtonStyle}"
+					Height="50"
+					Margin="2,0,2,0"
+					Click="RisingEdgeButton_Click"
+					ToolTip="Trigger on rising edge (signal crosses level upward)">
+					<svgc:SvgViewbox Source="/Icons/risingEdge.svg" Width="35" Height="40" />
+				</Button>
 
-					<Button x:Name="AlternatingEdgeButton"
-						Style="{StaticResource WideButtonStyle}"
-						Width="25" Height="50"
-						Margin="2,0,2,0"
-						Click="AlternatingEdgeButton_Click"
-						ToolTip="Trigger on alternating edges (rising and falling)">
-						<svgc:SvgViewbox Source="/Icons/alternatingEdge.svg" Width="18" Height="40" />
-					</Button>
+				<Button x:Name="AlternatingEdgeButton"
+					Grid.Column="1"
+					Style="{StaticResource WideButtonStyle}"
+					Height="50"
+					Margin="2,0,2,0"
+					Click="AlternatingEdgeButton_Click"
+					ToolTip="Trigger on alternating edges (rising and falling)">
+					<svgc:SvgViewbox Source="/Icons/alternatingEdge.svg" Width="35" Height="40" />
+				</Button>
 
-					<Button x:Name="FallingEdgeButton"
-						Style="{StaticResource WideButtonStyle}"
-						Width="25" Height="50"
-						Margin="2,0,2,0"
-						Click="FallingEdgeButton_Click"
-						ToolTip="Trigger on falling edge (signal crosses level downward)">
-						<svgc:SvgViewbox Source="/Icons/fallingEdge.svg" Width="18" Height="40" />
-					</Button>
-				</StackPanel>
+				<Button x:Name="FallingEdgeButton"
+					Grid.Column="2"
+					Style="{StaticResource WideButtonStyle}"
+					Height="50"
+					Margin="2,0,2,0"
+					Click="FallingEdgeButton_Click"
+					ToolTip="Trigger on falling edge (signal crosses level downward)">
+					<svgc:SvgViewbox Source="/Icons/fallingEdge.svg" Width="35" Height="40" />
+				</Button>
 			</Grid>
 
 			<!-- Mode buttons row -->
 			<Grid Grid.Row="3" Margin="5,2,5,5">
-				<StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
-					<Button x:Name="NormalModeButton" Content="Normal" Style="{StaticResource WideButtonStyle}"
-						  MinWidth="50" Height="50"
-						  Margin="2,0,5,0"
-						  Click="NormalModeButton_Click"
-						  Background="{Binding NormalModeButtonBackground}"
-						  ToolTip="Continuous trigger mode - trigger repeatedly"/>
-					<Button x:Name="SingleModeButton" Content="Single" Style="{StaticResource WideButtonStyle}"
-			  MinWidth="50" Height="50"
-			  Margin="5,0,2,0"
-			  Click="SingleModeButton_Click"
-			  Background="{Binding SingleModeButtonBackground}"
-			  ToolTip="Single-shot trigger mode - trigger once then stop"/>
-				</StackPanel>
+				<Grid.ColumnDefinitions>
+					<ColumnDefinition Width="*"/>
+					<ColumnDefinition Width="*"/>
+				</Grid.ColumnDefinitions>
+				<Button x:Name="NormalModeButton" Content="Normal" Style="{StaticResource WideButtonStyle}"
+					  Grid.Column="0"
+					  Height="50"
+					  Margin="2,0,2,0"
+					  Click="NormalModeButton_Click"
+					  Background="{Binding NormalModeButtonBackground}"
+					  ToolTip="Continuous trigger mode - trigger repeatedly"/>
+				<Button x:Name="SingleModeButton" Content="Single" Style="{StaticResource WideButtonStyle}"
+					  Grid.Column="1"
+					  Height="50"
+					  Margin="2,0,2,0"
+					  Click="SingleModeButton_Click"
+					  Background="{Binding SingleModeButtonBackground}"
+					  ToolTip="Single-shot trigger mode - trigger once then stop"/>
 			</Grid>
 		</Grid>
 	</Border>
