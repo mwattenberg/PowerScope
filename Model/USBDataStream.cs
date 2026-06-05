@@ -80,9 +80,20 @@ namespace PowerScope.Model
         private double _calculatedSampleRate = 0.0;
         private readonly object _sampleRateCalculationLock = new object();
 
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+        private struct SP_DEVICE_INTERFACE_DETAIL_DATA
+        {
+            public int cbSize;
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 256)]
+            public string DevicePath;
+        }
+
         public UsbSourceSetting SourceSetting { get; init; }
         public long TotalSamples { get; private set; }
         public long TotalBits { get; private set; }
+        public long TotalFrames { get; private set; }
+        public long TotalReadErrors { get; private set; }
+        public int LastWin32Error { get; private set; }
         private RingBuffer<double>[] ReceivedData { get; set; }
         public DataParser Parser { get; init; }
         public int UsbUpdateRateHz { get; set; } = 1000;
@@ -365,8 +376,18 @@ namespace PowerScope.Model
                     return;
                 }
 
-                // Send start command to device
-                SendStart(_winUsbHandle);
+                // Send start command to device.
+                // This is a best-effort vendor control transfer — if the firmware does not
+                // implement the request the device will STALL it, which is not fatal.
+                // Data streaming begins regardless via the bulk IN endpoint.
+                try
+                {
+                    SendStart(_winUsbHandle);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"USB SendStart warning (non-fatal): {ex.Message}");
+                }
 
                 IsStreaming = true;
 
@@ -471,14 +492,20 @@ namespace PowerScope.Model
                     int bytesRead;
                     if (!WinUsb_ReadPipe(_winUsbHandle, PipeIn, _readBuffer, _readBuffer.Length, out bytesRead, IntPtr.Zero))
                     {
-                        var error = Marshal.GetLastWin32Error();
+                        int error = Marshal.GetLastWin32Error();
+                        LastWin32Error = error;
+
                         if (error == 995) // ERROR_OPERATION_ABORTED - normal when stopping
                             break;
 
+                        TotalReadErrors++;
                         consecutiveErrorCount++;
+
+                        StatusMessage = $"Read error Win32={error} (total errors: {TotalReadErrors})";
+
                         if (consecutiveErrorCount >= maxConsecutiveErrors)
                         {
-                            HandleRuntimeDisconnection($"USB read error: {new System.ComponentModel.Win32Exception(error).Message}");
+                            HandleRuntimeDisconnection($"USB read error Win32={error}: {new System.ComponentModel.Win32Exception(error).Message}");
                             break;
                         }
                         Thread.Sleep(10);
@@ -490,6 +517,11 @@ namespace PowerScope.Model
                         TotalBits += bytesRead * 8;
                         ProcessReceivedUsbData(_readBuffer, bytesRead);
                         consecutiveErrorCount = 0;
+
+                        // Update status with live byte count so the user can see data arriving
+                        long totalBytes = TotalBits / 8;
+                        if (totalBytes % (64 * 1024) < bytesRead) // update roughly every 64KB
+                            StatusMessage = $"Streaming — {totalBytes / 1024} KB  {TotalFrames} frames";
                     }
                     else
                     {
@@ -498,7 +530,10 @@ namespace PowerScope.Model
                 }
                 catch (System.ComponentModel.Win32Exception ex)
                 {
+                    TotalReadErrors++;
+                    LastWin32Error = ex.NativeErrorCode;
                     consecutiveErrorCount++;
+                    StatusMessage = $"Win32 error {ex.NativeErrorCode}: {ex.Message}";
                     if (consecutiveErrorCount >= maxConsecutiveErrors)
                     {
                         HandleRuntimeDisconnection($"USB communication error: {ex.Message}");
@@ -508,7 +543,9 @@ namespace PowerScope.Model
                 }
                 catch (Exception ex)
                 {
+                    TotalReadErrors++;
                     consecutiveErrorCount++;
+                    StatusMessage = $"Error: {ex.Message}";
                     if (consecutiveErrorCount >= maxConsecutiveErrors)
                     {
                         HandleRuntimeDisconnection($"Unexpected USB error: {ex.Message}");
@@ -557,48 +594,149 @@ namespace PowerScope.Model
             Array.Copy(readBuffer, 0, _holdBuffer, _holdBufferLength, bytesRead);
             _holdBufferLength += bytesRead;
 
-            // Process complete 24-byte frames (12 channels * 2 bytes each)
-            const int frameSize = 24;
-            int completeFrames = _holdBufferLength / frameSize;
+           // Dynamically parse binary frames with a custom starting sequence or continuous layout
+           // Determine our single-channel data size based on the parser format
+           int bytesPerChannel = Parser.Format switch
+           {
+               DataParser.BinaryFormat.int16_t => 2,
+               DataParser.BinaryFormat.uint16_t => 2,
+               DataParser.BinaryFormat.int32_t => 4,
+               DataParser.BinaryFormat.uint32_t => 4,
+               DataParser.BinaryFormat.float_t => 4,
+               _ => 2
+           };
 
-            if (completeFrames > 0)
-            {
-                double[][] frameData = new double[12][];
-                for (int ch = 0; ch < 12; ch++)
-                {
-                    frameData[ch] = new double[completeFrames];
-                }
+           int payloadSize = Parser.NumberOfChannels * bytesPerChannel;
+           byte[] frameStart = Parser.FrameStart;
+           bool usesFraming = frameStart != null && frameStart.Length > 0;
+           int frameSize = usesFraming ? (frameStart.Length + payloadSize) : payloadSize;
 
-                int offset = 0;
-                for (int frame = 0; frame < completeFrames; frame++)
-                {
-                    for (int channel = 0; channel < 12; channel++)
+           if (usesFraming)
+           {
+               // Parse packets aligning with our starting sequence (e.g., 0xAA, 0xAA)
+               List<int> frameIndices = new List<int>();
+               for (int i = 0; i <= _holdBufferLength - frameSize; i++)
+               {
+                   bool isMatch = true;
+                   for (int k = 0; k < frameStart.Length; k++)
+                   {
+                       if (_holdBuffer[i + k] != frameStart[k])
+                       {
+                           isMatch = false;
+                           break;
+                       }
+                   }
+                   if (isMatch)
+                   {
+                       frameIndices.Add(i);
+                       i += frameSize - 1; // skip past this frame
+                   }
+               }
+
+               int completeFrames = frameIndices.Count;
+               if (completeFrames > 0)
+               {
+                   double[][] frameData = new double[Parser.NumberOfChannels][];
+                   for (int ch = 0; ch < Parser.NumberOfChannels; ch++)
+                   {
+                       frameData[ch] = new double[completeFrames];
+                   }
+
+                   for (int frame = 0; frame < completeFrames; frame++)
                     {
-                        // Convert little-endian 16-bit values to doubles
-                        ushort rawValue = (ushort)(_holdBuffer[offset] | (_holdBuffer[offset + 1] << 8));
-                        frameData[channel][frame] = rawValue;
-                        offset += 2;
-                    }
-                }
+                       int dataOffset = frameIndices[frame] + frameStart.Length;
+                       for (int channel = 0; channel < Parser.NumberOfChannels; channel++)
+                       {
+                           int offset = dataOffset + (channel * bytesPerChannel);
+                           frameData[channel][frame] = ReadBinaryValue(_holdBuffer, offset, Parser.Format);
+                       }
+                   }
 
-                // Process the frame data through the parser
-                try
-                {
-                    AddDataToRingBuffers(frameData);
-                }
-                catch (Exception)
-                {
-                    // Error processing data, continue
-                }
+                   try
+                   {
+                       AddDataToRingBuffers(frameData);
+                   }
+                   catch (Exception)
+                   {
+                       // Ignore processing issues and keep streaming
+                   }
 
-                // Move remaining bytes to start of buffer
-                int remainingBytes = _holdBufferLength - (completeFrames * frameSize);
-                if (remainingBytes > 0)
-                {
-                    Array.Copy(_holdBuffer, completeFrames * frameSize, _holdBuffer, 0, remainingBytes);
-                }
-                _holdBufferLength = remainingBytes;
-            }
+                   // Move remaining data after the last processed frame to the start
+                   int lastFrameEnd = frameIndices[completeFrames - 1] + frameSize;
+                   int remainingBytes = _holdBufferLength - lastFrameEnd;
+                   if (remainingBytes > 0)
+                   {
+                       Array.Copy(_holdBuffer, lastFrameEnd, _holdBuffer, 0, remainingBytes);
+                   }
+                   _holdBufferLength = remainingBytes;
+               }
+               else if (_holdBufferLength > 1024)
+               {
+                   // If we have a lot of bytes but no sync sequences found, flush buffer to avoid infinite growth
+                   // but keep the very end to scan for partial matches
+                   int keepBytes = frameSize - 1;
+                   Array.Copy(_holdBuffer, _holdBufferLength - keepBytes, _holdBuffer, 0, keepBytes);
+                   _holdBufferLength = keepBytes;
+               }
+           }
+           else
+           {
+               // Simple stream layout: sequential un-framed raw binary
+               int completeFrames = _holdBufferLength / frameSize;
+               if (completeFrames > 0)
+               {
+                   double[][] frameData = new double[Parser.NumberOfChannels][];
+                   for (int ch = 0; ch < Parser.NumberOfChannels; ch++)
+                   {
+                       frameData[ch] = new double[completeFrames];
+                   }
+
+                   int offset = 0;
+                   for (int frame = 0; frame < completeFrames; frame++)
+                   {
+                       for (int channel = 0; channel < Parser.NumberOfChannels; channel++)
+                       {
+                           frameData[channel][frame] = ReadBinaryValue(_holdBuffer, offset, Parser.Format);
+                           offset += bytesPerChannel;
+                       }
+                   }
+
+                   try
+                   {
+                       AddDataToRingBuffers(frameData);
+                   }
+                   catch (Exception)
+                   {
+                       // Ignore processing issues and keep streaming
+                   }
+
+                   int remainingBytes = _holdBufferLength - (completeFrames * frameSize);
+                   if (remainingBytes > 0)
+                   {
+                       Array.Copy(_holdBuffer, completeFrames * frameSize, _holdBuffer, 0, remainingBytes);
+                   }
+                   _holdBufferLength = remainingBytes;
+               }
+           }
+        }
+
+        private static double ReadBinaryValue(byte[] data, int offset, DataParser.BinaryFormat format)
+        {
+           switch (format)
+           {
+               case DataParser.BinaryFormat.int16_t:
+                   return (short)(data[offset] | (data[offset + 1] << 8));
+               case DataParser.BinaryFormat.uint16_t:
+                   return (ushort)(data[offset] | (data[offset + 1] << 8));
+               case DataParser.BinaryFormat.int32_t:
+                   return BitConverter.ToInt32(data, offset);
+               case DataParser.BinaryFormat.uint32_t:
+                   return BitConverter.ToUInt32(data, offset);
+               case DataParser.BinaryFormat.float_t:
+                   return BitConverter.ToSingle(data, offset);
+               default:
+                   return 0;
+           }
         }
 
         private void AddDataToRingBuffers(double[][] parsedData)
@@ -625,7 +763,8 @@ namespace PowerScope.Model
             {
                 int newSamples = parsedData[0].Length;
                 TotalSamples += newSamples;
-                
+                TotalFrames += newSamples;
+
                 // Update sample rate calculation
                 UpdateSampleRateCalculation(newSamples);
             }
@@ -726,19 +865,19 @@ namespace PowerScope.Model
         }
 
         // SetupAPI for device enumeration
-        [DllImport("setupapi.dll", SetLastError = true)]
+        [DllImport("setupapi.dll", CharSet = CharSet.Unicode, SetLastError = true)]
         private static extern IntPtr SetupDiGetClassDevs(ref Guid ClassGuid, IntPtr Enumerator, IntPtr hwndParent, uint Flags);
 
-        [DllImport("setupapi.dll", SetLastError = true)]
+        [DllImport("setupapi.dll", CharSet = CharSet.Unicode, SetLastError = true)]
         private static extern bool SetupDiEnumDeviceInterfaces(IntPtr DeviceInfoSet, IntPtr DeviceInfoData, ref Guid InterfaceClassGuid, uint MemberIndex, ref SP_DEVICE_INTERFACE_DATA DeviceInterfaceData);
 
-        [DllImport("setupapi.dll", SetLastError = true)]
+        [DllImport("setupapi.dll", CharSet = CharSet.Unicode, SetLastError = true)]
         private static extern bool SetupDiGetDeviceInterfaceDetail(IntPtr DeviceInfoSet, ref SP_DEVICE_INTERFACE_DATA DeviceInterfaceData, IntPtr DeviceInterfaceDetailData, int DeviceInterfaceDetailDataSize, out int RequiredSize, ref SP_DEVINFO_DATA DeviceInfoData);
 
-        [DllImport("setupapi.dll", SetLastError = true)]
+        [DllImport("setupapi.dll", CharSet = CharSet.Unicode, SetLastError = true)]
         private static extern bool SetupDiDestroyDeviceInfoList(IntPtr DeviceInfoSet);
 
-        [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+        [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
         private static extern SafeFileHandle CreateFile(string lpFileName, int dwDesiredAccess, int dwShareMode, IntPtr lpSecurityAttributes, int dwCreationDisposition, int dwFlagsAndAttributes, IntPtr hTemplateFile);
 
         [StructLayout(LayoutKind.Sequential)]
@@ -767,14 +906,24 @@ namespace PowerScope.Model
         private const int FILE_SHARE_WRITE = 2;
         private const int OPEN_EXISTING = 3;
         private const int FILE_ATTRIBUTE_NORMAL = 0x80;
+        private const int FILE_FLAG_OVERLAPPED = unchecked((int)0x40000000);
         private const uint POLICY_ALLOW_PARTIAL_READS = 0x00000002;
         private const uint POLICY_IGNORE_SHORT_PACKETS = 0x00000003;
         private const uint POLICY_RAW_IO = 0x00000001;
 
-        private static string FindDevicePath(Guid guid)
+        /// <summary>
+        /// Enumerates all connected devices matching the PowerScope WinUSB interface GUID.
+        /// Returns display strings suitable for a ComboBox.
+        /// Format: "FX2G3 PowerScope [path index]" or the device path itself if only one is found.
+        /// </summary>
+        public static string[] GetAvailableDevices()
         {
+            Guid guid = new Guid(DeviceInterfaceGuid);
+            List<string> results = new List<string>();
+
             IntPtr h = SetupDiGetClassDevs(ref guid, IntPtr.Zero, IntPtr.Zero, DIGCF_PRESENT | DIGCF_DEVICEINTERFACE);
-            if (h == IntPtr.Zero || h.ToInt64() == -1) return null;
+            if (h == IntPtr.Zero || h.ToInt64() == -1)
+                return new string[0];
 
             try
             {
@@ -785,12 +934,147 @@ namespace PowerScope.Model
                     SP_DEVINFO_DATA devInfo = new SP_DEVINFO_DATA { cbSize = Marshal.SizeOf<SP_DEVINFO_DATA>() };
                     SetupDiGetDeviceInterfaceDetail(h, ref did, IntPtr.Zero, 0, out required, ref devInfo);
                     IntPtr detail = Marshal.AllocHGlobal(required);
+                            try
+                            {
+                                Marshal.WriteInt32(detail, IntPtr.Size == 8 ? 8 : 6);
+                                if (SetupDiGetDeviceInterfaceDetail(h, ref did, detail, required, out required, ref devInfo))
+                                {
+                                    string path = Marshal.PtrToStringUni(IntPtr.Add(detail, 4));
+                                    if (!string.IsNullOrEmpty(path))
+                                        results.Add(path);
+                                }
+                            }
+                            finally
+                            {
+                                Marshal.FreeHGlobal(detail);
+                            }
+                        }
+                    }
+                    finally
+                    {
+                        SetupDiDestroyDeviceInfoList(h);
+                    }
+
+                    // Build human-readable display strings from device paths.
+            // A path looks like \\?\USB#VID_04B4&PID_0081#<instance>#{guid}
+            // Extract the instance ID segment (index 2) as a short discriminator.
+            string[] displayNames = new string[results.Count];
+            for (int i = 0; i < results.Count; i++)
+            {
+                string path = results[i];
+                string instance = string.Empty;
+
+                string[] segments = path.TrimStart('\\', '?').Split('#');
+                if (segments.Length >= 3)
+                    instance = segments[2]; // e.g. "7&49e5708&0&4"
+
+                if (results.Count == 1)
+                    displayNames[i] = "FX2G3 PowerScope";
+                else
+                    displayNames[i] = $"FX2G3 PowerScope [{instance}]";
+            }
+
+            return displayNames;
+        }
+
+        /// <summary>
+        /// Returns the raw device paths indexed identically to GetAvailableDevices().
+        /// Used internally to resolve the selected display name back to a path.
+        /// </summary>
+        public static string[] GetAvailableDevicePaths()
+        {
+            Guid guid = new Guid(DeviceInterfaceGuid);
+            List<string> results = new List<string>();
+
+            IntPtr h = SetupDiGetClassDevs(ref guid, IntPtr.Zero, IntPtr.Zero, DIGCF_PRESENT | DIGCF_DEVICEINTERFACE);
+            if (h == IntPtr.Zero || h.ToInt64() == -1)
+                return new string[0];
+
+            try
+            {
+                SP_DEVICE_INTERFACE_DATA did = new SP_DEVICE_INTERFACE_DATA { cbSize = Marshal.SizeOf<SP_DEVICE_INTERFACE_DATA>() };
+                for (uint i = 0; SetupDiEnumDeviceInterfaces(h, IntPtr.Zero, ref guid, i, ref did); i++)
+                {
+                    int required;
+                    SP_DEVINFO_DATA devInfo = new SP_DEVINFO_DATA { cbSize = Marshal.SizeOf<SP_DEVINFO_DATA>() };
+                    SetupDiGetDeviceInterfaceDetail(h, ref did, IntPtr.Zero, 0, out required, ref devInfo);
+                    IntPtr detail = Marshal.AllocHGlobal(required);
+                            try
+                            {
+                                Marshal.WriteInt32(detail, IntPtr.Size == 8 ? 8 : 6);
+                                if (SetupDiGetDeviceInterfaceDetail(h, ref did, detail, required, out required, ref devInfo))
+                                {
+                                    string path = Marshal.PtrToStringUni(IntPtr.Add(detail, 4));
+                                    if (!string.IsNullOrEmpty(path))
+                                        results.Add(path);
+                                }
+                            }
+                            finally
+                            {
+                                Marshal.FreeHGlobal(detail);
+                            }
+                        }
+                    }
+                    finally
+                    {
+                        SetupDiDestroyDeviceInfoList(h);
+                    }
+
+                    return results.ToArray();
+        }
+
+        private static string FindDevicePath(Guid guid)
+        {
+            IntPtr h = SetupDiGetClassDevs(
+                ref guid,
+                IntPtr.Zero,
+                IntPtr.Zero,
+                DIGCF_PRESENT | DIGCF_DEVICEINTERFACE);
+
+            if (h == IntPtr.Zero || h.ToInt64() == -1)
+                return null;
+
+            try
+            {
+                SP_DEVICE_INTERFACE_DATA did = new SP_DEVICE_INTERFACE_DATA
+                {
+                    cbSize = Marshal.SizeOf<SP_DEVICE_INTERFACE_DATA>()
+                };
+
+                for (uint i = 0; SetupDiEnumDeviceInterfaces(h, IntPtr.Zero, ref guid, i, ref did); i++)
+                {
+                    SP_DEVINFO_DATA devInfo = new SP_DEVINFO_DATA
+                    {
+                        cbSize = Marshal.SizeOf<SP_DEVINFO_DATA>()
+                    };
+
+                    // First call: get required buffer size
+                    SetupDiGetDeviceInterfaceDetail(
+                        h, ref did, IntPtr.Zero, 0, out int required, ref devInfo);
+
+                    IntPtr detail = Marshal.AllocHGlobal(required);
                     try
                     {
-                        Marshal.WriteInt32(detail, IntPtr.Size == 8 ? 8 : 6); // cbSize
-                        if (SetupDiGetDeviceInterfaceDetail(h, ref did, detail, required, out required, ref devInfo))
+                        // Write cbSize into raw buffer first
+                        Marshal.WriteInt32(detail, IntPtr.Size == 8 ? 8 : 6);
+
+                        if (SetupDiGetDeviceInterfaceDetail(
+                            h, ref did, detail, required, out required, ref devInfo))
                         {
-                            string path = Marshal.PtrToStringUni(IntPtr.Add(detail, IntPtr.Size == 8 ? 8 : 4));
+                            // Dump first 32 bytes so we can see the raw memory
+                            Debug.WriteLine("Raw bytes:");
+                            for (int b = 0; b < Math.Min(32, required); b++)
+                            {
+                                byte val = Marshal.ReadByte(detail, b);
+                                Debug.Write($"{val:X2} ");
+                            }
+                            Debug.WriteLine("\n");
+                            Debug.WriteLine($"required size = {required}");
+                            Debug.WriteLine($"IntPtr.Size = {IntPtr.Size}");
+
+                            // Marshal the whole struct — no manual offset needed
+                            var detailData = Marshal.PtrToStructure<SP_DEVICE_INTERFACE_DETAIL_DATA>(detail);
+                            string path = detailData.DevicePath;
                             return path;
                         }
                     }
@@ -804,6 +1088,7 @@ namespace PowerScope.Model
             {
                 SetupDiDestroyDeviceInfoList(h);
             }
+
             return null;
         }
 
@@ -813,18 +1098,23 @@ namespace PowerScope.Model
             if (path == null)
                 throw new Exception("Device not found");
 
-            var dev = CreateFile(path, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, IntPtr.Zero, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, IntPtr.Zero);
+            var dev = CreateFile(path, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, IntPtr.Zero, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED, IntPtr.Zero);
             if (dev.IsInvalid)
-                throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+            {
+                int err = Marshal.GetLastWin32Error();
+                throw new System.ComponentModel.Win32Exception(err, $"CreateFile failed for path '{path}' (Win32 error {err})");
+            }
 
             if (!WinUsb_Initialize(dev, out var h))
                 throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
 
-            // Set recommended pipe policies
+            // Allow partial reads and ignore short packets so ReadPipe returns
+            // as soon as data is available rather than waiting for a full buffer.
+            // RAW_IO is intentionally omitted: it requires exact-multiple-of-MaxPacketSize
+            // transfers and would block indefinitely on variable-length payloads.
             uint one = 1;
             WinUsb_SetPipePolicy(h, PipeIn, POLICY_ALLOW_PARTIAL_READS, sizeof(uint), ref one);
             WinUsb_SetPipePolicy(h, PipeIn, POLICY_IGNORE_SHORT_PACKETS, sizeof(uint), ref one);
-            WinUsb_SetPipePolicy(h, PipeIn, POLICY_RAW_IO, sizeof(uint), ref one);
 
             return (dev, h);
         }

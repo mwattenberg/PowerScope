@@ -86,6 +86,10 @@ namespace PowerScope.Model
         private uint _ftdiClockFrequency;
         private string _ftdiSelectedDevice;
 
+        // USB-related properties
+        private string _usbSelectedDevice;
+        private byte _usbEndpointId;
+
         // SPI-specific configuration properties
         private uint _spiClockFrequency;
         private byte _spiLatencyTimer;
@@ -130,6 +134,10 @@ namespace PowerScope.Model
             FtdiDeviceIndex = 0; // Default to first device
             FtdiClockFrequency = 1000000; // Default to 1MHz
             FtdiSelectedDevice = null;
+
+            // USB defaults
+            UsbSelectedDevice = null;
+            UsbEndpointId = 0x81; // Default bulk IN endpoint from device descriptor
             
             // SPI defaults
             SpiClockFrequency = 15000000; // Default to 15MHz for SPI
@@ -468,6 +476,33 @@ namespace PowerScope.Model
             {
                 _ftdiSelectedDevice = value;
                 OnPropertyChanged(nameof(FtdiSelectedDevice));
+            }
+        }
+
+        // USB properties
+        public string UsbSelectedDevice
+        {
+            get { return _usbSelectedDevice; }
+            set
+            {
+                if (_usbSelectedDevice != value)
+                {
+                    _usbSelectedDevice = value;
+                    OnPropertyChanged(nameof(UsbSelectedDevice));
+                }
+            }
+        }
+
+        public byte UsbEndpointId
+        {
+            get { return _usbEndpointId; }
+            set
+            {
+                if (_usbEndpointId != value)
+                {
+                    _usbEndpointId = value;
+                    OnPropertyChanged(nameof(UsbEndpointId));
+                }
             }
         }
 

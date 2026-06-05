@@ -39,12 +39,17 @@ namespace PowerScope.View.UserForms
             Loaded += SerialConfigWindow_Loaded;
             Loaded += SerialConfigWindow_Loaded_AudioDevices;
             Loaded += SerialConfigWindow_Loaded_FTDIDevices;
+            Loaded += SerialConfigWindow_Loaded_USBDevices;
             ComboBox_DataFormat.SelectionChanged += DataFormatCombo_SelectionChanged;
             ComboBox_AudioDevices.SelectionChanged += ComboBox_AudioDevices_SelectionChanged;
             ComboBox_FTDIDevice.SelectionChanged += ComboBox_FTDIDevice_SelectionChanged;
+            ComboBox_USBDataFormat.SelectionChanged += USBDataFormatCombo_SelectionChanged;
+            ComboBox_USBDevice.SelectionChanged += ComboBox_USBDevice_SelectionChanged;
+            ComboBox_USBEndpoint.SelectionChanged += ComboBox_USBEndpoint_SelectionChanged;
             SetRawBinaryPanelVisibility();
             SetASCIIPanelVisibility();
             SetFTDIRawBinaryPanelVisibility();
+            SetUSBDataFormatPanelVisibility();
             
             // Wire up demo signal type selection change to update the info text
             ComboBox_DemoSignalType.SelectionChanged += ComboBox_DemoSignalType_SelectionChanged;
@@ -74,7 +79,7 @@ namespace PowerScope.View.UserForms
                 StreamSource.AudioInput => TabItem_Audio,
                 StreamSource.Demo => TabItem_Demo,
                 StreamSource.File => TabItem_File,
-                StreamSource.USB => null, // USB tab exists but is not implemented yet
+                StreamSource.USB => TabItem_USB,
                 StreamSource.FTDI => TabItem_FTDI,
                 _ => TabItem_Serial // Default fallback to Serial tab
             };
@@ -139,6 +144,112 @@ namespace PowerScope.View.UserForms
         private void SerialConfigWindow_Loaded_FTDIDevices(object sender, RoutedEventArgs e)
         {
             LoadFTDIDevices();
+        }
+
+        private void SerialConfigWindow_Loaded_USBDevices(object sender, RoutedEventArgs e)
+        {
+            LoadUSBDevices();
+        }
+
+        private void LoadUSBDevices()
+        {
+            ComboBox_USBDevice.Items.Clear();
+
+            try
+            {
+                string[] devices = PowerScope.Model.USBDataStream.GetAvailableDevices();
+
+                if (devices.Length > 0)
+                {
+                    for (int i = 0; i < devices.Length; i++)
+                    {
+                        ComboBoxItem item = new ComboBoxItem
+                        {
+                            Content = devices[i],
+                            Tag = i,
+                            ToolTip = "VID 04B4 / PID 0081 — Infineon FX2G3 — WinUSB"
+                        };
+                        ComboBox_USBDevice.Items.Add(item);
+                    }
+
+                    // Restore previously selected device or default to the first
+                    bool restored = false;
+                    if (!string.IsNullOrEmpty(ViewModel.UsbSelectedDevice))
+                    {
+                        for (int i = 0; i < devices.Length; i++)
+                        {
+                            if (devices[i] == ViewModel.UsbSelectedDevice)
+                            {
+                                ComboBox_USBDevice.SelectedIndex = i;
+                                restored = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (!restored)
+                    {
+                        ComboBox_USBDevice.SelectedIndex = 0;
+                        ViewModel.UsbSelectedDevice = devices[0];
+                    }
+                }
+                else
+                {
+                    ComboBoxItem noDeviceItem = new ComboBoxItem
+                    {
+                        Content = "No PowerScope USB device found",
+                        IsEnabled = false,
+                        ToolTip = "Make sure the FX2G3 device is connected and the WinUSB driver is installed."
+                    };
+                    ComboBox_USBDevice.Items.Add(noDeviceItem);
+                    ComboBox_USBDevice.SelectedIndex = 0;
+                    ViewModel.UsbSelectedDevice = null;
+                }
+            }
+            catch (Exception ex)
+            {
+                ComboBoxItem errorItem = new ComboBoxItem
+                {
+                    Content = $"Error scanning USB: {ex.Message}",
+                    IsEnabled = false
+                };
+                ComboBox_USBDevice.Items.Add(errorItem);
+                ComboBox_USBDevice.SelectedIndex = 0;
+                System.Diagnostics.Debug.WriteLine($"USB device scan failed: {ex}");
+            }
+
+            // Restore or default endpoint selection
+            foreach (object obj in ComboBox_USBEndpoint.Items)
+            {
+                if (obj is ComboBoxItem epItem && epItem.Tag is string tagStr &&
+                    byte.TryParse(tagStr, out byte tagByte) && tagByte == ViewModel.UsbEndpointId)
+                {
+                    ComboBox_USBEndpoint.SelectedItem = epItem;
+                    break;
+                }
+            }
+        }
+
+        private void ComboBox_USBDevice_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (ViewModel == null)
+                return;
+
+            if (ComboBox_USBDevice.SelectedItem is ComboBoxItem selectedItem && selectedItem.IsEnabled)
+                ViewModel.UsbSelectedDevice = selectedItem.Content?.ToString();
+        }
+
+        private void ComboBox_USBEndpoint_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (ViewModel == null)
+                return;
+
+            if (ComboBox_USBEndpoint.SelectedItem is ComboBoxItem selectedItem &&
+                selectedItem.Tag is string tagStr &&
+                byte.TryParse(tagStr, out byte endpointId))
+            {
+                ViewModel.UsbEndpointId = endpointId;
+            }
         }
 
         /// <summary>
@@ -712,9 +823,13 @@ namespace PowerScope.View.UserForms
                     break;
                     
                 case StreamSource.USB:
-                    // USB validation would go here when implemented
-                    MessageBox.Show("USB streams are not yet implemented.", "Not Implemented", MessageBoxButton.OK, MessageBoxImage.Information);
-                    return;
+                    // Validate USB settings (number of channels must be positive)
+                    if (ViewModel.NumberOfChannels <= 0)
+                    {
+                        MessageBox.Show("Please specify a valid number of channels.", "Invalid Input", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        return;
+                    }
+                    break;
                     
                 case StreamSource.FTDI:
                     // Validate FTDI settings
@@ -808,6 +923,31 @@ namespace PowerScope.View.UserForms
             }
         }
 
+        private void USBDataFormatCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            SetUSBDataFormatPanelVisibility();
+        }
+
+        private void SetUSBDataFormatPanelVisibility()
+        {
+            if (ComboBox_USBDataFormat == null)
+                return;
+
+            DataFormatType format = DataFormatType.RawBinary;
+
+            if (ComboBox_USBDataFormat.SelectedItem is ComboBoxItem item &&
+                Enum.TryParse<DataFormatType>(item.Tag?.ToString(), out DataFormatType parsed))
+            {
+                format = parsed;
+            }
+
+            if (Panel_USBRawBinary != null)
+                Panel_USBRawBinary.Visibility = format == DataFormatType.RawBinary ? Visibility.Visible : Visibility.Collapsed;
+
+            if (Panel_USBAscii != null)
+                Panel_USBAscii.Visibility = format == DataFormatType.ASCII ? Visibility.Visible : Visibility.Collapsed;
+        }
+
         private void TabControl_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (ViewModel == null || !(sender is TabControl tabControl))
@@ -837,6 +977,10 @@ namespace PowerScope.View.UserForms
                 else if (selectedTab.Name == "TabItem_Audio")
                 {
                     ViewModel.StreamSource = StreamSource.AudioInput;
+                }
+                else if (selectedTab.Name == "TabItem_USB")
+                {
+                    ViewModel.StreamSource = StreamSource.USB;
                 }
                 else if (selectedTab.Name == "TabItem_Demo")
                 {

@@ -108,6 +108,24 @@ namespace PowerScope.Model
                            new XElement("UpDownSampling", upDownSamplingFactor)
                   );
                 }
+                else if (stream is USBDataStream usbStream)
+                {
+                    string dataFormatStr = usbStream.Parser.Mode == DataParser.ParserMode.ASCII ? "ASCII" : "RawBinary";
+                    string binaryFormatStr = usbStream.Parser.Mode == DataParser.ParserMode.ASCII ? "uint16_t" : usbStream.Parser.Format.ToString();
+                    string numberTypeStr = ConvertBinaryFormatToNumberType(binaryFormatStr);
+                    string frameStartStr = usbStream.Parser.Mode == DataParser.ParserMode.Binary && usbStream.Parser.FrameStart != null 
+                        ? ConvertFrameStartToString(usbStream.Parser.FrameStart) 
+                        : "0xAA,0xAA";
+
+                    streamElement.Add(
+                        new XElement("StreamSource", "USB"),
+                        new XElement("NumberOfChannels", usbStream.ChannelCount),
+                        new XElement("DataFormat", dataFormatStr),
+                        new XElement("NumberType", numberTypeStr),
+                        new XElement("FrameStart", frameStartStr),
+                        new XElement("UpDownSampling", upDownSamplingFactor)
+                    );
+                }
                 else if (stream is SerialDataStream serialStream)
                 {
                     string dataFormatStr = serialStream.Parser.Mode == DataParser.ParserMode.ASCII ? "ASCII" : "RawBinary";
@@ -346,6 +364,10 @@ namespace PowerScope.Model
             {
                 case StreamSource.Demo:
                     ParseDemoStreamSettings(streamElement, streamSettings);
+                    break;
+
+                case StreamSource.USB:
+                    // USB requires no special parsing beyond channels & formatting
                     break;
 
                 case StreamSource.AudioInput:

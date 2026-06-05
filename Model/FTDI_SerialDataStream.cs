@@ -144,6 +144,11 @@ namespace PowerScope.Model
             }
         }
 
+        public uint DeviceIndex => _deviceIndex;
+        public uint ClockFrequency => _clockFrequency;
+        public int SpiMode => _spiMode;
+        public DataParser Parser => _parser;
+
         #endregion
 
         #region Constructor

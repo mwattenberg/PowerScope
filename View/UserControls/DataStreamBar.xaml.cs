@@ -323,10 +323,36 @@ namespace PowerScope.View.UserControls
         public IDataStream CreateDataStreamFromUserInput(StreamSettings vm)
         {
             IDataStream dataStream;
-            
+
             // Determine stream type based on StreamSource property
             switch (vm.StreamSource)
             {
+                case StreamSource.USB:
+                    // Create USBDataStream using WinUSB and Microsoft OS Descriptors
+                    UsbSourceSetting usbSourceSetting = new UsbSourceSetting("{8D2C9D52-5C6B-4F0B-9F1B-3EBE8C4F9A61}", "FX2G3 PowerScope", vm.NumberOfChannels);
+                    DataParser usbDataParser;
+                    
+                    // Convert NumberType to BinaryFormat
+                    DataParser.BinaryFormat usbBinaryFormat = vm.NumberType switch
+                    {
+                        NumberTypeEnum.Int16 => DataParser.BinaryFormat.int16_t,
+                        NumberTypeEnum.Uint16 => DataParser.BinaryFormat.uint16_t,
+                        NumberTypeEnum.Int32 => DataParser.BinaryFormat.int32_t,
+                        NumberTypeEnum.Uint32 => DataParser.BinaryFormat.uint32_t,
+                        NumberTypeEnum.Float32 => DataParser.BinaryFormat.float_t,
+                        _ => DataParser.BinaryFormat.uint16_t // Default fallback
+                    };
+
+                    // Check if frame start bytes are provided (user defined, default: 0xAAAA or custom like 0xAA 0xAA)
+                    byte[] usbFrameStartBytes = ParseFrameStartBytes(vm.FrameStart);
+                    if (usbFrameStartBytes != null && usbFrameStartBytes.Length > 0)
+                        usbDataParser = new DataParser(usbBinaryFormat, vm.NumberOfChannels, usbFrameStartBytes);
+                    else
+                        usbDataParser = new DataParser(usbBinaryFormat, vm.NumberOfChannels);
+
+                    dataStream = new USBDataStream(usbSourceSetting, usbDataParser);
+                    break;
+
                 case StreamSource.Demo:
                     DemoSettings demoSettings = new DemoSettings(vm.NumberOfChannels, vm.DemoSampleRate, vm.DemoSignalType);
                     dataStream = new DemoDataStream(demoSettings);

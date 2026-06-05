@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "PowerScope": {
+      "commandName": "Project",
+      "debugEngines": "managed"
+    }
+  }
+}

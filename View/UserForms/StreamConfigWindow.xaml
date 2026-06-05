@@ -476,12 +476,82 @@
                     </TabItem>
 
 
-                    <TabItem Header="USB">
-                        <StackPanel Margin="10" VerticalAlignment="Top">
-                            <Label Content="Future releases will support direct connection to USB device via WinUSB."/>
-                            <Label Content="Focus will be on Infineon PSOC 6 at first."/>
-                            <!-- Add USB controls as needed -->
-                        </StackPanel>
+                    <TabItem Header="USB" x:Name="TabItem_USB">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel Margin="10" VerticalAlignment="Top">
+                                <!-- Section header -->
+                                <Label Content="USB Device Configuration" Style="{StaticResource BoldLabelStyle}" Margin="0,0,0,5"/>
+
+                                <!-- Device selector -->
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                                    <Label Content="Device:" VerticalAlignment="Center" Width="80"
+                                           ToolTip="PowerScope WinUSB devices found on this system."/>
+                                    <ComboBox x:Name="ComboBox_USBDevice" Width="200"
+                                              ToolTip="Select the FX2G3 PowerScope device to connect to."/>
+                                </StackPanel>
+
+                                <!-- Endpoint selector -->
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                                    <Label Content="Endpoint:" VerticalAlignment="Center" Width="80"
+                                           ToolTip="Select the bulk IN endpoint to read data from."/>
+                                    <ComboBox x:Name="ComboBox_USBEndpoint" Width="200"
+                                              ToolTip="EP 0x81 is the primary bulk IN endpoint on this device.">
+                                        <ComboBoxItem Content="EP 0x81 — Bulk IN (primary)" Tag="129" IsSelected="True"/>
+                                    </ComboBox>
+                                </StackPanel>
+
+                                <!-- Channels -->
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                                    <Label Content="Channels:" VerticalAlignment="Center" ToolTip="Set the number of data channels (numbers only)." Width="80"/>
+                                    <TextBox x:Name="TextBox_USBChannels" Width="200" Text="{Binding NumberOfChannels, Mode=TwoWay}"
+                                             PreviewTextInput="NumbersOnly_PreviewTextInput"
+                                             ToolTip="Enter number of channels (numbers only, e.g., 1, 2, 8)" />
+                                </StackPanel>
+
+                                <!-- Data format -->
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                                    <Label Content="Data format:" VerticalAlignment="Center" ToolTip="Raw binary uses fewer bits per value but is harder to debug. ASCII is easy to debug but requires more bits per value." Width="80"/>
+                                    <ComboBox x:Name="ComboBox_USBDataFormat" Width="200" SelectedValue="{Binding DataFormat, Mode=TwoWay}" SelectedValuePath="Tag"
+                                              SelectionChanged="USBDataFormatCombo_SelectionChanged">
+                                        <ComboBoxItem Content="Raw binary" Tag="RawBinary" />
+                                        <ComboBoxItem Content="ASCII" Tag="ASCII" />
+                                    </ComboBox>
+                                </StackPanel>
+
+                                <!-- Raw binary conditional controls -->
+                                <StackPanel x:Name="Panel_USBRawBinary" Visibility="Collapsed" Margin="0,0,0,5">
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                                        <Label Content="Frame start:" VerticalAlignment="Center" ToolTip="Optional but recommended. Specify the frame start sequence to distinguish between frames." Width="80"/>
+                                        <TextBox x:Name="TextBox_USBFrameStart" Width="200" Text="{Binding FrameStart, Mode=TwoWay}" />
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                                        <Label Content="Number Type:" VerticalAlignment="Center" ToolTip="Select the type of numbers in the data stream." Width="80"/>
+                                        <ComboBox x:Name="ComboBox_USBNumberType" Width="200" SelectedValuePath="Tag" SelectedValue="{Binding NumberType, Mode=TwoWay}">
+                                            <ComboBoxItem Content="Uint8" Tag="Uint8" />
+                                            <ComboBoxItem Content="Int8" Tag="Int8" />
+                                            <ComboBoxItem Content="Uint16" Tag="Uint16" />
+                                            <ComboBoxItem Content="Int16" Tag="Int16" IsSelected="True" />
+                                            <ComboBoxItem Content="Uint32" Tag="Uint32" />
+                                            <ComboBoxItem Content="Int32" Tag="Int32" />
+                                            <ComboBoxItem Content="Float32" Tag="Float32" />
+                                            <ComboBoxItem Content="Float64" Tag="Float64" />
+                                        </ComboBox>
+                                    </StackPanel>
+                                </StackPanel>
+
+                                <!-- ASCII conditional controls -->
+                                <StackPanel x:Name="Panel_USBAscii" Visibility="Collapsed" Margin="0,0,0,5">
+                                    <StackPanel Orientation="Horizontal">
+                                        <Label Content="Column delimiter:" VerticalAlignment="Center" ToolTip="Set the delimiter used to separate columns in ASCII data." Width="80"/>
+                                        <ComboBox x:Name="ComboBox_USBColumnDelimiter" Width="200" SelectedValue="{Binding Delimiter, Mode=TwoWay}" SelectedValuePath="Content">
+                                            <ComboBoxItem Content="Comma" IsSelected="True"/>
+                                            <ComboBoxItem Content="Space"/>
+                                            <ComboBoxItem Content="CRLF"/>
+                                        </ComboBox>
+                                    </StackPanel>
+                                </StackPanel>
+                            </StackPanel>
+                        </ScrollViewer>
                     </TabItem>
                     
                     <!-- Audio Tab -->

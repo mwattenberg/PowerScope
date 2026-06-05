@@ -45,6 +45,8 @@ namespace PowerScope.View.UserControls
             
             // Set the port and baud display manually since we changed DataContext
             UpdatePortAndBaudDisplay();
+            UpdateUsageLabelForStreamType();
+            ShowUSBDiagnosticRows();
 
             //// Subscribe to property changes if the data stream supports it
             if (dataStream is INotifyPropertyChanged notifyPropertyChanged)
@@ -80,6 +82,11 @@ namespace PowerScope.View.UserControls
                 {
                     displayText = $"FTDI: {_associatedStreamSettings.FtdiSelectedDevice ?? "Unknown Device"}";
                 }
+                else if (_associatedStreamSettings.StreamSource == Model.StreamSource.USB)
+                {
+                    string deviceName = _associatedStreamSettings.UsbSelectedDevice ?? "FX2G3 PowerScope";
+                    displayText = $"USB: {deviceName}";
+                }
                 else
                 {
                     displayText = "Unknown";
@@ -92,6 +99,32 @@ namespace PowerScope.View.UserControls
                     portBaudTextBlock.Text = displayText;
                 }
             }
+        }
+
+        private void UpdateUsageLabelForStreamType()
+        {
+            TextBlock usageLabel = this.FindName("UsageLabelTextBlock") as TextBlock;
+            if (usageLabel == null)
+                return;
+
+            if (AssociatedDataStream.StreamType == "USB")
+                usageLabel.Text = "Throughput:";
+            else if (AssociatedDataStream.StreamType == "Demo" || AssociatedDataStream.StreamType == "Audio")
+                usageLabel.Text = "Usage:";
+            else
+                usageLabel.Text = "Usage:";
+        }
+
+        private void ShowUSBDiagnosticRows()
+        {
+            if (AssociatedDataStream.StreamType != "USB")
+                return;
+
+            if (Row_USBFrames != null)
+                Row_USBFrames.Visibility = Visibility.Visible;
+
+            if (Row_USBErrors != null)
+                Row_USBErrors.Visibility = Visibility.Visible;
         }
 
         private void DataStream_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
@@ -171,10 +204,11 @@ namespace PowerScope.View.UserControls
                     _prevBitsCount = currentBits;
 
                     double portUsagePercent;
-                    if (AssociatedDataStream.StreamType == "Demo" || AssociatedDataStream.StreamType == "Audio")
+                    if (AssociatedDataStream.StreamType == "Demo" || 
+                        AssociatedDataStream.StreamType == "Audio" ||
+                        AssociatedDataStream.StreamType == "USB")
                     {
-                        // For demo and audio streams, show a different metric or just show N/A
-                        portUsagePercent = 0; // Demo and Audio don't have port usage
+                        portUsagePercent = 0;
                     }
                     else
                     {
@@ -189,6 +223,31 @@ namespace PowerScope.View.UserControls
                     if (AssociatedDataStream.StreamType == "Demo" || AssociatedDataStream.StreamType == "Audio")
                     {
                         PortUsageTextBlock.Text = "N/A";
+                    }
+                    else if (AssociatedDataStream.StreamType == "USB")
+                    {
+                        // Show KB/s throughput instead of port usage percentage
+                        long kbPerSecond = bitsPerSecond / 8 / 1024;
+                        PortUsageTextBlock.Text = $"{kbPerSecond} KB/s";
+
+                        // Update USB-specific diagnostic rows
+                        if (AssociatedDataStream is USBDataStream usbStream)
+                        {
+                            if (USBFramesTextBlock != null)
+                                USBFramesTextBlock.Text = usbStream.TotalFrames.ToString("N0");
+
+                            if (USBErrorsTextBlock != null)
+                            {
+                                long errors = usbStream.TotalReadErrors;
+                                int lastErr = usbStream.LastWin32Error;
+                                USBErrorsTextBlock.Text = lastErr != 0
+                                    ? $"{errors}  (err {lastErr})"
+                                    : errors.ToString();
+                                USBErrorsTextBlock.Foreground = errors > 0
+                                    ? new SolidColorBrush(Colors.OrangeRed)
+                                    : new SolidColorBrush(Colors.White);
+                            }
+                        }
                     }
                     else
                     {
