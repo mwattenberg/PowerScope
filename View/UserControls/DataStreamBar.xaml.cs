@@ -329,7 +329,7 @@ namespace PowerScope.View.UserControls
             {
                 case StreamSource.USB:
                     // Create USBDataStream using WinUSB and Microsoft OS Descriptors
-                    UsbSourceSetting usbSourceSetting = new UsbSourceSetting("{8D2C9D52-5C6B-4F0B-9F1B-3EBE8C4F9A61}", "FX2G3 PowerScope", vm.NumberOfChannels);
+                    UsbSourceSetting usbSourceSetting = new UsbSourceSetting("{8D2C9D52-5C6B-4F0B-9F1B-3EBE8C4F9A61}", "FX2G3 PowerScope");
                     DataParser usbDataParser;
                     
                     // Convert NumberType to BinaryFormat
@@ -350,7 +350,12 @@ namespace PowerScope.View.UserControls
                     else
                         usbDataParser = new DataParser(usbBinaryFormat, vm.NumberOfChannels);
 
-                    dataStream = new USBDataStream(usbSourceSetting, usbDataParser);
+                    var usbDs = new USBDataStream(usbSourceSetting, usbDataParser);
+                    usbDs.SelectedDevicePath  = vm.UsbSelectedDevicePath;
+                    usbDs.Interface           = vm.UsbInterface;
+                    usbDs.UartBaudRate        = (vm.UsbInterface == UsbInterfaceType.UART && vm.Baud > 0) ? vm.Baud : 0;
+                    usbDs.UartBufferThreshold = vm.UsbBufThreshold > 0 ? vm.UsbBufThreshold : 64;
+                    dataStream = usbDs;
                     break;
 
                 case StreamSource.Demo:

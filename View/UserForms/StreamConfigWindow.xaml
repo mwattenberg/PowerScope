@@ -490,14 +490,38 @@
                                               ToolTip="Select the FX2G3 PowerScope device to connect to."/>
                                 </StackPanel>
 
-                                <!-- Endpoint selector -->
-                                <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-                                    <Label Content="Endpoint:" VerticalAlignment="Center" Width="80"
-                                           ToolTip="Select the bulk IN endpoint to read data from."/>
-                                    <ComboBox x:Name="ComboBox_USBEndpoint" Width="200"
-                                              ToolTip="EP 0x81 is the primary bulk IN endpoint on this device.">
-                                        <ComboBoxItem Content="EP 0x81 — Bulk IN (primary)" Tag="129" IsSelected="True"/>
+                                <!-- Interface selector -->
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                                    <Label Content="Interface:" VerticalAlignment="Center" Width="80"
+                                           ToolTip="Physical interface used by the FX2G3 to talk to the attached device."/>
+                                    <ComboBox x:Name="ComboBox_USBInterface" Width="200"
+                                              ToolTip="Select the interface type. UART relays bytes from SCB1 RX to the USB host.">
+                                        <ComboBoxItem Content="SPI"  Tag="SPI"/>
+                                        <ComboBoxItem Content="UART" Tag="UART" IsSelected="True"/>
+                                        <ComboBoxItem Content="I2C"  Tag="I2C"/>
                                     </ComboBox>
+                                </StackPanel>
+
+                                <!-- UART-specific settings (baud rate + buffer threshold) -->
+                                <StackPanel x:Name="Panel_USBUartSettings" Margin="0,0,0,5">
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                                        <Label Content="Baud rate:" VerticalAlignment="Center" Width="80"
+                                               ToolTip="UART baud rate of the FX2G3's SCB1 interface. Sent to the device on connect via USB vendor command 0xA3."/>
+                                        <TextBox x:Name="TextBox_USBBaud" Width="200"
+                                                 Text="{Binding Baud, Mode=TwoWay}"
+                                                 PreviewTextInput="BaudOnly_PreviewTextInput"
+                                                 ToolTip="e.g. 115200, 921600, 6000000"/>
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                                        <Label Content="Packet size:" VerticalAlignment="Center" Width="80"
+                                               ToolTip="Bytes the FX2G3 accumulates before sending a USB packet. Smaller = lower latency; larger = better bus efficiency at high baud rates."/>
+                                        <ComboBox x:Name="ComboBox_USBBufThreshold" Width="200"
+                                                  ToolTip="Small (64 B) for lowest latency; Large (256 B) for high baud rates (≥1 MBaud).">
+                                            <ComboBoxItem Content="Small  (64 B)"  Tag="64"/>
+                                            <ComboBoxItem Content="Medium (128 B)" Tag="128"/>
+                                            <ComboBoxItem Content="Large  (256 B)" Tag="256"/>
+                                        </ComboBox>
+                                    </StackPanel>
                                 </StackPanel>
 
                                 <!-- Channels -->

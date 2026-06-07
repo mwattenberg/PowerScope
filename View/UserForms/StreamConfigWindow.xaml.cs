@@ -45,11 +45,13 @@ namespace PowerScope.View.UserForms
             ComboBox_FTDIDevice.SelectionChanged += ComboBox_FTDIDevice_SelectionChanged;
             ComboBox_USBDataFormat.SelectionChanged += USBDataFormatCombo_SelectionChanged;
             ComboBox_USBDevice.SelectionChanged += ComboBox_USBDevice_SelectionChanged;
-            ComboBox_USBEndpoint.SelectionChanged += ComboBox_USBEndpoint_SelectionChanged;
+            ComboBox_USBInterface.SelectionChanged += ComboBox_USBInterface_SelectionChanged;
+            ComboBox_USBBufThreshold.SelectionChanged += ComboBox_USBBufThreshold_SelectionChanged;
             SetRawBinaryPanelVisibility();
             SetASCIIPanelVisibility();
             SetFTDIRawBinaryPanelVisibility();
             SetUSBDataFormatPanelVisibility();
+            SetUSBUartPanelVisibility();
             
             // Wire up demo signal type selection change to update the info text
             ComboBox_DemoSignalType.SelectionChanged += ComboBox_DemoSignalType_SelectionChanged;
@@ -157,7 +159,10 @@ namespace PowerScope.View.UserForms
 
             try
             {
+                // Display names and device paths are index-aligned (same enumeration order).
+                // The path uniquely identifies a physical board; the display name is just a label.
                 string[] devices = PowerScope.Model.USBDataStream.GetAvailableDevices();
+                string[] paths = PowerScope.Model.USBDataStream.GetAvailableDevicePaths();
 
                 if (devices.Length > 0)
                 {
@@ -166,15 +171,28 @@ namespace PowerScope.View.UserForms
                         ComboBoxItem item = new ComboBoxItem
                         {
                             Content = devices[i],
-                            Tag = i,
+                            Tag = i < paths.Length ? paths[i] : null, // device path = stable selection key
                             ToolTip = "VID 04B4 / PID 0081 — Infineon FX2G3 — WinUSB"
                         };
                         ComboBox_USBDevice.Items.Add(item);
                     }
 
-                    // Restore previously selected device or default to the first
+                    // Restore the previously selected device by its path (stable across sessions);
+                    // fall back to display name, then to the first device.
                     bool restored = false;
-                    if (!string.IsNullOrEmpty(ViewModel.UsbSelectedDevice))
+                    if (!string.IsNullOrEmpty(ViewModel.UsbSelectedDevicePath))
+                    {
+                        for (int i = 0; i < paths.Length; i++)
+                        {
+                            if (string.Equals(paths[i], ViewModel.UsbSelectedDevicePath, StringComparison.OrdinalIgnoreCase))
+                            {
+                                ComboBox_USBDevice.SelectedIndex = i;
+                                restored = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (!restored && !string.IsNullOrEmpty(ViewModel.UsbSelectedDevice))
                     {
                         for (int i = 0; i < devices.Length; i++)
                         {
@@ -191,6 +209,7 @@ namespace PowerScope.View.UserForms
                     {
                         ComboBox_USBDevice.SelectedIndex = 0;
                         ViewModel.UsbSelectedDevice = devices[0];
+                        ViewModel.UsbSelectedDevicePath = paths.Length > 0 ? paths[0] : null;
                     }
                 }
                 else
@@ -204,6 +223,7 @@ namespace PowerScope.View.UserForms
                     ComboBox_USBDevice.Items.Add(noDeviceItem);
                     ComboBox_USBDevice.SelectedIndex = 0;
                     ViewModel.UsbSelectedDevice = null;
+                    ViewModel.UsbSelectedDevicePath = null;
                 }
             }
             catch (Exception ex)
@@ -218,16 +238,39 @@ namespace PowerScope.View.UserForms
                 System.Diagnostics.Debug.WriteLine($"USB device scan failed: {ex}");
             }
 
-            // Restore or default endpoint selection
-            foreach (object obj in ComboBox_USBEndpoint.Items)
+            // Restore or default Interface selection
+            bool interfaceRestored = false;
+            foreach (object obj in ComboBox_USBInterface.Items)
             {
-                if (obj is ComboBoxItem epItem && epItem.Tag is string tagStr &&
-                    byte.TryParse(tagStr, out byte tagByte) && tagByte == ViewModel.UsbEndpointId)
+                if (obj is ComboBoxItem ifItem && ifItem.Tag is string tagStr &&
+                    tagStr == ViewModel.UsbInterface.ToString())
                 {
-                    ComboBox_USBEndpoint.SelectedItem = epItem;
+                    ComboBox_USBInterface.SelectedItem = ifItem;
+                    interfaceRestored = true;
                     break;
                 }
             }
+            if (!interfaceRestored)
+                ComboBox_USBInterface.SelectedIndex = 1; // default UART
+
+            SetUSBUartPanelVisibility();
+
+            // Restore or default buffer threshold selection
+            bool thresholdRestored = false;
+            foreach (object obj in ComboBox_USBBufThreshold.Items)
+            {
+                if (obj is ComboBoxItem threshItem &&
+                    threshItem.Tag is string ts &&
+                    int.TryParse(ts, out int tv) &&
+                    tv == ViewModel.UsbBufThreshold)
+                {
+                    ComboBox_USBBufThreshold.SelectedItem = threshItem;
+                    thresholdRestored = true;
+                    break;
+                }
+            }
+            if (!thresholdRestored)
+                ComboBox_USBBufThreshold.SelectedIndex = 1; // default Medium (128 B)
         }
 
         private void ComboBox_USBDevice_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -236,19 +279,44 @@ namespace PowerScope.View.UserForms
                 return;
 
             if (ComboBox_USBDevice.SelectedItem is ComboBoxItem selectedItem && selectedItem.IsEnabled)
+            {
                 ViewModel.UsbSelectedDevice = selectedItem.Content?.ToString();
+                ViewModel.UsbSelectedDevicePath = selectedItem.Tag as string; // device path key
+            }
         }
 
-        private void ComboBox_USBEndpoint_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        private void ComboBox_USBInterface_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (ViewModel == null)
                 return;
 
-            if (ComboBox_USBEndpoint.SelectedItem is ComboBoxItem selectedItem &&
+            if (ComboBox_USBInterface.SelectedItem is ComboBoxItem selectedItem &&
                 selectedItem.Tag is string tagStr &&
-                byte.TryParse(tagStr, out byte endpointId))
+                Enum.TryParse<UsbInterfaceType>(tagStr, out UsbInterfaceType iface))
             {
-                ViewModel.UsbEndpointId = endpointId;
+                ViewModel.UsbInterface = iface;
+            }
+
+            SetUSBUartPanelVisibility();
+        }
+
+        private void SetUSBUartPanelVisibility()
+        {
+            if (Panel_USBUartSettings != null)
+                Panel_USBUartSettings.Visibility =
+                    ViewModel?.UsbInterface == UsbInterfaceType.UART
+                        ? Visibility.Visible
+                        : Visibility.Collapsed;
+        }
+
+        private void ComboBox_USBBufThreshold_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (ViewModel == null) return;
+            if (ComboBox_USBBufThreshold.SelectedItem is ComboBoxItem item &&
+                item.Tag is string tagStr &&
+                int.TryParse(tagStr, out int threshold))
+            {
+                ViewModel.UsbBufThreshold = threshold;
             }
         }
 

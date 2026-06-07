@@ -32,8 +32,6 @@
             <RowDefinition Height="Auto"/>   <!-- Port Usage -->
             <RowDefinition Height="Auto"/>   <!-- Samples/sec -->
             <RowDefinition Height="Auto"/>   <!-- Status -->
-            <RowDefinition Height="Auto"/>   <!-- USB: Frames -->
-            <RowDefinition Height="Auto"/>   <!-- USB: Errors -->
         </Grid.RowDefinitions>
 
         <!-- Top row with Connect (left) and Close (right) buttons -->
@@ -108,35 +106,11 @@
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
             <TextBlock Grid.Column="0" Text="Status:" Style="{StaticResource InfoLabelStyle}"/>
-            <TextBlock Grid.Column="1" x:Name="StatusTextBlock" Text="{Binding StatusMessage}" 
-                       Style="{StaticResource InfoTextStyle}" 
-                       HorizontalAlignment="Right"/>
-        </Grid>
-
-        <!-- USB: Frames received -->
-        <Grid Grid.Row="5" Margin="4,1,4,1" x:Name="Row_USBFrames" Visibility="Collapsed">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
-            <TextBlock Grid.Column="0" Text="Frames:" Style="{StaticResource InfoLabelStyle}"/>
-            <TextBlock Grid.Column="1" x:Name="USBFramesTextBlock" Text="0"
+            <TextBlock Grid.Column="1" x:Name="StatusTextBlock" Text="–"
                        Style="{StaticResource InfoTextStyle}"
                        HorizontalAlignment="Right"/>
         </Grid>
 
-        <!-- USB: Read errors and last Win32 error code -->
-        <Grid Grid.Row="6" Margin="4,1,4,1" x:Name="Row_USBErrors" Visibility="Collapsed">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
-            <TextBlock Grid.Column="0" Text="Errors:" Style="{StaticResource InfoLabelStyle}"/>
-            <TextBlock Grid.Column="1" x:Name="USBErrorsTextBlock" Text="0"
-                       Style="{StaticResource InfoTextStyle}"
-                       HorizontalAlignment="Right"
-                       ToolTip="Read errors / last Win32 error code"/>
-        </Grid>
     </Grid>
 </UserControl>
 

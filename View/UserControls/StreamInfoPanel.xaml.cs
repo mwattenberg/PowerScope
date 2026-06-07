@@ -3,8 +3,8 @@ using System.ComponentModel;
 using System.Timers;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Media;
-using ScottPlot.Plottables;
 using PowerScope.Model;
 using System.IO;
 
@@ -28,25 +28,32 @@ namespace PowerScope.View.UserControls
         public StreamInfoPanel(IDataStream dataStream, StreamSettings streamSettings)
         {
             InitializeComponent();
-            
-            // Initialize timer for updating port usage and samples
-            _updateTimer = new System.Timers.Timer(1000) { AutoReset = true };
-            _updateTimer.Elapsed += UpdatePortStatistics;
-            _updateTimer.Start();
-            
-            // Handle unloaded event to clean up timer
+
             Unloaded += StreamInfoPanel_Unloaded;
-           
+
             this.AssociatedDataStream = dataStream;
             _associatedStreamSettings = streamSettings;
 
-            // Set the DataStream as DataContext for direct binding
+            // DataContext = the concrete stream object so bindings can reach runtime properties
             DataContext = dataStream;
-            
-            // Set the port and baud display manually since we changed DataContext
+
             UpdatePortAndBaudDisplay();
             UpdateUsageLabelForStreamType();
-            ShowUSBDiagnosticRows();
+
+            if (dataStream is USBDataStream)
+            {
+                // USB: model owns all metric calculations and fires OnPropertyChanged.
+                // Bind directly — no polling timer needed.
+                SetupUsbBindings();
+            }
+            else
+            {
+                // Serial / Audio / Demo / File: use a 1-second polling timer to compute
+                // port-usage % (delta of TotalBits / baud rate) and refresh the UI.
+                _updateTimer = new System.Timers.Timer(1000) { AutoReset = true };
+                _updateTimer.Elapsed += UpdatePortStatistics;
+                _updateTimer.Start();
+            }
 
             //// Subscribe to property changes if the data stream supports it
             if (dataStream is INotifyPropertyChanged notifyPropertyChanged)
@@ -107,50 +114,56 @@ namespace PowerScope.View.UserControls
             if (usageLabel == null)
                 return;
 
-            if (AssociatedDataStream.StreamType == "USB")
-                usageLabel.Text = "Throughput:";
-            else if (AssociatedDataStream.StreamType == "Demo" || AssociatedDataStream.StreamType == "Audio")
-                usageLabel.Text = "Usage:";
-            else
-                usageLabel.Text = "Usage:";
+            usageLabel.Text = AssociatedDataStream.StreamType == "USB" ? "Throughput:" : "Usage:";
         }
 
-        private void ShowUSBDiagnosticRows()
+        /// <summary>
+        /// For USB streams: wires the three metric TextBlocks directly to the model's
+        /// <see cref="USBDataStream.SampleRate"/>, <see cref="USBDataStream.ThroughputKBps"/>,
+        /// and <see cref="USBDataStream.StatusMessage"/> properties via WPF one-way bindings.
+        /// The model fires <see cref="INotifyPropertyChanged"/> whenever values change, so no
+        /// polling timer is needed on the view side.
+        /// </summary>
+        private void SetupUsbBindings()
         {
-            if (AssociatedDataStream.StreamType != "USB")
-                return;
+            // Samples/s  — e.g. "27,500"
+            SamplesPerSecondTextBlock.SetBinding(
+                TextBlock.TextProperty,
+                new Binding(nameof(USBDataStream.SampleRate))
+                {
+                    StringFormat = "N0",
+                    Mode = BindingMode.OneWay
+                });
 
-            if (Row_USBFrames != null)
-                Row_USBFrames.Visibility = Visibility.Visible;
+            // Throughput  — e.g. "440 KB/s"
+            PortUsageTextBlock.SetBinding(
+                TextBlock.TextProperty,
+                new Binding(nameof(USBDataStream.ThroughputKBps))
+                {
+                    StringFormat = "{0:F0} KB/s",
+                    Mode = BindingMode.OneWay
+                });
 
-            if (Row_USBErrors != null)
-                Row_USBErrors.Visibility = Visibility.Visible;
+            // Status  — "Running", "Stopped", "Err: …", etc.
+            StatusTextBlock.SetBinding(
+                TextBlock.TextProperty,
+                new Binding(nameof(USBDataStream.StatusMessage))
+                {
+                    Mode = BindingMode.OneWay
+                });
         }
 
         private void DataStream_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
         {
-            // Update UI when connection state changes
+            // Refresh the connect/disconnect button whenever the connection state changes
             if (e.PropertyName == nameof(IDataStream.IsConnected) ||
                 e.PropertyName == nameof(IDataStream.IsStreaming))
             {
-                UpdateButtonAppearance();
+                Application.Current?.Dispatcher?.BeginInvoke(UpdateButtonAppearance);
             }
-
-            // Handle sample rate changes for immediate UI updates (especially useful for serial streams)
-            if (e.PropertyName == nameof(IDataStream.SampleRate))
-            {
-                // Trigger an immediate UI update for sample rate display
-                Application.Current?.Dispatcher?.BeginInvoke(() =>
-                {
-                    if (AssociatedDataStream.IsStreaming)
-                    {
-                        double streamSampleRate = AssociatedDataStream.SampleRate;
-                        long samplesPerSecond = (long)Math.Round(streamSampleRate);
-                        SamplesPerSecondTextBlock.Text = samplesPerSecond.ToString();
-                    }
-                });
-            }
-
+            // Note: SampleRate / ThroughputKBps / StatusMessage for USB are handled by
+            // WPF one-way bindings set up in SetupUsbBindings() — no manual TextBlock
+            // updates are needed or wanted here (they would break the binding).
         }
 
         private void UpdateButtonAppearance()
@@ -171,11 +184,8 @@ namespace PowerScope.View.UserControls
 
         private void StreamInfoPanel_Unloaded(object sender, RoutedEventArgs e)
         {
-            if (_updateTimer != null)
-            {
-                _updateTimer.Stop();
-                _updateTimer.Dispose();
-            }
+            _updateTimer?.Stop();
+            _updateTimer?.Dispose();
             
             // Unsubscribe from property change events
             //if (AssociatedDataStream is INotifyPropertyChanged notifyPropertyChanged)
@@ -184,6 +194,8 @@ namespace PowerScope.View.UserControls
             //}
         }
 
+        // Called only for non-USB streams (serial, audio, demo, file).
+        // USB telemetry is driven entirely by WPF bindings to USBDataStream properties.
         private void UpdatePortStatistics(object sender, ElapsedEventArgs e)
         {
             if (Application.Current == null)
@@ -193,71 +205,32 @@ namespace PowerScope.View.UserControls
             {
                 if (AssociatedDataStream.IsStreaming)
                 {
-                    // Use the data stream's built-in sample rate calculation
-                    // This provides better accuracy and consistency across different stream types
-                    double streamSampleRate = AssociatedDataStream.SampleRate;
-                    long samplesPerSecond = (long)Math.Round(streamSampleRate);
+                    long samplesPerSecond = (long)Math.Round(AssociatedDataStream.SampleRate);
+                    SamplesPerSecondTextBlock.Text = samplesPerSecond.ToString("N0");
 
-                    // Calculate bits per second and port usage percentage
                     long currentBits = AssociatedDataStream.TotalBits;
                     long bitsPerSecond = currentBits - _prevBitsCount;
                     _prevBitsCount = currentBits;
 
-                    double portUsagePercent;
-                    if (AssociatedDataStream.StreamType == "Demo" || 
-                        AssociatedDataStream.StreamType == "Audio" ||
-                        AssociatedDataStream.StreamType == "USB")
-                    {
-                        portUsagePercent = 0;
-                    }
-                    else
-                    {
-                        // For serial streams, calculate based on baud rate
-                        // Get baud rate from associated stream settings
-                        portUsagePercent = _associatedStreamSettings?.Baud > 0 ? 
-                            (100.0 * bitsPerSecond / _associatedStreamSettings.Baud) : 0;
-                    }
-
-                    // Update UI with the stream's calculated sample rate
-                    SamplesPerSecondTextBlock.Text = samplesPerSecond.ToString();
                     if (AssociatedDataStream.StreamType == "Demo" || AssociatedDataStream.StreamType == "Audio")
                     {
                         PortUsageTextBlock.Text = "N/A";
                     }
-                    else if (AssociatedDataStream.StreamType == "USB")
-                    {
-                        // Show KB/s throughput instead of port usage percentage
-                        long kbPerSecond = bitsPerSecond / 8 / 1024;
-                        PortUsageTextBlock.Text = $"{kbPerSecond} KB/s";
-
-                        // Update USB-specific diagnostic rows
-                        if (AssociatedDataStream is USBDataStream usbStream)
-                        {
-                            if (USBFramesTextBlock != null)
-                                USBFramesTextBlock.Text = usbStream.TotalFrames.ToString("N0");
-
-                            if (USBErrorsTextBlock != null)
-                            {
-                                long errors = usbStream.TotalReadErrors;
-                                int lastErr = usbStream.LastWin32Error;
-                                USBErrorsTextBlock.Text = lastErr != 0
-                                    ? $"{errors}  (err {lastErr})"
-                                    : errors.ToString();
-                                USBErrorsTextBlock.Foreground = errors > 0
-                                    ? new SolidColorBrush(Colors.OrangeRed)
-                                    : new SolidColorBrush(Colors.White);
-                            }
-                        }
-                    }
                     else
                     {
-                        PortUsageTextBlock.Text = $"{portUsagePercent:F1}%";
+                        double usagePct = _associatedStreamSettings?.Baud > 0
+                            ? 100.0 * bitsPerSecond / _associatedStreamSettings.Baud
+                            : 0;
+                        PortUsageTextBlock.Text = $"{usagePct:F1}%";
                     }
+
+                    StatusTextBlock.Text = "Running";
                 }
                 else
                 {
                     SamplesPerSecondTextBlock.Text = "0";
                     PortUsageTextBlock.Text = "0%";
+                    StatusTextBlock.Text = "–";
                     _prevBitsCount = 0;
                 }
             });

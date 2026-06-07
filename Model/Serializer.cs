@@ -113,8 +113,8 @@ namespace PowerScope.Model
                     string dataFormatStr = usbStream.Parser.Mode == DataParser.ParserMode.ASCII ? "ASCII" : "RawBinary";
                     string binaryFormatStr = usbStream.Parser.Mode == DataParser.ParserMode.ASCII ? "uint16_t" : usbStream.Parser.Format.ToString();
                     string numberTypeStr = ConvertBinaryFormatToNumberType(binaryFormatStr);
-                    string frameStartStr = usbStream.Parser.Mode == DataParser.ParserMode.Binary && usbStream.Parser.FrameStart != null 
-                        ? ConvertFrameStartToString(usbStream.Parser.FrameStart) 
+                    string frameStartStr = usbStream.Parser.Mode == DataParser.ParserMode.Binary && usbStream.Parser.FrameStart != null
+                        ? ConvertFrameStartToString(usbStream.Parser.FrameStart)
                         : "0xAA,0xAA";
 
                     streamElement.Add(
@@ -123,7 +123,11 @@ namespace PowerScope.Model
                         new XElement("DataFormat", dataFormatStr),
                         new XElement("NumberType", numberTypeStr),
                         new XElement("FrameStart", frameStartStr),
-                        new XElement("UpDownSampling", upDownSamplingFactor)
+                        new XElement("UpDownSampling", upDownSamplingFactor),
+                        new XElement("UsbInterface", usbStream.Interface.ToString()),
+                        new XElement("Baud", usbStream.UartBaudRate),
+                        new XElement("UsbBufThreshold", usbStream.UartBufferThreshold),
+                        new XElement("UsbSelectedDevicePath", usbStream.SelectedDevicePath ?? "")
                     );
                 }
                 else if (stream is SerialDataStream serialStream)
@@ -367,7 +371,7 @@ namespace PowerScope.Model
                     break;
 
                 case StreamSource.USB:
-                    // USB requires no special parsing beyond channels & formatting
+                    ParseUsbStreamSettings(streamElement, streamSettings);
                     break;
 
                 case StreamSource.AudioInput:
@@ -400,6 +404,36 @@ namespace PowerScope.Model
             XElement demoSignalTypeElement = streamElement.Element("DemoSignalType");
             if (demoSignalTypeElement != null)
                 streamSettings.DemoSignalType = demoSignalTypeElement.Value;
+        }
+
+        /// <summary>
+        /// Parses USB stream specific settings (interface type, baud rate, buffer threshold).
+        /// Fields were added in a later version; missing elements fall back to safe defaults
+        /// so older session files continue to load without errors.
+        /// </summary>
+        private static void ParseUsbStreamSettings(XElement streamElement, StreamSettings streamSettings)
+        {
+            XElement interfaceElement = streamElement.Element("UsbInterface");
+            if (interfaceElement != null && Enum.TryParse<UsbInterfaceType>(interfaceElement.Value, out UsbInterfaceType iface))
+                streamSettings.UsbInterface = iface;
+            else
+                streamSettings.UsbInterface = UsbInterfaceType.UART; // backward-compat default
+
+            XElement baudElement = streamElement.Element("Baud");
+            if (baudElement != null && int.TryParse(baudElement.Value, out int baud))
+                streamSettings.Baud = baud;
+
+            XElement thresholdElement = streamElement.Element("UsbBufThreshold");
+            if (thresholdElement != null && int.TryParse(thresholdElement.Value, out int threshold))
+                streamSettings.UsbBufThreshold = threshold;
+            else
+                streamSettings.UsbBufThreshold = 128; // backward-compat default
+
+            // Stable per-board selection key. Empty/missing => first available device.
+            XElement devicePathElement = streamElement.Element("UsbSelectedDevicePath");
+            streamSettings.UsbSelectedDevicePath = string.IsNullOrEmpty(devicePathElement?.Value)
+                ? null
+                : devicePathElement.Value;
         }
 
         /// <summary>

@@ -33,6 +33,16 @@ namespace PowerScope.Model
     }
 
     /// <summary>
+    /// Physical interface used by the FX2G3 USB bridge to talk to the target device.
+    /// </summary>
+    public enum UsbInterfaceType
+    {
+        SPI,
+        UART,
+        I2C
+    }
+
+    /// <summary>
     /// Supported stream source types
     /// </summary>
     public enum StreamSource
@@ -88,7 +98,9 @@ namespace PowerScope.Model
 
         // USB-related properties
         private string _usbSelectedDevice;
-        private byte _usbEndpointId;
+        private string _usbSelectedDevicePath;
+        private UsbInterfaceType _usbInterface;
+        private int _usbBufThreshold;
 
         // SPI-specific configuration properties
         private uint _spiClockFrequency;
@@ -137,7 +149,9 @@ namespace PowerScope.Model
 
             // USB defaults
             UsbSelectedDevice = null;
-            UsbEndpointId = 0x81; // Default bulk IN endpoint from device descriptor
+            UsbSelectedDevicePath = null;
+            UsbInterface = UsbInterfaceType.UART;
+            UsbBufThreshold = 128;
             
             // SPI defaults
             SpiClockFrequency = 15000000; // Default to 15MHz for SPI
@@ -493,15 +507,56 @@ namespace PowerScope.Model
             }
         }
 
-        public byte UsbEndpointId
+        /// <summary>
+        /// The WinUSB device-interface path of the selected FX2G3 unit, e.g.
+        /// \\?\USB#VID_04B4&amp;PID_0081#&lt;instance&gt;#{guid}. Unlike the shared interface GUID,
+        /// the &lt;instance&gt; segment uniquely identifies one physical board, so this is the key
+        /// used to open the exact device the user picked (and to restore it across sessions).
+        /// Null/empty = open the first available PowerScope device.
+        /// </summary>
+        public string UsbSelectedDevicePath
         {
-            get { return _usbEndpointId; }
+            get { return _usbSelectedDevicePath; }
             set
             {
-                if (_usbEndpointId != value)
+                if (_usbSelectedDevicePath != value)
                 {
-                    _usbEndpointId = value;
-                    OnPropertyChanged(nameof(UsbEndpointId));
+                    _usbSelectedDevicePath = value;
+                    OnPropertyChanged(nameof(UsbSelectedDevicePath));
+                }
+            }
+        }
+
+        /// <summary>
+        /// Physical interface the FX2G3 uses to talk to the attached MCU/device (SPI, UART, I2C).
+        /// </summary>
+        public UsbInterfaceType UsbInterface
+        {
+            get { return _usbInterface; }
+            set
+            {
+                if (_usbInterface != value)
+                {
+                    _usbInterface = value;
+                    OnPropertyChanged(nameof(UsbInterface));
+                }
+            }
+        }
+
+        /// <summary>
+        /// Number of UART/SPI bytes the FX2G3 accumulates before firing a USB packet.
+        /// Smaller = lower latency, more USB overhead. Range: 1–512.
+        /// </summary>
+        public int UsbBufThreshold
+        {
+            get { return _usbBufThreshold; }
+            set
+            {
+                int clamped = Math.Max(1, Math.Min(512, value));
+                if (_usbBufThreshold != clamped)
+                {
+                    _usbBufThreshold = clamped;
+                    OnPropertyChanged(nameof(UsbBufThreshold));
                 }
             }
         }
