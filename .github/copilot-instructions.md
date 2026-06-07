@@ -10,7 +10,7 @@ All data sources implement `IDataStream` interface (`Model/DataStream.cs`):
 
 **Physical Streams:**
 - `SerialDataStream` - Serial/UART data (primary use case)
-- `FTDI_SerialDataStream` - High-speed FTDI chips
+- `USBDataStream` - WinUSB bulk transfer (FX2G3 bridge)
 - `AudioDataStream` - Audio input devices  
 - `FileDataStream` - Playback from CSV files
 - `DemoDataStream` - Simulated test data
@@ -68,14 +68,14 @@ The codebase follows a **channel-centric architecture** where `Channel` objects 
 PowerScope follows a **channel-centric data flow** where raw data from hardware passes through multiple processing stages before being displayed:
 
 ### 1. Stream Creation & Connection
-User adds stream via `DataStreamBar` → creates `IDataStream` implementation (e.g., `SerialDataStream`, `AudioDataStream`, `FTDI_SerialDataStream`).
+User adds stream via `DataStreamBar` → creates `IDataStream` implementation (e.g., `SerialDataStream`, `AudioDataStream`, `USBDataStream`).
 
 ### 2. Channel Registration  
 Stream creates `Channel` objects → added to `DataStreamBar.Channels` (the single source of truth for all channels in the application).
 
 ### 3. Data Acquisition (Background Thread)
 Each `IDataStream` implementation runs a background thread/timer that:
-- Reads raw bytes from hardware (serial port, audio device, FTDI chip, etc.)
+- Reads raw bytes from hardware (serial port, audio device, USB bridge, etc.)
 - Parses bytes into samples via `DataParser` (ASCII or binary formats)
 - Writes parsed samples to per-channel `RingBuffer<double>` instances
 
@@ -256,7 +256,6 @@ ScottPlot renders the data arrays using GPU acceleration (`WpfPlotGL`) at the co
 - ScottPlot.WPF 5.0.55 (plotting)
 - RJCP.SerialPortStream (reliable serial)
 - NAudio (audio input)
-- FtdiSharp (local project reference for FTDI support)
 
 ## Testing & Debug Workflows
 

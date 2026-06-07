@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net8.0-windows8.0</TargetFramework>
+    <TargetFramework>net10.0-windows10.0.17763.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
@@ -26,6 +26,7 @@
   <PropertyGroup>
     <PublishReadyToRun>true</PublishReadyToRun>
     <TieredPGO>true</TieredPGO>
+    <StartupObject>PowerScope.App</StartupObject>
   </PropertyGroup>
 
   <ItemGroup>
@@ -37,7 +38,6 @@
     <PackageReference Include="SharpVectors.Wpf" Version="1.8.5" />
     <PackageReference Include="System.IO.Ports" Version="10.0.0-preview.6.25358.103" />
     <PackageReference Include="System.Management" Version="9.0.7" />
-	<ProjectReference Include="FtdiSharp\src\FtdiSharp\FtdiSharp.csproj"/>
   </ItemGroup>
 
   <ItemGroup>
@@ -45,25 +45,13 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Remove="FtdiSharp\**" />
-    <EmbeddedResource Remove="FtdiSharp\**" />
-    <None Remove="FtdiSharp\**" />
-    <Page Remove="FtdiSharp\**" />
-  </ItemGroup>
-
-  <ItemGroup>
     <Compile Remove="Model\CursorChannelViewModel.cs" />
     <Compile Remove="Model\SerialDataStreamSinc.cs" />
-    <Compile Remove="SPI.cs" />
     <Compile Remove="View\UserControls\DraggableAxisLines.cs" />
   </ItemGroup>
 
   <ItemGroup>
     <None Remove="View\UserControls\xExpand.svg" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <None Include="SPI.cs" />
   </ItemGroup>
 
   <ItemGroup>

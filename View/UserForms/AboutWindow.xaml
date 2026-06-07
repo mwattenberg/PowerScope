@@ -67,10 +67,6 @@
                             <Hyperlink NavigateUri="https://github.com/naudio/NAudio" RequestNavigate="Hyperlink_RequestNavigate">NAudio</Hyperlink>
                         </TextBlock>
 
-                        <TextBlock TextWrapping="Wrap" Margin="8,0,0,2">
-                            <Hyperlink NavigateUri="https://github.com/swharden/FtdiSharp" RequestNavigate="Hyperlink_RequestNavigate">FtdiSharp</Hyperlink>
-                        </TextBlock>
-
                         <!-- Optional spacing -->
                         <TextBlock Text="" Height="8"/>
                     </StackPanel>

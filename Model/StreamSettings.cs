@@ -51,8 +51,7 @@ namespace PowerScope.Model
         AudioInput,
         Demo,
         File,
-        USB,
-        FTDI
+        USB
     }
 
     public class StreamSettings : INotifyPropertyChanged
@@ -91,25 +90,11 @@ namespace PowerScope.Model
         private string _fileParseStatus;
         private long _fileTotalSamples;
 
-        // FTDI-related properties
-        private uint _ftdiDeviceIndex;
-        private uint _ftdiClockFrequency;
-        private string _ftdiSelectedDevice;
-
         // USB-related properties
         private string _usbSelectedDevice;
         private string _usbSelectedDevicePath;
         private UsbInterfaceType _usbInterface;
         private int _usbBufThreshold;
-
-        // SPI-specific configuration properties
-        private uint _spiClockFrequency;
-        private byte _spiLatencyTimer;
-        private int _spiTransferInterval;
-        private int _spiTransferSize;
-        private byte _spiChipSelectPolarity;
-        private byte _spiMode;
-        private byte _spiDataOrder;
 
         // Callback for applying settings to data streams
         public Action<IDataStream> DataStreamConfigurationCallback { get; set; }
@@ -142,26 +127,12 @@ namespace PowerScope.Model
             FileParseStatus = "No file selected";
             FileTotalSamples = 0;
             
-            // FTDI defaults
-            FtdiDeviceIndex = 0; // Default to first device
-            FtdiClockFrequency = 1000000; // Default to 1MHz
-            FtdiSelectedDevice = null;
-
             // USB defaults
             UsbSelectedDevice = null;
             UsbSelectedDevicePath = null;
             UsbInterface = UsbInterfaceType.UART;
             UsbBufThreshold = 128;
-            
-            // SPI defaults
-            SpiClockFrequency = 15000000; // Default to 15MHz for SPI
-            SpiLatencyTimer = 2; // Default latency timer
-            SpiTransferInterval = 10; // Default transfer interval
-            SpiTransferSize = 256; // Default transfer size
-            SpiChipSelectPolarity = 0; // Default active-low CS
-            SpiMode = 0; // Default SPI mode 0
-            SpiDataOrder = 0; // Default MSB first
-            
+
             // StreamSource will be set by the configuration dialog based on selected tab
             StreamSource = StreamSource.SerialPort; // Default to serial port;
             
@@ -462,37 +433,6 @@ namespace PowerScope.Model
             }
         }
 
-        // FTDI properties
-        public uint FtdiDeviceIndex
-        {
-            get { return _ftdiDeviceIndex; }
-            set
-            {
-                _ftdiDeviceIndex = value;
-                OnPropertyChanged(nameof(FtdiDeviceIndex));
-            }
-        }
-
-        public uint FtdiClockFrequency
-        {
-            get { return _ftdiClockFrequency; }
-            set
-            {
-                _ftdiClockFrequency = value;
-                OnPropertyChanged(nameof(FtdiClockFrequency));
-            }
-        }
-
-        public string FtdiSelectedDevice
-        {
-            get { return _ftdiSelectedDevice; }
-            set
-            {
-                _ftdiSelectedDevice = value;
-                OnPropertyChanged(nameof(FtdiSelectedDevice));
-            }
-        }
-
         // USB properties
         public string UsbSelectedDevice
         {
@@ -561,71 +501,7 @@ namespace PowerScope.Model
             }
         }
 
-        // SPI Configuration Properties
-        public uint SpiClockFrequency
-        {
-   get { return _spiClockFrequency; }
- set
-    {
-     if (_spiClockFrequency != value)
-    {
-               _spiClockFrequency = value;
-    OnPropertyChanged(nameof(SpiClockFrequency));
-        }
- }
-        }
-
-        public byte SpiLatencyTimer
-        {
-       get { return _spiLatencyTimer; }
-         set { _spiLatencyTimer = 2; } // Always 2ms - fixed
- }
-
-        public int SpiTransferInterval
-        {
-            get { return _spiTransferInterval; }
-            set { _spiTransferInterval = 10; } // Always 10ms - fixed
-      }
-
-        public int SpiTransferSize
-        {
-            get { return _spiTransferSize; }
-            set { _spiTransferSize = 256; } // Always 256 bytes - fixed
-        }
-
-     public byte SpiChipSelectPolarity
-        {
-  get { return _spiChipSelectPolarity; }
-            set
-{
-    if (_spiChipSelectPolarity != value && (value == 0 || value == 1))
-             {
-         _spiChipSelectPolarity = value;
- OnPropertyChanged(nameof(SpiChipSelectPolarity));
-         }
-   }
-        }
-
-        public byte SpiMode
-        {
-       get { return _spiMode; }
-     set
-      {
-         if (_spiMode != value && value >= 0 && value <= 3)
-        {
- _spiMode = value;
- OnPropertyChanged(nameof(SpiMode));
-    }
-      }
-        }
-
-        public byte SpiDataOrder
-{
-  get { return _spiDataOrder; }
-            set { _spiDataOrder = 0; } // Always MSB First (0) - fixed
-        }
-
-      public event PropertyChangedEventHandler PropertyChanged;
+        public event PropertyChangedEventHandler PropertyChanged;
 
         protected virtual void OnPropertyChanged(string propertyName)
         {
@@ -695,6 +571,162 @@ namespace PowerScope.Model
 
             // Call the configured callback if available
             DataStreamConfigurationCallback?.Invoke(dataStream);
+        }
+
+        /// <summary>
+        /// Apply USB-specific settings to a USBDataStream: device path, physical interface
+        /// (UART/SPI), UART baud rate, and buffer threshold.
+        /// Must be called before Connect() so the values are in place when StartStreaming()
+        /// sends the control transfers to the FX2G3.
+        /// </summary>
+        /// <param name="dataStream">Data stream to configure — no-op for non-USB streams</param>
+        public void ApplyUsbSettingsToDataStream(IDataStream dataStream)
+        {
+            if (dataStream is USBDataStream usbStream)
+            {
+                usbStream.SelectedDevicePath  = this.UsbSelectedDevicePath;
+                usbStream.Interface           = this.UsbInterface;
+                usbStream.UartBaudRate        = (this.UsbInterface == UsbInterfaceType.UART && this.Baud > 0) ? this.Baud : 0;
+                usbStream.UartBufferThreshold = this.UsbBufThreshold > 0 ? this.UsbBufThreshold : 64;
+            }
+        }
+
+        /// <summary>
+        /// Parses the FrameStart hex string (e.g. "AA AA") into a byte array.
+        /// Returns { 0xAA, 0xAA } as a safe default when the string is absent or invalid.
+        /// </summary>
+        public byte[] ParseFrameStartBytes()
+        {
+            string frameStart = this.FrameStart;
+            if (string.IsNullOrEmpty(frameStart))
+                return new byte[] { 0xAA, 0xAA };
+            try
+            {
+                string[] parts = frameStart.Split(new char[] { ' ', ',', ';' }, StringSplitOptions.RemoveEmptyEntries);
+                List<byte> bytes = new List<byte>();
+                foreach (string part in parts)
+                {
+                    string cleanPart = part.Trim().Replace("0x", "").Replace("0X", "");
+                    if (byte.TryParse(cleanPart, System.Globalization.NumberStyles.HexNumber, null, out byte b))
+                        bytes.Add(b);
+                }
+                return bytes.Count > 0 ? bytes.ToArray() : new byte[] { 0xAA, 0xAA };
+            }
+            catch
+            {
+                return new byte[] { 0xAA, 0xAA };
+            }
+        }
+
+        /// <summary>
+        /// Resolves the Delimiter string ("Comma", "Space", "Tab", "Semicolon", or a literal
+        /// character) to its char equivalent.
+        /// </summary>
+        public char ParseDelimiterChar()
+        {
+            string delimiter = this.Delimiter;
+            if (string.IsNullOrEmpty(delimiter))
+                return ',';
+            switch (delimiter.ToLower())
+            {
+                case "comma":
+                case ",":
+                    return ',';
+                case "space":
+                case " ":
+                    return ' ';
+                case "tab":
+                case "\t":
+                    return '\t';
+                case "semicolon":
+                case ";":
+                    return ';';
+                default:
+                    return delimiter[0];
+            }
+        }
+
+        /// <summary>
+        /// Maps the NumberType enum to the DataParser binary format constant.
+        /// </summary>
+        public DataParser.BinaryFormat GetBinaryFormat()
+        {
+            switch (this.NumberType)
+            {
+                case NumberTypeEnum.Int16:   return DataParser.BinaryFormat.int16_t;
+                case NumberTypeEnum.Uint16:  return DataParser.BinaryFormat.uint16_t;
+                case NumberTypeEnum.Int32:   return DataParser.BinaryFormat.int32_t;
+                case NumberTypeEnum.Uint32:  return DataParser.BinaryFormat.uint32_t;
+                case NumberTypeEnum.Float32: return DataParser.BinaryFormat.float_t;
+                default:                     return DataParser.BinaryFormat.uint16_t;
+            }
+        }
+
+        /// <summary>
+        /// Creates a DataParser fully configured from this StreamSettings instance.
+        /// ASCII mode uses Delimiter and a newline frame terminator.
+        /// Binary modes use NumberType and FrameStart bytes.
+        /// </summary>
+        public DataParser CreateDataParser()
+        {
+            if (this.DataFormat == DataFormatType.ASCII)
+            {
+                char separator = this.ParseDelimiterChar();
+                return new DataParser(this.NumberOfChannels, '\n', separator);
+            }
+            else
+            {
+                DataParser.BinaryFormat binaryFormat = this.GetBinaryFormat();
+                byte[] frameStartBytes = this.ParseFrameStartBytes();
+                if (frameStartBytes != null && frameStartBytes.Length > 0)
+                    return new DataParser(binaryFormat, this.NumberOfChannels, frameStartBytes);
+                else
+                    return new DataParser(binaryFormat, this.NumberOfChannels);
+            }
+        }
+
+        /// <summary>
+        /// Creates and fully configures an IDataStream from this StreamSettings instance.
+        /// This is the single factory method for all stream types; it also applies
+        /// up/down sampling so the returned stream is ready for Connect() + StartStreaming().
+        /// </summary>
+        public IDataStream CreateDataStream()
+        {
+            IDataStream dataStream;
+
+            switch (this.StreamSource)
+            {
+                case StreamSource.USB:
+                    UsbSourceSetting usbSourceSetting = new UsbSourceSetting(USBDataStream.DeviceInterfaceGuid, "FX2G3 PowerScope");
+                    DataParser usbDataParser = this.CreateDataParser();
+                    USBDataStream usbDs = new USBDataStream(usbSourceSetting, usbDataParser);
+                    this.ApplyUsbSettingsToDataStream(usbDs);
+                    dataStream = usbDs;
+                    break;
+
+                case StreamSource.Demo:
+                    DemoSettings demoSettings = new DemoSettings(this.NumberOfChannels, this.DemoSampleRate, this.DemoSignalType);
+                    dataStream = new DemoDataStream(demoSettings);
+                    break;
+
+                case StreamSource.AudioInput:
+                    dataStream = new AudioDataStream(this.AudioDevice, this.AudioSampleRate);
+                    break;
+
+                case StreamSource.File:
+                    dataStream = new FileDataStream(this.FilePath, this.FileLoopPlayback);
+                    break;
+
+                case StreamSource.SerialPort:
+                default:
+                    SourceSetting sourceSetting = new SourceSetting(this.Port, this.Baud, this.DataBits, this.StopBits, this.Parity);
+                    DataParser serialParser = this.CreateDataParser();
+                    dataStream = new SerialDataStream(sourceSetting, serialParser);
+                    break;
+            }
+
+            this.ApplyUpDownSamplingToDataStream(dataStream);
+            return dataStream;
         }
 
         /// <summary>
