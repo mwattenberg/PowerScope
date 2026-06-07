@@ -54,12 +54,13 @@ namespace PowerScope.Model
     public class USBDataStream : IDataStream, IChannelConfigurable
     {
         // Constants from your example
-        private const string DeviceInterfaceGuid = "{8D2C9D52-5C6B-4F0B-9F1B-3EBE8C4F9A61}";
+        public const string DeviceInterfaceGuid = "{8D2C9D52-5C6B-4F0B-9F1B-3EBE8C4F9A61}";
         private const byte PipeIn = 0x81;
         private const byte REQ_START             = 0xA0;
         private const byte REQ_STOP              = 0xA1;
         private const byte REQ_SET_BUF_THRESHOLD = 0xA2;
         private const byte REQ_SET_BAUD          = 0xA3;
+        private const byte REQ_SET_INTERFACE     = 0xA4;
 
         // USB handles
         private SafeFileHandle _deviceHandle;
@@ -126,6 +127,15 @@ namespace PowerScope.Model
                 if (_interface == value) return;
                 _interface = value;
                 OnPropertyChanged(nameof(Interface));
+
+                if (_winUsbHandle != IntPtr.Zero)
+                {
+                    try { SendSetInterface(_winUsbHandle, value); }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"USB SetInterface warning: {ex.Message}");
+                    }
+                }
             }
         }
 
@@ -489,9 +499,12 @@ namespace PowerScope.Model
                 // Data streaming begins regardless via the bulk IN endpoint.
                 try
                 {
+                    // Set interface first so the firmware reconfigures SCB1 before
+                    // streaming starts. SPI ignores SET_BAUD and SET_BUF_THRESHOLD.
+                    SendSetInterface(_winUsbHandle, _interface);
                     SendStart(_winUsbHandle);
                     SendSetBufThreshold(_winUsbHandle, (ushort)_uartBufThreshold);
-                    if (_uartBaudRate > 0)
+                    if (_uartBaudRate > 0 && _interface == UsbInterfaceType.UART)
                         SendSetBaudRate(_winUsbHandle, (uint)_uartBaudRate);
                 }
                 catch (Exception ex)
@@ -1112,6 +1125,32 @@ namespace PowerScope.Model
                 Request     = REQ_SET_BAUD,
                 Value       = (ushort)(baudRate & 0xFFFF),
                 Index       = (ushort)(baudRate >> 16),
+                Length      = 0
+            };
+            int transferred;
+            if (!WinUsb_ControlTransfer(h, setup, null, 0, out transferred, IntPtr.Zero))
+                throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+        }
+
+        /// <summary>
+        /// Sends a 0xA4 SET_INTERFACE vendor control transfer to the FX2G3.
+        /// wValue 0 = UART, 1 = SPI. The firmware calls SwitchInterface() which
+        /// reconfigures SCB1 and resets the streaming state.
+        /// </summary>
+        private static void SendSetInterface(IntPtr h, UsbInterfaceType iface)
+        {
+            ushort wValue;
+            if (iface == UsbInterfaceType.SPI)
+                wValue = 1;
+            else
+                wValue = 0; // UART (default); I2C not yet supported in firmware
+
+            var setup = new WINUSB_SETUP_PACKET
+            {
+                RequestType = 0x40, // Host-to-device | Vendor | Recipient: Device
+                Request     = REQ_SET_INTERFACE,
+                Value       = wValue,
+                Index       = 0,
                 Length      = 0
             };
             int transferred;
