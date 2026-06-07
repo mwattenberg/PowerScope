@@ -51,8 +51,7 @@ namespace PowerScope.Model
         AudioInput,
         Demo,
         File,
-        USB,
-        FTDI
+        USB
     }
 
     public class StreamSettings : INotifyPropertyChanged
@@ -91,25 +90,11 @@ namespace PowerScope.Model
         private string _fileParseStatus;
         private long _fileTotalSamples;
 
-        // FTDI-related properties
-        private uint _ftdiDeviceIndex;
-        private uint _ftdiClockFrequency;
-        private string _ftdiSelectedDevice;
-
         // USB-related properties
         private string _usbSelectedDevice;
         private string _usbSelectedDevicePath;
         private UsbInterfaceType _usbInterface;
         private int _usbBufThreshold;
-
-        // SPI-specific configuration properties
-        private uint _spiClockFrequency;
-        private byte _spiLatencyTimer;
-        private int _spiTransferInterval;
-        private int _spiTransferSize;
-        private byte _spiChipSelectPolarity;
-        private byte _spiMode;
-        private byte _spiDataOrder;
 
         // Callback for applying settings to data streams
         public Action<IDataStream> DataStreamConfigurationCallback { get; set; }
@@ -142,26 +127,12 @@ namespace PowerScope.Model
             FileParseStatus = "No file selected";
             FileTotalSamples = 0;
             
-            // FTDI defaults
-            FtdiDeviceIndex = 0; // Default to first device
-            FtdiClockFrequency = 1000000; // Default to 1MHz
-            FtdiSelectedDevice = null;
-
             // USB defaults
             UsbSelectedDevice = null;
             UsbSelectedDevicePath = null;
             UsbInterface = UsbInterfaceType.UART;
             UsbBufThreshold = 128;
-            
-            // SPI defaults
-            SpiClockFrequency = 15000000; // Default to 15MHz for SPI
-            SpiLatencyTimer = 2; // Default latency timer
-            SpiTransferInterval = 10; // Default transfer interval
-            SpiTransferSize = 256; // Default transfer size
-            SpiChipSelectPolarity = 0; // Default active-low CS
-            SpiMode = 0; // Default SPI mode 0
-            SpiDataOrder = 0; // Default MSB first
-            
+
             // StreamSource will be set by the configuration dialog based on selected tab
             StreamSource = StreamSource.SerialPort; // Default to serial port;
             
@@ -462,37 +433,6 @@ namespace PowerScope.Model
             }
         }
 
-        // FTDI properties
-        public uint FtdiDeviceIndex
-        {
-            get { return _ftdiDeviceIndex; }
-            set
-            {
-                _ftdiDeviceIndex = value;
-                OnPropertyChanged(nameof(FtdiDeviceIndex));
-            }
-        }
-
-        public uint FtdiClockFrequency
-        {
-            get { return _ftdiClockFrequency; }
-            set
-            {
-                _ftdiClockFrequency = value;
-                OnPropertyChanged(nameof(FtdiClockFrequency));
-            }
-        }
-
-        public string FtdiSelectedDevice
-        {
-            get { return _ftdiSelectedDevice; }
-            set
-            {
-                _ftdiSelectedDevice = value;
-                OnPropertyChanged(nameof(FtdiSelectedDevice));
-            }
-        }
-
         // USB properties
         public string UsbSelectedDevice
         {
@@ -561,71 +501,7 @@ namespace PowerScope.Model
             }
         }
 
-        // SPI Configuration Properties
-        public uint SpiClockFrequency
-        {
-   get { return _spiClockFrequency; }
- set
-    {
-     if (_spiClockFrequency != value)
-    {
-               _spiClockFrequency = value;
-    OnPropertyChanged(nameof(SpiClockFrequency));
-        }
- }
-        }
-
-        public byte SpiLatencyTimer
-        {
-       get { return _spiLatencyTimer; }
-         set { _spiLatencyTimer = 2; } // Always 2ms - fixed
- }
-
-        public int SpiTransferInterval
-        {
-            get { return _spiTransferInterval; }
-            set { _spiTransferInterval = 10; } // Always 10ms - fixed
-      }
-
-        public int SpiTransferSize
-        {
-            get { return _spiTransferSize; }
-            set { _spiTransferSize = 256; } // Always 256 bytes - fixed
-        }
-
-     public byte SpiChipSelectPolarity
-        {
-  get { return _spiChipSelectPolarity; }
-            set
-{
-    if (_spiChipSelectPolarity != value && (value == 0 || value == 1))
-             {
-         _spiChipSelectPolarity = value;
- OnPropertyChanged(nameof(SpiChipSelectPolarity));
-         }
-   }
-        }
-
-        public byte SpiMode
-        {
-       get { return _spiMode; }
-     set
-      {
-         if (_spiMode != value && value >= 0 && value <= 3)
-        {
- _spiMode = value;
- OnPropertyChanged(nameof(SpiMode));
-    }
-      }
-        }
-
-        public byte SpiDataOrder
-{
-  get { return _spiDataOrder; }
-            set { _spiDataOrder = 0; } // Always MSB First (0) - fixed
-        }
-
-      public event PropertyChangedEventHandler PropertyChanged;
+        public event PropertyChangedEventHandler PropertyChanged;
 
         protected virtual void OnPropertyChanged(string propertyName)
         {

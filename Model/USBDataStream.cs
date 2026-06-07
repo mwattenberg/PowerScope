@@ -702,7 +702,7 @@ namespace PowerScope.Model
         /// <summary>
         /// Assembles received bytes (prepending any residue from the previous read) and
         /// delegates decoding to the shared <see cref="DataParser"/>. This is the same
-        /// path used by SerialDataStream / FTDI_SerialDataStream — there is no USB-specific
+        /// path used by SerialDataStream — there is no USB-specific
         /// parser. ASCII and binary (framed or continuous) all flow through Parser.ParseData.
         /// </summary>
         private void ProcessReceivedUsbData(byte[] readBuffer, int bytesRead)
