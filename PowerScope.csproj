@@ -50,6 +50,12 @@
     <Compile Remove="View\UserControls\DraggableAxisLines.cs" />
   </ItemGroup>
 
+  <!-- The test project lives in a subfolder; keep its sources out of the app build -->
+  <ItemGroup>
+    <Compile Remove="Tests\**" />
+    <None Remove="Tests\**" />
+  </ItemGroup>
+
   <ItemGroup>
     <None Remove="View\UserControls\xExpand.svg" />
   </ItemGroup>

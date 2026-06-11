@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Ports; // Add for Parity enum
+using System.Linq;
 using System.Management;
 using System.Timers;
 using System.Windows;
@@ -12,6 +13,7 @@ using System.Windows.Media;
 using System.Xml.Linq;
 using ScottPlot.Plottables;
 using PowerScope.Model;
+using PowerScope.Model.Mcp;
 using PowerScope.View.UserControls;
 using PowerScope.View.UserForms;
 using Aelian.FFT;
@@ -26,6 +28,7 @@ namespace PowerScope
     public partial class MainWindow : Window
     {
         private PlotManager _plotManager;
+        private McpServer _mcpServer;
 
         // Configurable display settings - use DataStream's ring buffer capacity
         public int DisplayElements { get; set; } = 3000; // Number of elements to display
@@ -73,6 +76,31 @@ namespace PowerScope
 
             // Set DataContext for command bindings
             DataContext = this;
+
+            // Start the MCP server so AI agents can read live waveform data
+            if (App.McpEnabled)
+            {
+                StartMcpServer();
+            }
+        }
+
+        /// <summary>
+        /// Starts the MCP server on localhost. Failure to start (e.g. port already
+        /// in use by another PowerScope instance) is not fatal to the application.
+        /// </summary>
+        private void StartMcpServer()
+        {
+            try
+            {
+                McpToolService toolService = new McpToolService(new McpWindowHost(this));
+                _mcpServer = new McpServer(toolService, App.McpPort);
+                _mcpServer.Start();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Warning: MCP server failed to start on port {App.McpPort}: {ex.Message}");
+                _mcpServer = null;
+            }
         }
 
         private void InitializeCommands()
@@ -348,16 +376,21 @@ namespace PowerScope
         }
 
         /// <summary>
-        /// Reads plot settings from an XML file in the application directory and applies them.
+        /// Reads plot settings from an XML file and applies them.
+        /// Uses the file given via the --config command line argument when present,
+        /// otherwise Settings.xml in the application directory.
         /// </summary>
         private void readSettingsXML()
         {
-            string filePath = Path.Combine(Directory.GetCurrentDirectory(), "Settings.xml");
+            string filePath = App.ConfigFilePath ?? Path.Combine(Directory.GetCurrentDirectory(), "Settings.xml");
             Serializer.ReadSettingsFromXML(filePath, _plotManager, DataStreamBar);
         }
 
         protected override void OnClosed(EventArgs e)
         {
+            // Stop accepting MCP requests before tearing anything down
+            _mcpServer?.Dispose();
+
             writeSettingsToXML(); // Save settings on exit
 
             // Stop updates
@@ -373,6 +406,67 @@ namespace PowerScope
             base.OnClosed(e);
         }
 
+        /// <summary>
+        /// IMcpHost implementation backed by the live MainWindow.
+        /// MCP tool calls arrive on thread pool threads, so every interaction
+        /// with UI-owned state is marshalled through the dispatcher.
+        /// </summary>
+        private class McpWindowHost : IMcpHost
+        {
+            private readonly MainWindow _window;
+
+            public McpWindowHost(MainWindow window)
+            {
+                _window = window;
+            }
+
+            public IReadOnlyList<Channel> GetChannels()
+            {
+                return _window.Dispatcher.Invoke(() => _window.DataStreamBar.Channels.ToList());
+            }
+
+            public int AddDemoStream(int numberOfChannels, int sampleRate, string signalType)
+            {
+                return _window.Dispatcher.Invoke(() =>
+                {
+                    StreamSettings settings = new StreamSettings
+                    {
+                        StreamSource = StreamSource.Demo,
+                        NumberOfChannels = numberOfChannels,
+                        DemoSampleRate = sampleRate,
+                        DemoSignalType = signalType
+                    };
+
+                    IDataStream dataStream = settings.CreateDataStream();
+                    dataStream.Connect();
+                    dataStream.StartStreaming();
+
+                    _window.DataStreamBar.AddChannelsForStream(dataStream);
+                    _window.DataStreamBar.AddStreamInfoPanel(settings, dataStream);
+
+                    return dataStream.ChannelCount;
+                });
+            }
+
+            public void LoadConfiguration(string filePath)
+            {
+                _window.Dispatcher.Invoke(() =>
+                {
+                    Serializer.ReadSettingsFromXML(filePath, _window._plotManager, _window.DataStreamBar);
+                });
+            }
+
+            public void RemoveAllStreams()
+            {
+                _window.Dispatcher.Invoke(() =>
+                {
+                    foreach (IDataStream stream in _window.DataStreamBar.ConnectedDataStreams)
+                    {
+                        _window.DataStreamBar.RemoveStreamByDataStream(stream);
+                    }
+                });
+            }
+        }
     }
 
     // Simple RelayCommand implementation
