@@ -2,8 +2,13 @@
 
 PowerScope embeds an [MCP](https://modelcontextprotocol.io) (Model Context Protocol) server so AI agents
 like Claude Code can read live waveform data from connected hardware. The intended workflow: an agent
-edits MCU firmware (e.g. control loop gains of a buck converter), builds and flashes it, then reads the
-resulting transient through PowerScope and iterates.
+writes MCU application code (e.g. control loop gains of a buck converter), builds and flashes it, then
+verifies the resulting behavior through PowerScope and iterates.
+
+The MCP layer is transport-agnostic — it operates on PowerScope's `IDataStream`/`Channel` abstraction,
+so the MCU can be connected any way PowerScope supports: its UART through a virtual COM port, native
+USB if the MCU has it, a USB bridge chip (e.g. FX2G3), or even an audio input. The agent sees the same
+channels and tools regardless of the physical link.
 
 The server starts automatically with the application and listens on **localhost only** —
 it is never reachable from other machines.
