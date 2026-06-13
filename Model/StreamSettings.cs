@@ -138,7 +138,7 @@ namespace PowerScope.Model
             
             // Leave other values as null/zero to be set by user input
             Port = null;
-            Baud = 0;
+            Baud = 3000000;
             AudioDevice = null;
             AudioDeviceIndex = 0;
             AudioSampleRate = 44100; // Set reasonable default for audio

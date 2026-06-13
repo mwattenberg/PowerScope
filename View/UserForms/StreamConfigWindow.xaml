@@ -410,26 +410,28 @@
                                     </ComboBox>
                                 </StackPanel>
 
-                                <!-- UART-specific settings (baud rate + buffer threshold) -->
+                                <!-- UART-only settings (baud rate) -->
                                 <StackPanel x:Name="Panel_USBUartSettings" Margin="0,0,0,5">
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
                                         <Label Content="Baud rate:" VerticalAlignment="Center" Width="80"
-                                               ToolTip="UART baud rate of the FX2G3's SCB1 interface. Sent to the device on connect via USB vendor command 0xA3."/>
+                                               ToolTip="UART baud rate of the FX2G3's SCB1 interface. Freely configurable — depends only on the attached device. Sent on connect via USB vendor command 0xA3."/>
                                         <TextBox x:Name="TextBox_USBBaud" Width="200"
                                                  Text="{Binding Baud, Mode=TwoWay}"
                                                  PreviewTextInput="BaudOnly_PreviewTextInput"
-                                                 ToolTip="e.g. 115200, 921600, 6000000"/>
+                                                 ToolTip="Freely configurable, e.g. 115200, 921600, 3000000, 6000000 — limited only by the attached hardware."/>
                                     </StackPanel>
-                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
-                                        <Label Content="Packet size:" VerticalAlignment="Center" Width="80"
-                                               ToolTip="Bytes the FX2G3 accumulates before sending a USB packet. Smaller = lower latency; larger = better bus efficiency at high baud rates."/>
-                                        <ComboBox x:Name="ComboBox_USBBufThreshold" Width="200"
-                                                  ToolTip="Small (64 B) for lowest latency; Large (256 B) for high baud rates (≥1 MBaud).">
-                                            <ComboBoxItem Content="Small  (64 B)"  Tag="64"/>
-                                            <ComboBoxItem Content="Medium (128 B)" Tag="128"/>
-                                            <ComboBoxItem Content="Large  (256 B)" Tag="256"/>
-                                        </ComboBox>
-                                    </StackPanel>
+                                </StackPanel>
+
+                                <!-- Packet size (UART and SPI) -->
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
+                                    <Label Content="Packet size:" VerticalAlignment="Center" Width="80"
+                                           ToolTip="Bytes the FX2G3 accumulates before sending a USB packet. Smaller = lower latency; larger = better throughput efficiency."/>
+                                    <ComboBox x:Name="ComboBox_USBBufThreshold" Width="200"
+                                              ToolTip="Small (64 B) for lowest latency; Large (256 B) for high throughput.">
+                                        <ComboBoxItem Content="Small  (64 B)"  Tag="64"/>
+                                        <ComboBoxItem Content="Medium (128 B)" Tag="128"/>
+                                        <ComboBoxItem Content="Large  (256 B)" Tag="256"/>
+                                    </ComboBox>
                                 </StackPanel>
 
                                 <!-- Channels -->
