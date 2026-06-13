@@ -1,44 +1,42 @@
 # PowerScope MCP Server
 
 PowerScope embeds an [MCP](https://modelcontextprotocol.io) (Model Context Protocol) server so AI agents
-like Claude Code can read live waveform data from connected hardware. The intended workflow: an agent
+like Claude Desktop can read live waveform data from connected hardware. The intended workflow: an agent
 writes MCU application code (e.g. control loop gains of a buck converter), builds and flashes it, then
 verifies the resulting behavior through PowerScope and iterates.
 
 The MCP layer is transport-agnostic — it operates on PowerScope's `IDataStream`/`Channel` abstraction,
-so the MCU can be connected any way PowerScope supports: its UART through a virtual COM port, native
-USB if the MCU has it, a USB bridge chip (e.g. FX2G3), or even an audio input. The agent sees the same
-channels and tools regardless of the physical link.
+so the MCU can be connected any way PowerScope supports: UART through a virtual COM port, native USB,
+a USB bridge chip (e.g. FX2G3), or even an audio input. The agent sees the same channels and tools
+regardless of the physical link.
 
-The server starts automatically with the application and listens on **localhost only** —
-it is never reachable from other machines.
+## Connecting from Claude Desktop
 
-## Connecting from Claude Code
-
-```
-claude mcp add --transport http powerscope http://localhost:5642/mcp
-```
-
-Or in `.mcp.json` / `settings.json`:
+Add the following to `claude_desktop_config.json`
+(`%APPDATA%\Claude\claude_desktop_config.json` on Windows):
 
 ```json
 {
   "mcpServers": {
     "powerscope": {
-      "type": "http",
-      "url": "http://localhost:5642/mcp"
+      "command": "C:\\path\\to\\PowerScope.exe",
+      "args": ["--stdio"]
     }
   }
 }
 ```
 
+Replace `C:\\path\\to\\PowerScope.exe` with the actual installation path.
+Claude Desktop will launch PowerScope (which opens its normal window) and communicate with the
+MCP server over the process's stdin/stdout.
+
 ## Command line arguments
 
 | Argument | Effect |
 |---|---|
-| `--config <path>` | Load the given session XML at startup instead of `Settings.xml`. Configure streams once in the GUI, save the session, then launch reproducibly: `PowerScope.exe --config buck_test.xml` |
-| `--mcp-port <port>` | MCP server port (default 5642). Use when running multiple instances. |
-| `--no-mcp` | Disable the MCP server. |
+| `--config <path>` | Load the given session XML at startup instead of `Settings.xml`. Configure streams once in the GUI, save the session, then launch reproducibly: `PowerScope.exe --stdio --config buck_test.xml` |
+| `--stdio` | Start the MCP server on stdin/stdout (required for Claude Desktop). Without this flag no MCP server runs. |
+| `--no-mcp` | Disable the MCP server (overrides `--stdio` if both are specified). |
 
 ## Tools
 
@@ -62,11 +60,11 @@ Or in `.mcp.json` / `settings.json`:
 
 ## Architecture
 
-- `Model/Mcp/McpServer.cs` — dependency-free JSON-RPC server over the MCP streamable HTTP transport (`HttpListener`, localhost prefix needs no admin rights). Supports `initialize`, `ping`, `tools/list`, `tools/call`, notifications.
+- `Model/Mcp/McpServer.cs` — wraps the official [ModelContextProtocol C# SDK](https://csharp.sdk.modelcontextprotocol.io) (NuGet: `ModelContextProtocol 1.4.0`). Runs a stdio transport host; discovers tools via `[McpServerToolType]`/`[McpServerTool]` attributes on the `PowerScopeTools` bridge class.
 - `Model/Mcp/McpToolService.cs` — tool implementations, transport-independent.
 - `Model/Mcp/IMcpHost.cs` — boundary to the application. `MainWindow.McpWindowHost` implements it by marshalling onto the WPF dispatcher; tests implement it with bare `DemoDataStream`s.
 
-Tests live in `Tests/PowerScope.Tests.csproj` and verify the tool layer against demo waveforms with known properties (sine RMS = amplitude/√2, etc.) plus the HTTP protocol behavior end to end:
+Tests live in `Tests/PowerScope.Tests.csproj` and verify the tool layer against demo waveforms with known properties (sine RMS = amplitude/√2, etc.):
 
 ```powershell
 dotnet test Tests\PowerScope.Tests.csproj

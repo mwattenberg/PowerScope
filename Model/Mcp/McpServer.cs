@@ -1,298 +1,142 @@
 using System;
-using System.IO;
-using System.Net;
-using System.Reflection;
-using System.Text;
+using System.ComponentModel;
 using System.Text.Json.Nodes;
+using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using ModelContextProtocol.Server;
 
 namespace PowerScope.Model.Mcp
 {
     /// <summary>
-    /// Minimal MCP (Model Context Protocol) server using the streamable HTTP transport.
-    /// Implements the JSON-RPC subset MCP clients require - initialize, notifications,
-    /// ping, tools/list and tools/call - with no external dependencies.
-    ///
-    /// Listens on localhost only: this keeps the server unreachable from other machines
-    /// and lets HttpListener bind without administrator rights (the 'localhost' prefix
-    /// is exempt from URL ACL reservations).
-    ///
-    /// Register in Claude Code with:
-    ///   claude mcp add --transport http powerscope http://localhost:5642/mcp
+    /// MCP server using the official ModelContextProtocol C# SDK with stdio transport.
+    /// Register in Claude Desktop's claude_desktop_config.json:
+    ///   "powerscope": { "command": "C:\\...\\PowerScope.exe", "args": ["--stdio"] }
     /// </summary>
-    public class McpServer : IDisposable
+    public sealed class McpServer : IDisposable
     {
-        public const int DefaultPort = 5642;
-
-        private readonly HttpListener _listener;
-        private readonly McpToolService _tools;
-        private readonly string _sessionId = Guid.NewGuid().ToString("N");
+        private readonly IHost _host;
+        private readonly CancellationTokenSource _cts = new();
         private bool _disposed;
 
-        public int Port { get; }
-
-        public McpServer(McpToolService tools, int port = DefaultPort)
+        public McpServer(McpToolService tools)
         {
-            _tools = tools ?? throw new ArgumentNullException(nameof(tools));
-            Port = port;
-            _listener = new HttpListener();
-            _listener.Prefixes.Add($"http://localhost:{port}/");
+            var settings = new HostApplicationBuilderSettings { Args = [] };
+            var builder = Host.CreateEmptyApplicationBuilder(settings);
+
+            // Stdio transport: only JSON-RPC must go to stdout. Route any SDK/host
+            // log messages to stderr so they don't corrupt the protocol stream.
+            builder.Logging
+                   .SetMinimumLevel(LogLevel.Warning)
+                   .AddConsole(o => o.LogToStandardErrorThreshold = LogLevel.Trace);
+
+            builder.Services
+                   .AddSingleton(tools)
+                   .AddMcpServer()
+                   .WithStdioServerTransport()
+                   .WithToolsFromAssembly();
+
+            _host = builder.Build();
         }
 
         public void Start()
         {
-            _listener.Start();
-            Task.Run(AcceptLoop);
-        }
-
-        private async Task AcceptLoop()
-        {
-            while (_listener.IsListening)
-            {
-                HttpListenerContext context;
-                try
-                {
-                    context = await _listener.GetContextAsync();
-                }
-                catch (Exception)
-                {
-                    break; // listener stopped or disposed
-                }
-
-                _ = Task.Run(() => HandleRequest(context));
-            }
-        }
-
-        private void HandleRequest(HttpListenerContext context)
-        {
-            HttpListenerResponse response = context.Response;
-            try
-            {
-                response.Headers["Mcp-Session-Id"] = _sessionId;
-
-                switch (context.Request.HttpMethod)
-                {
-                    case "POST":
-                        HandlePost(context.Request, response);
-                        break;
-                    case "DELETE":
-                        // Session termination - nothing to clean up, sessions are stateless here
-                        response.StatusCode = 200;
-                        break;
-                    default:
-                        // No server-initiated SSE stream is offered (GET) and other verbs are unsupported
-                        response.StatusCode = 405;
-                        break;
-                }
-            }
-            catch (Exception)
-            {
-                try { response.StatusCode = 500; } catch { }
-            }
-            finally
-            {
-                try { response.Close(); } catch { }
-            }
-        }
-
-        private void HandlePost(HttpListenerRequest request, HttpListenerResponse response)
-        {
-            string body;
-            using (StreamReader reader = new StreamReader(request.InputStream, request.ContentEncoding ?? Encoding.UTF8))
-            {
-                body = reader.ReadToEnd();
-            }
-
-            JsonNode parsed;
-            try
-            {
-                parsed = JsonNode.Parse(body);
-            }
-            catch
-            {
-                WriteJson(response, RpcError(null, -32700, "Parse error"));
-                return;
-            }
-
-            JsonNode reply;
-            if (parsed is JsonArray batch)
-            {
-                JsonArray replies = new JsonArray();
-                foreach (JsonNode message in batch)
-                {
-                    JsonObject singleReply = ProcessMessage(message as JsonObject);
-                    if (singleReply != null)
-                        replies.Add(singleReply);
-                }
-                reply = replies.Count > 0 ? replies : null;
-            }
-            else
-            {
-                reply = ProcessMessage(parsed as JsonObject);
-            }
-
-            if (reply == null)
-            {
-                // Notification(s) only - acknowledge without a body
-                response.StatusCode = 202;
-                return;
-            }
-
-            WriteJson(response, reply);
-        }
-
-        /// <summary>
-        /// Processes a single JSON-RPC message. Returns the response object,
-        /// or null for notifications and client responses (which get no reply).
-        /// </summary>
-        private JsonObject ProcessMessage(JsonObject message)
-        {
-            if (message == null)
-                return RpcError(null, -32600, "Invalid request");
-
-            string method = (string)message["method"];
-            if (method == null)
-                return null; // a response from the client - nothing to do
-
-            JsonNode id = message["id"];
-            if (id == null)
-                return null; // notification (e.g. notifications/initialized)
-
-            try
-            {
-                JsonNode result;
-                switch (method)
-                {
-                    case "initialize":
-                        result = HandleInitialize(message["params"] as JsonObject);
-                        break;
-                    case "ping":
-                        result = new JsonObject();
-                        break;
-                    case "tools/list":
-                        result = new JsonObject { ["tools"] = _tools.GetToolDefinitions() };
-                        break;
-                    case "tools/call":
-                        result = HandleToolsCall(message["params"] as JsonObject);
-                        break;
-                    default:
-                        return RpcError(id, -32601, $"Method not found: {method}");
-                }
-
-                return new JsonObject
-                {
-                    ["jsonrpc"] = "2.0",
-                    ["id"] = id.DeepClone(),
-                    ["result"] = result
-                };
-            }
-            catch (Exception ex)
-            {
-                return RpcError(id, -32603, ex.Message);
-            }
-        }
-
-        private JsonNode HandleInitialize(JsonObject parameters)
-        {
-            // Echo the client's protocol version - this server only uses features
-            // common to all streamable-HTTP protocol revisions
-            string protocolVersion = (string)(parameters?["protocolVersion"]) ?? "2025-06-18";
-
-            string version = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "1.0";
-
-            return new JsonObject
-            {
-                ["protocolVersion"] = protocolVersion,
-                ["capabilities"] = new JsonObject
-                {
-                    ["tools"] = new JsonObject()
-                },
-                ["serverInfo"] = new JsonObject
-                {
-                    ["name"] = "PowerScope",
-                    ["version"] = version
-                },
-                ["instructions"] = "PowerScope real-time data acquisition. Call get_status to discover active streams and channels, " +
-                                   "read_samples / get_measurements to access waveform data, clear_data before capturing a transient. " +
-                                   "Use add_demo_stream (synthetic signals) or load_config (saved hardware session) to set up acquisition."
-            };
-        }
-
-        private JsonNode HandleToolsCall(JsonObject parameters)
-        {
-            string name = (string)(parameters?["name"]);
-            if (string.IsNullOrEmpty(name))
-                throw new ArgumentException("tools/call requires a 'name' parameter");
-
-            JsonObject arguments = parameters["arguments"] as JsonObject ?? new JsonObject();
-
-            string text;
-            bool isError = false;
-            try
-            {
-                text = _tools.CallTool(name, arguments).ToJsonString();
-            }
-            catch (McpToolException ex)
-            {
-                text = ex.Message;
-                isError = true;
-            }
-            catch (Exception ex)
-            {
-                // Unexpected tool failures are still reported as tool errors so the
-                // AI client can read the message and adjust, per the MCP spec
-                text = $"Tool '{name}' failed: {ex.Message}";
-                isError = true;
-            }
-
-            return new JsonObject
-            {
-                ["content"] = new JsonArray
-                {
-                    new JsonObject { ["type"] = "text", ["text"] = text }
-                },
-                ["isError"] = isError
-            };
-        }
-
-        private static JsonObject RpcError(JsonNode id, int code, string message)
-        {
-            return new JsonObject
-            {
-                ["jsonrpc"] = "2.0",
-                ["id"] = id?.DeepClone(),
-                ["error"] = new JsonObject
-                {
-                    ["code"] = code,
-                    ["message"] = message
-                }
-            };
-        }
-
-        private static void WriteJson(HttpListenerResponse response, JsonNode payload)
-        {
-            byte[] bytes = Encoding.UTF8.GetBytes(payload.ToJsonString());
-            response.StatusCode = 200;
-            response.ContentType = "application/json";
-            response.ContentLength64 = bytes.Length;
-            response.OutputStream.Write(bytes, 0, bytes.Length);
+            _ = _host.RunAsync(_cts.Token);
         }
 
         public void Dispose()
         {
-            if (_disposed)
-                return;
+            if (_disposed) return;
             _disposed = true;
+            _cts.Cancel();
+            _cts.Dispose();
+            _host.Dispose();
+        }
+    }
 
-            try
+    /// <summary>
+    /// Bridge from the SDK's attribute-based tool discovery to the existing McpToolService
+    /// implementation. Each method re-serializes its typed parameters into a JsonObject so all
+    /// business logic, validation, and error handling remain in McpToolService (unit-tested in
+    /// McpToolServiceTests). McpToolException propagates naturally; the SDK wraps it as an
+    /// isError=true tool result per the MCP spec.
+    /// </summary>
+    [McpServerToolType]
+    internal sealed class PowerScopeTools
+    {
+        private readonly McpToolService _service;
+
+        public PowerScopeTools(McpToolService service) => _service = service;
+
+        [McpServerTool(Name = "get_status")]
+        [Description("Get the current state of PowerScope: all active data streams (type, connection state, sample rate, total samples acquired) and their channels (index, label, enabled, gain, offset). Call this first to discover available channels.")]
+        public string GetStatus() => _service.CallTool("get_status", new JsonObject()).ToJsonString();
+
+        [McpServerTool(Name = "read_samples")]
+        [Description("Read the latest samples from a channel's ring buffer. Samples are ordered oldest to newest; the last element is the most recent. Use 'decimate' to reduce the number of returned points for long captures.")]
+        public string ReadSamples(
+            [Description("Channel to read: global index integer (0, 1, ...) or label string ('CH1', 'VOUT', ...) from get_status.")] string channel,
+            [Description("Number of raw samples to fetch (default 1000, max 5000000).")] int count = 1000,
+            [Description("Return only every Nth sample (default 1 = all). The response contains at most count/decimate values.")] int decimate = 1)
+        {
+            var args = new JsonObject { ["count"] = count, ["decimate"] = decimate };
+            SetChannel(args, channel);
+            return _service.CallTool("read_samples", args).ToJsonString();
+        }
+
+        [McpServerTool(Name = "get_measurements")]
+        [Description("Compute statistics over the latest samples of a channel: min, max, mean, RMS, standard deviation, peak-to-peak and estimated fundamental frequency (from mean-crossings). Useful for checking signal levels, ripple and steady-state behavior without transferring raw data.")]
+        public string GetMeasurements(
+            [Description("Channel to analyze: global index integer or label string from get_status.")] string channel,
+            [Description("Number of latest samples to analyze (default 10000, max 5000000).")] int count = 10000)
+        {
+            var args = new JsonObject { ["count"] = count };
+            SetChannel(args, channel);
+            return _service.CallTool("get_measurements", args).ToJsonString();
+        }
+
+        [McpServerTool(Name = "clear_data")]
+        [Description("Clear the ring buffers of all streams (discards acquired samples, streams keep running). Call this right before provoking a transient so read_samples afterwards contains only the event of interest.")]
+        public string ClearData() => _service.CallTool("clear_data", new JsonObject()).ToJsonString();
+
+        [McpServerTool(Name = "add_demo_stream")]
+        [Description("Add a synthetic demo data stream (no hardware required). Useful for testing the tool chain before connecting real hardware.")]
+        public string AddDemoStream(
+            [Description("Number of channels (default 4).")] int num_channels = 4,
+            [Description("Sample rate in Hz (default 10000).")] int sample_rate = 10000,
+            [Description("Signal shape: 'Sine Wave', 'Square Wave', 'Triangle Wave', 'Random Noise', 'Mixed Signals', 'Chirp Signal', 'Tones', 'sin(x)/x'. Default 'Sine Wave'.")] string signal_type = "Sine Wave")
+        {
+            return _service.CallTool("add_demo_stream", new JsonObject
             {
-                if (_listener.IsListening)
-                    _listener.Stop();
-                _listener.Close();
-            }
-            catch { }
+                ["num_channels"] = num_channels,
+                ["sample_rate"] = sample_rate,
+                ["signal_type"] = signal_type
+            }).ToJsonString();
+        }
 
-            GC.SuppressFinalize(this);
+        [McpServerTool(Name = "load_config")]
+        [Description("Load a PowerScope session configuration XML file (saved via File > Save Settings). Creates and starts the configured streams — the standard way to connect to real hardware that was set up in the GUI.")]
+        public string LoadConfig(
+            [Description("Absolute path to the PowerScope settings XML file.")] string file_path)
+        {
+            return _service.CallTool("load_config", new JsonObject
+            {
+                ["file_path"] = file_path
+            }).ToJsonString();
+        }
+
+        [McpServerTool(Name = "remove_all_streams")]
+        [Description("Stop, disconnect and remove all active streams and their channels.")]
+        public string RemoveAllStreams() => _service.CallTool("remove_all_streams", new JsonObject()).ToJsonString();
+
+        private static void SetChannel(JsonObject args, string channel)
+        {
+            if (int.TryParse(channel, out int idx))
+                args["channel"] = idx;
+            else
+                args["channel"] = channel;
         }
     }
 }

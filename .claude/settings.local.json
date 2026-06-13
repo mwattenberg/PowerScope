@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git submodule *)",
+      "Bash(git fetch *)",
+      "Bash(git checkout *)",
+      "Bash(git pull *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(dotnet build *)",
+      "Bash(\"C:\\\\Users\\\\Martin\\\\ModusToolbox\\\\tools_3.8\\\\modus-shell\\\\bin\\\\make\" CY_MAKE_IDE=eclipse CY_IDE_TOOLS_DIR=C:/Users/Martin/ModusToolbox/tools_3.8 CY_IDE_BT_TOOLS_DIR= -j8 build_proj)",
+      "Bash(ls \"C:\\\\Users\\\\Martin\\\\ModusToolbox\\\\\")",
+      "PowerShell(Set-Location \"C:\\\\Users\\\\Martin\\\\mtw\\\\PowerScope_FX2G3\"; $env:CY_TOOLS_PATHS = \"C:/Users/Martin/ModusToolbox/tools_3.8\"; & \"C:\\\\Users\\\\Martin\\\\ModusToolbox\\\\tools_3.8\\\\modus-shell\\\\bin\\\\make.exe\" CY_MAKE_IDE=eclipse \"CY_IDE_TOOLS_DIR=C:/Users/Martin/ModusToolbox/tools_3.8\" CY_IDE_BT_TOOLS_DIR= -j8 build_proj 2>&1 | Select-Object -Last 50)",
+      "PowerShell(& \"C:\\\\Users\\\\Martin\\\\ModusToolbox\\\\tools_3.8\\\\modus-shell\\\\bin\\\\bash.exe\" -c \"export CY_TOOLS_PATHS='C:/Users/Martin/ModusToolbox/tools_3.8'; cd /cygdrive/c/Users/Martin/mtw/PowerScope_FX2G3 && make CY_MAKE_IDE=eclipse CY_IDE_TOOLS_DIR=C:/Users/Martin/ModusToolbox/tools_3.8 CY_IDE_BT_TOOLS_DIR= -j8 build_proj 2>&1 | tail -40\")",
+      "PowerShell(& \"C:\\\\Users\\\\Martin\\\\ModusToolbox\\\\tools_3.8\\\\modus-shell\\\\bin\\\\bash.exe\" -c \"export PATH='/c/Users/Martin/ModusToolbox/tools_3.8/modus-shell/bin:$PATH'; export CY_TOOLS_PATHS='C:/Users/Martin/ModusToolbox/tools_3.8'; cd /c/Users/Martin/mtw/PowerScope_FX2G3 && make CY_MAKE_IDE=eclipse CY_IDE_TOOLS_DIR=C:/Users/Martin/ModusToolbox/tools_3.8 CY_IDE_BT_TOOLS_DIR= -j8 build_proj\" 2>&1 | Select-Object -Last 60)",
+      "Bash(xargs grep -l \"InitUart\")",
+      "PowerShell(cd C:\\\\Users\\\\Martin\\\\source\\\\repos\\\\mwattenberg\\\\PowerScope; dotnet build -c Debug 2>&1 | Where-Object { $_ -match \": error\" } | Select-Object -First 30; Write-Output \"---SUMMARY---\"; dotnet build -c Debug 2>&1 | Select-Object -Last 3)",
+      "Bash(git rm *)",
+      "Bash(rm -rf .git/modules/FtdiSharp)",
+      "Bash(git commit --amend -m 'Remove FTDI MPSSE implementation *)",
+      "Bash(git push *)",
+      "WebFetch(domain:csharp.sdk.modelcontextprotocol.io)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:github.com)",
+      "Bash(Remove-Item \"C:\\\\Users\\\\Martin\\\\source\\\\repos\\\\mwattenberg\\\\PowerScope\\\\Tests\\\\McpServerProtocolTests.cs\")",
+      "Bash(dotnet test *)"
+    ]
+  }
+}

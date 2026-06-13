@@ -27,7 +27,7 @@ dotnet run
 dotnet test Tests\PowerScope.Tests.csproj
 ```
 
-Command line arguments: `--config <path>` (load a session XML instead of Settings.xml at startup), `--mcp-port <port>` (default 5642), `--no-mcp` (disable the MCP server).
+Command line arguments: `--config <path>` (load a session XML instead of Settings.xml at startup), `--stdio` (start the MCP server on stdin/stdout for Claude Desktop), `--no-mcp` (disable the MCP server).
 
 ## Companion Repositories
 
@@ -107,7 +107,7 @@ Modal dialogs in `View/UserForms/`:
 
 ### MCP Server
 
-PowerScope embeds an MCP server (`Model/Mcp/`, see `docs/MCP.md`) so AI agents can read live waveform data: dependency-free streamable-HTTP JSON-RPC on `http://localhost:5642/mcp`. Tools: `get_status`, `read_samples`, `get_measurements`, `clear_data`, `add_demo_stream`, `load_config`, `remove_all_streams`. The `IMcpHost` interface decouples the tool layer from the UI — `MainWindow.McpWindowHost` marshals onto the dispatcher; tests (`Tests/`) back it with `DemoDataStream`s directly.
+PowerScope embeds an MCP server (`Model/Mcp/`, see `docs/MCP.md`) so AI agents can read live waveform data. Uses the official `ModelContextProtocol` C# SDK (NuGet 1.4.0) with stdio transport — launched with `--stdio` for Claude Desktop. Tools: `get_status`, `read_samples`, `get_measurements`, `clear_data`, `add_demo_stream`, `load_config`, `remove_all_streams`. The `IMcpHost` interface decouples the tool layer from the UI — `MainWindow.McpWindowHost` marshals onto the dispatcher; tests (`Tests/`) back it with `DemoDataStream`s directly.
 
 ## Key Dependencies
 

@@ -1,16 +1,15 @@
 using System.Configuration;
 using System.Data;
 using System.Windows;
-using PowerScope.Model.Mcp;
 
 namespace PowerScope
 {
     /// <summary>
     /// Interaction logic for App.xaml
     /// Parses command line arguments before MainWindow is created:
-    ///   --config &lt;path&gt;    load the given session XML instead of Settings.xml
-    ///   --mcp-port &lt;port&gt;  port for the MCP server (default 5642)
-    ///   --no-mcp           disable the MCP server
+    ///   --config &lt;path&gt;  load the given session XML instead of Settings.xml
+    ///   --stdio           start the MCP server on stdin/stdout (for Claude Desktop)
+    ///   --no-mcp          disable the MCP server (no-op when --stdio is not set)
     /// </summary>
     public partial class App : Application
     {
@@ -21,14 +20,10 @@ namespace PowerScope
         public static string ConfigFilePath { get; private set; }
 
         /// <summary>
-        /// Port the MCP server listens on (localhost only), set via --mcp-port.
+        /// Whether to run the MCP stdio server. Enabled by --stdio so the process
+        /// can serve as a Claude Desktop MCP server while also showing its window.
         /// </summary>
-        public static int McpPort { get; private set; } = McpServer.DefaultPort;
-
-        /// <summary>
-        /// Whether the MCP server should be started, cleared via --no-mcp.
-        /// </summary>
-        public static bool McpEnabled { get; private set; } = true;
+        public static bool McpEnabled { get; private set; } = false;
 
         protected override void OnStartup(StartupEventArgs e)
         {
@@ -47,12 +42,8 @@ namespace PowerScope
                             ConfigFilePath = args[++i];
                         break;
 
-                    case "--mcp-port":
-                        if (i + 1 < args.Length && int.TryParse(args[i + 1], out int port) && port > 0 && port <= 65535)
-                        {
-                            McpPort = port;
-                            i++;
-                        }
+                    case "--stdio":
+                        McpEnabled = true;
                         break;
 
                     case "--no-mcp":

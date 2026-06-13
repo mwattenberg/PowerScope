@@ -85,20 +85,20 @@ namespace PowerScope
         }
 
         /// <summary>
-        /// Starts the MCP server on localhost. Failure to start (e.g. port already
-        /// in use by another PowerScope instance) is not fatal to the application.
+        /// Starts the MCP stdio server. Called when --stdio was passed on the command line.
+        /// Claude Desktop communicates over the process's stdin/stdout; the WPF window still opens.
         /// </summary>
         private void StartMcpServer()
         {
             try
             {
                 McpToolService toolService = new McpToolService(new McpWindowHost(this));
-                _mcpServer = new McpServer(toolService, App.McpPort);
+                _mcpServer = new McpServer(toolService);
                 _mcpServer.Start();
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Warning: MCP server failed to start on port {App.McpPort}: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Warning: MCP server failed to start: {ex.Message}");
                 _mcpServer = null;
             }
         }
