@@ -33,5 +33,12 @@ namespace PowerScope.Model.Mcp
         /// Stops, disconnects and removes all active streams and their channels.
         /// </summary>
         void RemoveAllStreams();
+
+        /// <summary>
+        /// Renders the current plot to a file and returns the absolute path written.
+        /// Supported formats: ".png" and ".svg" (determined by filePath extension).
+        /// Pass null to have the implementation choose a temp path.
+        /// </summary>
+        string ExportPlot(string filePath, int width, int height);
     }
 }

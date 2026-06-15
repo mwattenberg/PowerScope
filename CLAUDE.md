@@ -27,7 +27,7 @@ dotnet run
 dotnet test Tests\PowerScope.Tests.csproj
 ```
 
-Command line arguments: `--config <path>` (load a session XML instead of Settings.xml at startup), `--stdio` (start the MCP server on stdin/stdout for Claude Desktop), `--no-mcp` (disable the MCP server).
+Command line arguments: `--config <path>` (load a session XML instead of Settings.xml at startup). The TCP MCP server is enabled/disabled from the Plot Settings window (persisted in the session XML), not via a command line switch.
 
 ## Companion Repositories
 

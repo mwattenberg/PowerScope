@@ -37,88 +37,6 @@ namespace PowerScope.Model.Mcp
         }
 
         /// <summary>
-        /// Tool definitions for the MCP tools/list response.
-        /// Built fresh on every call because JsonNode instances cannot be re-parented.
-        /// </summary>
-        public JsonArray GetToolDefinitions()
-        {
-            return new JsonArray
-            {
-                Tool("get_status",
-                    "Get the current state of PowerScope: all active data streams (type, connection state, sample rate, total samples acquired) and their channels (index, label, enabled, gain, offset). Call this first to discover available channels.",
-                    new JsonObject { ["type"] = "object", ["properties"] = new JsonObject() }),
-
-                Tool("read_samples",
-                    "Read the latest samples from a channel's ring buffer. Samples are ordered oldest to newest; the last element is the most recent sample. Use 'decimate' to reduce the number of returned points for long captures.",
-                    new JsonObject
-                    {
-                        ["type"] = "object",
-                        ["properties"] = new JsonObject
-                        {
-                            ["channel"] = ChannelArgSchema(),
-                            ["count"] = IntArgSchema($"Number of raw samples to fetch (default 1000, max {MaxRawSamples})."),
-                            ["decimate"] = IntArgSchema("Return only every Nth sample (default 1 = all). The response contains at most count/decimate values.")
-                        },
-                        ["required"] = new JsonArray { "channel" }
-                    }),
-
-                Tool("get_measurements",
-                    "Compute statistics over the latest samples of a channel: min, max, mean, RMS, standard deviation, peak-to-peak and an estimated fundamental frequency (from mean-crossings). Useful for checking signal levels, ripple and steady-state behavior without transferring raw data.",
-                    new JsonObject
-                    {
-                        ["type"] = "object",
-                        ["properties"] = new JsonObject
-                        {
-                            ["channel"] = ChannelArgSchema(),
-                            ["count"] = IntArgSchema($"Number of latest samples to analyze (default 10000, max {MaxRawSamples}).")
-                        },
-                        ["required"] = new JsonArray { "channel" }
-                    }),
-
-                Tool("clear_data",
-                    "Clear the ring buffers of all streams (discards acquired samples, streams keep running). Call this right before provoking a transient so read_samples afterwards contains only the event of interest.",
-                    new JsonObject { ["type"] = "object", ["properties"] = new JsonObject() }),
-
-                Tool("add_demo_stream",
-                    "Add a synthetic demo data stream (no hardware required). Useful for testing the tool chain before connecting real hardware.",
-                    new JsonObject
-                    {
-                        ["type"] = "object",
-                        ["properties"] = new JsonObject
-                        {
-                            ["num_channels"] = IntArgSchema("Number of channels (default 4)."),
-                            ["sample_rate"] = IntArgSchema("Sample rate in Hz (default 10000)."),
-                            ["signal_type"] = new JsonObject
-                            {
-                                ["type"] = "string",
-                                ["description"] = "One of: 'Sine Wave', 'Square Wave', 'Triangle Wave', 'Random Noise', 'Mixed Signals', 'Chirp Signal', 'Tones', 'sin(x)/x'. Default 'Sine Wave'."
-                            }
-                        }
-                    }),
-
-                Tool("load_config",
-                    "Load a PowerScope session configuration XML file (as saved via File > Save Settings). This creates and starts the configured streams (serial/USB/audio/demo) with all channel settings - the way to connect to real hardware that was previously configured in the GUI.",
-                    new JsonObject
-                    {
-                        ["type"] = "object",
-                        ["properties"] = new JsonObject
-                        {
-                            ["file_path"] = new JsonObject
-                            {
-                                ["type"] = "string",
-                                ["description"] = "Absolute path to the PowerScope settings XML file."
-                            }
-                        },
-                        ["required"] = new JsonArray { "file_path" }
-                    }),
-
-                Tool("remove_all_streams",
-                    "Stop, disconnect and remove all active streams and their channels.",
-                    new JsonObject { ["type"] = "object", ["properties"] = new JsonObject() })
-            };
-        }
-
-        /// <summary>
         /// Dispatches a tools/call request. Throws McpToolException for
         /// expected errors; the caller maps those to isError tool results.
         /// </summary>
@@ -133,6 +51,7 @@ namespace PowerScope.Model.Mcp
                 case "add_demo_stream": return AddDemoStream(arguments);
                 case "load_config": return LoadConfig(arguments);
                 case "remove_all_streams": return RemoveAllStreams();
+                case "capture_plot": return CapturePlot(arguments);
                 default:
                     throw new McpToolException($"Unknown tool '{name}'.");
             }
@@ -341,6 +260,28 @@ namespace PowerScope.Model.Mcp
             return new JsonObject { ["removed"] = true };
         }
 
+        private JsonObject CapturePlot(JsonObject args)
+        {
+            string filePath = GetStringArg(args, "file_path", null);
+            int width = GetIntArg(args, "width", 1920, 1, 7680);
+            int height = GetIntArg(args, "height", 1080, 1, 4320);
+
+            try
+            {
+                string saved = _host.ExportPlot(filePath, width, height);
+                return new JsonObject
+                {
+                    ["file_path"] = saved,
+                    ["width"] = width,
+                    ["height"] = height
+                };
+            }
+            catch (NotSupportedException ex)
+            {
+                throw new McpToolException(ex.Message);
+            }
+        }
+
         #endregion
 
         #region Helpers
@@ -424,34 +365,6 @@ namespace PowerScope.Model.Mcp
             {
                 throw new McpToolException($"Argument '{name}' must be a string.");
             }
-        }
-
-        private static JsonObject Tool(string name, string description, JsonObject inputSchema)
-        {
-            return new JsonObject
-            {
-                ["name"] = name,
-                ["description"] = description,
-                ["inputSchema"] = inputSchema
-            };
-        }
-
-        private static JsonObject ChannelArgSchema()
-        {
-            return new JsonObject
-            {
-                ["type"] = new JsonArray { "integer", "string" },
-                ["description"] = "Channel to read: global channel index (from get_status) or channel label (e.g. 'CH1')."
-            };
-        }
-
-        private static JsonObject IntArgSchema(string description)
-        {
-            return new JsonObject
-            {
-                ["type"] = "integer",
-                ["description"] = description
-            };
         }
 
         #endregion

@@ -60,6 +60,11 @@ namespace PowerScope.Tests
             throw new NotSupportedException("load_config is not available in the test host");
         }
 
+        public string ExportPlot(string filePath, int width, int height)
+        {
+            throw new NotSupportedException("capture_plot is not available in the test host");
+        }
+
         public void RemoveAllStreams()
         {
             lock (_lock)
