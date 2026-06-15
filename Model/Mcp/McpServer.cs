@@ -1,4 +1,7 @@
 using System;
+using System.Diagnostics;
+using System.Net;
+using System.Net.Sockets;
 using System.ComponentModel;
 using System.Text.Json.Nodes;
 using System.Threading;
@@ -11,39 +14,71 @@ using ModelContextProtocol.Server;
 namespace PowerScope.Model.Mcp
 {
     /// <summary>
-    /// MCP server using the official ModelContextProtocol C# SDK with stdio transport.
-    /// Register in Claude Desktop's claude_desktop_config.json:
-    ///   "powerscope": { "command": "C:\\...\\PowerScope.exe", "args": ["--stdio"] }
+    /// MCP server using the official ModelContextProtocol C# SDK over TCP.
+    /// Listens on localhost:54321 and handles one client connection at a time.
+    /// Connect via the PowerScopeMCP companion executable, which bridges
+    /// an MCP client's stdio ↔ this TCP port.
     /// </summary>
     public sealed class McpServer : IDisposable
     {
-        private readonly IHost _host;
+        public const int DefaultPort = 54321;
+
+        private readonly McpToolService _tools;
+        private readonly TcpListener _listener;
         private readonly CancellationTokenSource _cts = new();
         private bool _disposed;
 
-        public McpServer(McpToolService tools)
+        public McpServer(McpToolService tools, int port = DefaultPort)
         {
-            var settings = new HostApplicationBuilderSettings { Args = [] };
-            var builder = Host.CreateEmptyApplicationBuilder(settings);
-
-            // Stdio transport: only JSON-RPC must go to stdout. Route any SDK/host
-            // log messages to stderr so they don't corrupt the protocol stream.
-            builder.Logging
-                   .SetMinimumLevel(LogLevel.Warning)
-                   .AddConsole(o => o.LogToStandardErrorThreshold = LogLevel.Trace);
-
-            builder.Services
-                   .AddSingleton(tools)
-                   .AddMcpServer()
-                   .WithStdioServerTransport()
-                   .WithToolsFromAssembly();
-
-            _host = builder.Build();
+            _tools = tools;
+            _listener = new TcpListener(IPAddress.Loopback, port);
         }
 
         public void Start()
         {
-            _ = _host.RunAsync(_cts.Token);
+            _listener.Start();
+            _ = AcceptLoopAsync(_cts.Token);
+        }
+
+        private async Task AcceptLoopAsync(CancellationToken ct)
+        {
+            while (!ct.IsCancellationRequested)
+            {
+                try
+                {
+                    TcpClient client = await _listener.AcceptTcpClientAsync(ct);
+                    _ = HandleClientAsync(client, ct);
+                }
+                catch (OperationCanceledException) { break; }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"MCP TCP accept error: {ex.Message}");
+                }
+            }
+        }
+
+        private async Task HandleClientAsync(TcpClient client, CancellationToken ct)
+        {
+            using (client)
+            {
+                NetworkStream stream = client.GetStream();
+
+                var settings = new HostApplicationBuilderSettings { Args = [] };
+                var builder = Host.CreateEmptyApplicationBuilder(settings);
+
+                builder.Logging
+                       .SetMinimumLevel(LogLevel.Warning)
+                       .AddConsole(o => o.LogToStandardErrorThreshold = LogLevel.Trace);
+
+                builder.Services
+                       .AddSingleton(_tools)
+                       .AddMcpServer()
+                       .WithStreamServerTransport(stream, stream)
+                       .WithToolsFromAssembly();
+
+                using IHost host = builder.Build();
+                await host.RunAsync(ct);
+            }
         }
 
         public void Dispose()
@@ -51,8 +86,8 @@ namespace PowerScope.Model.Mcp
             if (_disposed) return;
             _disposed = true;
             _cts.Cancel();
+            _listener.Stop();
             _cts.Dispose();
-            _host.Dispose();
         }
     }
 
@@ -130,6 +165,18 @@ namespace PowerScope.Model.Mcp
         [McpServerTool(Name = "remove_all_streams")]
         [Description("Stop, disconnect and remove all active streams and their channels.")]
         public string RemoveAllStreams() => _service.CallTool("remove_all_streams", new JsonObject()).ToJsonString();
+
+        [McpServerTool(Name = "capture_plot")]
+        [Description("Render the current PowerScope plot to a PNG or SVG file and return the file path. Use this to get a visual snapshot of the waveforms without transferring raw sample data.")]
+        public string CapturePlot(
+            [Description("Absolute path for the output file. Extension determines format: .png (default) or .svg. Omit to use a temp file.")] string file_path = null,
+            [Description("Image width in pixels (default 1920).")] int width = 1920,
+            [Description("Image height in pixels (default 1080).")] int height = 1080)
+        {
+            var args = new JsonObject { ["width"] = width, ["height"] = height };
+            if (file_path != null) args["file_path"] = file_path;
+            return _service.CallTool("capture_plot", args).ToJsonString();
+        }
 
         private static void SetChannel(JsonObject args, string channel)
         {

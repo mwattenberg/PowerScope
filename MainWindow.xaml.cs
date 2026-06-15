@@ -77,30 +77,60 @@ namespace PowerScope
             // Set DataContext for command bindings
             DataContext = this;
 
-            // Start the MCP server so AI agents can read live waveform data
-            if (App.McpEnabled)
-            {
-                StartMcpServer();
-            }
+            // Start or stop the MCP server to match the loaded setting, and keep it
+            // in sync as the user toggles it in the Plot Settings window.
+            _plotManager.Settings.PropertyChanged += Settings_PropertyChanged;
+            ApplyMcpServerState();
         }
 
-        /// <summary>
-        /// Starts the MCP stdio server. Called when --stdio was passed on the command line.
-        /// Claude Desktop communicates over the process's stdin/stdout; the WPF window still opens.
-        /// </summary>
+        private void Settings_PropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(PlotSettings.McpServerEnabled))
+                ApplyMcpServerState();
+        }
+
+        private void ApplyMcpServerState()
+        {
+            if (_plotManager.Settings.McpServerEnabled)
+                StartMcpServer();
+            else
+                StopMcpServer();
+        }
+
         private void StartMcpServer()
         {
+            if (_mcpServer != null)
+                return; // already running
+
             try
             {
                 McpToolService toolService = new McpToolService(new McpWindowHost(this));
                 _mcpServer = new McpServer(toolService);
                 _mcpServer.Start();
+                _plotManager.Settings.McpServerStatus = "Running";
+            }
+            catch (System.Net.Sockets.SocketException)
+            {
+                // Most commonly AddressAlreadyInUse: another process (e.g. a second
+                // PowerScope instance) already holds the MCP port.
+                _mcpServer?.Dispose();
+                _mcpServer = null;
+                _plotManager.Settings.McpServerStatus = "Port occupied";
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Warning: MCP server failed to start: {ex.Message}");
+                _mcpServer?.Dispose();
                 _mcpServer = null;
+                _plotManager.Settings.McpServerStatus = "Stopped";
             }
+        }
+
+        private void StopMcpServer()
+        {
+            _mcpServer?.Dispose();
+            _mcpServer = null;
+            _plotManager.Settings.McpServerStatus = "Stopped";
         }
 
         private void InitializeCommands()
@@ -403,6 +433,7 @@ namespace PowerScope
 
             // Dispose DataStreamBar which will handle all stream disposal
             DataStreamBar?.Dispose();
+            _mcpServer?.Dispose();
             base.OnClosed(e);
         }
 
@@ -464,6 +495,25 @@ namespace PowerScope
                     {
                         _window.DataStreamBar.RemoveStreamByDataStream(stream);
                     }
+                });
+            }
+
+            public string ExportPlot(string filePath, int width, int height)
+            {
+                return _window.Dispatcher.Invoke(() =>
+                {
+                    if (string.IsNullOrWhiteSpace(filePath))
+                        filePath = System.IO.Path.Combine(
+                            System.IO.Path.GetTempPath(),
+                            $"powerscope_plot_{DateTime.Now:yyyyMMdd_HHmmss}.png");
+
+                    string ext = System.IO.Path.GetExtension(filePath).ToLowerInvariant();
+                    if (ext == ".svg")
+                        _window.WpfPlot1.Plot.SaveSvg(filePath, width, height);
+                    else
+                        _window.WpfPlot1.Plot.SavePng(filePath, width, height);
+
+                    return filePath;
                 });
             }
         }

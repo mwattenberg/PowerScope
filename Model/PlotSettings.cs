@@ -118,6 +118,8 @@ namespace PowerScope.Model
         private bool _singleShotMode = false;
         private double _triggerLevel = 0.0;
         private int _triggerPosition = 100;
+        private bool _mcpServerEnabled = true;
+        private string _mcpServerStatus = "Stopped";
 
         /// <summary>
         /// Plot refresh rate option (enum-based)
@@ -418,6 +420,40 @@ namespace PowerScope.Model
                 {
                     _triggerPosition = value;
                     OnPropertyChanged(nameof(TriggerPosition));
+                }
+            }
+        }
+
+        /// <summary>
+        /// Whether the embedded TCP MCP server should be running (persisted).
+        /// MainWindow watches this property and starts/stops the server accordingly.
+        /// </summary>
+        public bool McpServerEnabled
+        {
+            get { return _mcpServerEnabled; }
+            set
+            {
+                if (_mcpServerEnabled != value)
+                {
+                    _mcpServerEnabled = value;
+                    OnPropertyChanged(nameof(McpServerEnabled));
+                }
+            }
+        }
+
+        /// <summary>
+        /// Runtime status of the MCP server for display in the settings window:
+        /// "Running", "Stopped" or "Port occupied". Set by MainWindow; not persisted.
+        /// </summary>
+        public string McpServerStatus
+        {
+            get { return _mcpServerStatus; }
+            set
+            {
+                if (_mcpServerStatus != value)
+                {
+                    _mcpServerStatus = value;
+                    OnPropertyChanged(nameof(McpServerStatus));
                 }
             }
         }

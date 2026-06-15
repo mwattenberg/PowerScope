@@ -364,3 +364,6 @@ FodyWeavers.xsd
 /Header.csv
 /nonHeader.csv
 /PowerScope.csproj
+
+# Claude MCP session config (device-specific, not for version control)
+ClaudePowerScope.xml

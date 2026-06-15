@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:PowerScope.View.UserForms"
         mc:Ignorable="d"
-        Title="Plot Settings" Height="432" Width="401" 
+        Title="Plot Settings" Height="470" Width="401"
         WindowStyle="None"
         AllowsTransparency="True"
         ResizeMode="NoResize" 
@@ -305,8 +305,25 @@
                     </Grid.ColumnDefinitions>
 
                     <Label Grid.Column="0" Content="Show Render Time:" VerticalAlignment="Center"/>
-                    <CheckBox x:Name="CheckBoxShowRenderTime" Grid.Column="1" VerticalAlignment="Center" 
+                    <CheckBox x:Name="CheckBoxShowRenderTime" Grid.Column="1" VerticalAlignment="Center"
                               IsChecked="{Binding ShowRenderTime}"/>
+                </Grid>
+
+                <!-- MCP Server -->
+                <Grid Margin="0,0,0,10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="150"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Label Grid.Column="0" Content="MCP Server:" VerticalAlignment="Center"/>
+                    <CheckBox x:Name="CheckBoxMcpServer" Grid.Column="1" VerticalAlignment="Center"
+                              IsChecked="{Binding McpServerEnabled}"/>
+                    <TextBlock x:Name="TextBlockMcpStatus" Grid.Column="2" VerticalAlignment="Center"
+                               Margin="10,0,0,0"
+                               Text="{Binding McpServerStatus}"
+                               Foreground="{DynamicResource PlotSettings_HeaderForegroundBrush}"/>
                 </Grid>
             </StackPanel>
         </Grid>

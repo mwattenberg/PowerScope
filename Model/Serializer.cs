@@ -40,6 +40,7 @@ namespace PowerScope.Model
             parent.Add(new XElement("ShowRenderTime", plotManager.Settings.ShowRenderTime));
             parent.Add(new XElement("YAutoScale", plotManager.Settings.YAutoScale));
             parent.Add(new XElement("BufferSize", plotManager.Settings.BufferSize));
+            parent.Add(new XElement("McpServerEnabled", plotManager.Settings.McpServerEnabled));
             parent.Add(new XElement("Xmin", plotManager.Settings.Xmin));
             parent.Add(new XElement("Xmax", plotManager.Settings.Xmax));
             parent.Add(new XElement("Ymin", plotManager.Settings.Ymin));
@@ -260,6 +261,7 @@ namespace PowerScope.Model
             bool showRenderTime = GetElementValueBool(settingsXml, "ShowRenderTime", false);
             bool yAutoScale = GetElementValueBool(settingsXml, "YAutoScale", true);
             int bufferSize = GetElementValueInt(settingsXml, "BufferSize", 500000);
+            bool mcpServerEnabled = GetElementValueBool(settingsXml, "McpServerEnabled", true);
             int xMin = GetElementValueInt(settingsXml, "Xmin", 0);
             int xMax = GetElementValueInt(settingsXml, "Xmax", 3000);
             int yMin = GetElementValueInt(settingsXml, "Ymin", -200);
@@ -282,6 +284,7 @@ namespace PowerScope.Model
             plotManager.Settings.ShowRenderTime = showRenderTime;
             plotManager.Settings.YAutoScale = yAutoScale;
             plotManager.Settings.BufferSize = bufferSize;
+            plotManager.Settings.McpServerEnabled = mcpServerEnabled;
             plotManager.Settings.Xmin = xMin;
             plotManager.Settings.Xmax = xMax;
             plotManager.Settings.Ymin = yMin;
