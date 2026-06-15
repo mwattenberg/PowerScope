@@ -224,11 +224,39 @@
 								<Setter Property="Background" Value="{DynamicResource PlotSettings_ButtonPressedBrush}"/>
 							</Trigger>
 						</ControlTemplate.Triggers>
-					</ControlTemplate>
-				</Setter.Value>
-			</Setter>
-		</Style>
-	</UserControl.Resources>
+							</ControlTemplate>
+							</Setter.Value>
+							</Setter>
+						</Style>
+
+						<!-- Trigger mode button styles with active state highlighting -->
+						<!-- These are defined after WideButtonStyle since they depend on it -->
+						<Style x:Key="TriggerNormalModeButtonStyle" TargetType="Button" BasedOn="{StaticResource WideButtonStyle}">
+							<Setter Property="Background" Value="{DynamicResource PlotSettings_TitleBarBrush}"/>
+							<Style.Triggers>
+								<MultiDataTrigger>
+									<MultiDataTrigger.Conditions>
+										<Condition Binding="{Binding EnableEdgeTrigger}" Value="True"/>
+										<Condition Binding="{Binding SingleShotMode}" Value="False"/>
+									</MultiDataTrigger.Conditions>
+									<Setter Property="Background" Value="LimeGreen"/>
+								</MultiDataTrigger>
+							</Style.Triggers>
+						</Style>
+
+						<Style x:Key="TriggerSingleModeButtonStyle" TargetType="Button" BasedOn="{StaticResource WideButtonStyle}">
+							<Setter Property="Background" Value="{DynamicResource PlotSettings_TitleBarBrush}"/>
+							<Style.Triggers>
+								<MultiDataTrigger>
+									<MultiDataTrigger.Conditions>
+										<Condition Binding="{Binding EnableEdgeTrigger}" Value="True"/>
+										<Condition Binding="{Binding SingleShotMode}" Value="True"/>
+									</MultiDataTrigger.Conditions>
+									<Setter Property="Background" Value="LimeGreen"/>
+								</MultiDataTrigger>
+							</Style.Triggers>
+						</Style>
+					</UserControl.Resources>
 
 	<Border Height="Auto" Background="{DynamicResource PlotSettings_BackgroundBrush}" CornerRadius="2">
 		<Grid x:Name="RootGrid" Background="{DynamicResource PlotSettings_BackgroundBrush}">
@@ -268,31 +296,70 @@
 				</Grid.ColumnDefinitions>
 				<Button x:Name="RisingEdgeButton"
 					Grid.Column="0"
-					Style="{StaticResource WideButtonStyle}"
 					Height="50"
 					Margin="2,0,2,0"
 					Click="RisingEdgeButton_Click"
 					ToolTip="Trigger on rising edge (signal crosses level upward)">
+					<Button.Style>
+						<Style TargetType="Button" BasedOn="{StaticResource WideButtonStyle}">
+							<Setter Property="Background" Value="{DynamicResource PlotSettings_TitleBarBrush}"/>
+							<Style.Triggers>
+								<MultiDataTrigger>
+									<MultiDataTrigger.Conditions>
+										<Condition Binding="{Binding EnableEdgeTrigger}" Value="True"/>
+										<Condition Binding="{Binding TriggerEdge}" Value="Rising"/>
+									</MultiDataTrigger.Conditions>
+									<Setter Property="Background" Value="LimeGreen"/>
+								</MultiDataTrigger>
+							</Style.Triggers>
+						</Style>
+					</Button.Style>
 					<svgc:SvgViewbox Source="/Icons/risingEdge.svg" Width="35" Height="40" />
 				</Button>
 
 				<Button x:Name="AlternatingEdgeButton"
 					Grid.Column="1"
-					Style="{StaticResource WideButtonStyle}"
 					Height="50"
 					Margin="2,0,2,0"
 					Click="AlternatingEdgeButton_Click"
 					ToolTip="Trigger on alternating edges (rising and falling)">
+					<Button.Style>
+						<Style TargetType="Button" BasedOn="{StaticResource WideButtonStyle}">
+							<Setter Property="Background" Value="{DynamicResource PlotSettings_TitleBarBrush}"/>
+							<Style.Triggers>
+								<MultiDataTrigger>
+									<MultiDataTrigger.Conditions>
+										<Condition Binding="{Binding EnableEdgeTrigger}" Value="True"/>
+										<Condition Binding="{Binding TriggerEdge}" Value="Alternating"/>
+									</MultiDataTrigger.Conditions>
+									<Setter Property="Background" Value="LimeGreen"/>
+								</MultiDataTrigger>
+							</Style.Triggers>
+						</Style>
+					</Button.Style>
 					<svgc:SvgViewbox Source="/Icons/alternatingEdge.svg" Width="35" Height="40" />
 				</Button>
 
 				<Button x:Name="FallingEdgeButton"
 					Grid.Column="2"
-					Style="{StaticResource WideButtonStyle}"
 					Height="50"
 					Margin="2,0,2,0"
 					Click="FallingEdgeButton_Click"
 					ToolTip="Trigger on falling edge (signal crosses level downward)">
+					<Button.Style>
+						<Style TargetType="Button" BasedOn="{StaticResource WideButtonStyle}">
+							<Setter Property="Background" Value="{DynamicResource PlotSettings_TitleBarBrush}"/>
+							<Style.Triggers>
+								<MultiDataTrigger>
+									<MultiDataTrigger.Conditions>
+										<Condition Binding="{Binding EnableEdgeTrigger}" Value="True"/>
+										<Condition Binding="{Binding TriggerEdge}" Value="Falling"/>
+									</MultiDataTrigger.Conditions>
+									<Setter Property="Background" Value="LimeGreen"/>
+								</MultiDataTrigger>
+							</Style.Triggers>
+						</Style>
+					</Button.Style>
 					<svgc:SvgViewbox Source="/Icons/fallingEdge.svg" Width="35" Height="40" />
 				</Button>
 			</Grid>
@@ -303,19 +370,17 @@
 					<ColumnDefinition Width="*"/>
 					<ColumnDefinition Width="*"/>
 				</Grid.ColumnDefinitions>
-				<Button x:Name="NormalModeButton" Content="Normal" Style="{StaticResource WideButtonStyle}"
+				<Button x:Name="NormalModeButton" Content="Normal" Style="{StaticResource TriggerNormalModeButtonStyle}"
 					  Grid.Column="0"
 					  Height="50"
 					  Margin="2,0,2,0"
 					  Click="NormalModeButton_Click"
-					  Background="{Binding NormalModeButtonBackground}"
 					  ToolTip="Continuous trigger mode - trigger repeatedly"/>
-				<Button x:Name="SingleModeButton" Content="Single" Style="{StaticResource WideButtonStyle}"
+				<Button x:Name="SingleModeButton" Content="Single" Style="{StaticResource TriggerSingleModeButtonStyle}"
 					  Grid.Column="1"
 					  Height="50"
 					  Margin="2,0,2,0"
 					  Click="SingleModeButton_Click"
-					  Background="{Binding SingleModeButtonBackground}"
 					  ToolTip="Single-shot trigger mode - trigger once then stop"/>
 			</Grid>
 		</Grid>

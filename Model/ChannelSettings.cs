@@ -101,8 +101,14 @@ namespace PowerScope.Model
                 {
                     _filter = value;
                     OnPropertyChanged(nameof(Filter));
+                    OnPropertyChanged(nameof(HasFilter));
                 }
             }
+        }
+
+        public bool HasFilter
+        {
+            get { return _filter != null; }
         }
 
         /// <summary>

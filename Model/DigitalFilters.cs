@@ -62,6 +62,12 @@ namespace PowerScope.Model
             }
         }
 
+        // The oldest element is at the tail — the slot _count steps behind _head.
+        public double Oldest
+        {
+            get { return _buffer[(_head - _count + _capacity) % _capacity]; }
+        }
+
         public void Clear()
         {
             _head = 0;
@@ -243,18 +249,11 @@ namespace PowerScope.Model
 
         public double Filter(double input)
         {
-            // Track the value being removed if buffer is full
-            double removedValue = 0.0;
             bool bufferWasFull = _window.Count == _windowSize;
 
             if (bufferWasFull)
             {
-                // Calculate which value will be overwritten
-                // We need to subtract it from the sum before adding the new value
-                double[] temp = new double[_windowSize];
-                _window.CopyTo(temp);
-                removedValue = temp[0]; // Oldest value that will be overwritten
-                _sum -= removedValue;
+                _sum -= _window.Oldest;
             }
 
             _window.Add(input);

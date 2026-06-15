@@ -17,6 +17,17 @@ namespace PowerScope.Model
         public char FrameEnd { get; init; }
         public char Separator { get; init; }
 
+        /// <summary>
+        /// Number of raw bytes that make up one complete sample across all channels
+        /// (binary modes only). Callers use this to size the pre-allocated output buffers
+        /// for <see cref="ParseInto"/>. Zero for ASCII parsers, where byte-per-sample has no
+        /// fixed meaning.
+        /// </summary>
+        public int BytesPerSample
+        {
+            get { return _numberOfBytesPerSample; }
+        }
+
         public DataParser(int numberOfChannels, char frameEnd, char separator)
         {
             Mode = ParserMode.ASCII;
@@ -75,6 +86,111 @@ namespace PowerScope.Model
                 return ParseBinaryWithFrameStart(data);
             else
                 return ParseSimpleBinary(data);
+        }
+
+        /// <summary>
+        /// Zero-allocation parse path for the high-throughput acquisition loop (binary modes only).
+        ///
+        /// Instead of allocating a fresh double[][] and residue byte[] on every call — which at
+        /// 3 MBaud means continuous garbage on the read thread — this fills caller-owned buffers
+        /// in place. Callers (SerialDataStream, USBDataStream) allocate <paramref name="output"/> and
+        /// <paramref name="residueBuffer"/> once at startup and reuse them on every read.
+        ///
+        /// Sizing contract (caller's responsibility):
+        ///   output.Length          == NumberOfChannels
+        ///   output[ch].Length      >= data.Length / BytesPerSample   (worst case: simple binary, no residue)
+        ///   residueBuffer.Length    >= data.Length                    (residue can be the whole buffer when
+        ///                                                              no complete frame is found)
+        ///
+        /// On return:
+        ///   output[ch][0 .. returnValue)        — the valid samples for channel ch this call
+        ///   residueBuffer[0 .. residueLength)   — trailing bytes that did not form a complete sample/frame;
+        ///                                          the caller copies these to the front of its working buffer
+        ///                                          before the next read (same role as the old ParsedData.Residue)
+        ///
+        /// ASCII is intentionally NOT supported here. ASCII throughput is never the bottleneck (anyone
+        /// choosing ASCII has already traded away throughput), so it stays on the allocating ParseData()
+        /// path rather than complicating this method. Calling with Mode == ASCII throws.
+        /// </summary>
+        /// <param name="data">Raw bytes for this read cycle, with any prior residue already prepended.</param>
+        /// <param name="output">Caller-owned [channel][sample] output matrix; must be pre-sized (see contract).</param>
+        /// <param name="residueBuffer">Caller-owned buffer receiving the incomplete trailing bytes.</param>
+        /// <param name="residueLength">Number of valid bytes written to <paramref name="residueBuffer"/>.</param>
+        /// <returns>Number of complete samples written per channel.</returns>
+        public int ParseInto(Span<byte> data, double[][] output, byte[] residueBuffer, out int residueLength)
+        {
+            if (Mode == ParserMode.ASCII)
+                throw new InvalidOperationException("ParseInto supports binary modes only; use ParseData for ASCII.");
+
+            if (_usesFraming)
+                return ParseBinaryWithFrameStartInto(data, output, residueBuffer, out residueLength);
+            else
+                return ParseSimpleBinaryInto(data, output, residueBuffer, out residueLength);
+        }
+
+        private int ParseSimpleBinaryInto(Span<byte> data, double[][] output, byte[] residueBuffer, out int residueLength)
+        {
+            int numberOfLines = data.Length / _numberOfBytesPerSample;
+
+            for (int currentLine = 0; currentLine < numberOfLines; currentLine++)
+            {
+                for (int channel = 0; channel < NumberOfChannels; channel++)
+                {
+                    int offset = channel * _numberOfBytesPerChannel + currentLine * _numberOfBytesPerSample;
+                    output[channel][currentLine] = ReadBinaryValue(data, offset);
+                }
+            }
+
+            // Trailing bytes that did not complete a full sample become residue for the next read.
+            int processedBytes = numberOfLines * _numberOfBytesPerSample;
+            residueLength = data.Length - processedBytes;
+            if (residueLength > 0)
+                data.Slice(processedBytes, residueLength).CopyTo(residueBuffer);
+
+            return numberOfLines;
+        }
+
+        private int ParseBinaryWithFrameStartInto(Span<byte> data, double[][] output, byte[] residueBuffer, out int residueLength)
+        {
+            int sequenceLength = FrameStart.Length + _numberOfBytesPerSample;
+            int lineCount = 0;
+            int lastSequenceEnd = 0;
+
+            // Scan for frame starts and decode each complete sequence directly into the output buffers.
+            // Unlike ParseData's framed path this keeps no List<int> of offsets — we write samples as we find them.
+            int i = 0;
+            while (i <= data.Length - sequenceLength)
+            {
+                if (IsFrameStart(data, i))
+                {
+                    int dataStart = i + FrameStart.Length;
+                    for (int channel = 0; channel < NumberOfChannels; channel++)
+                    {
+                        int channelDataStart = dataStart + (channel * _numberOfBytesPerChannel);
+                        output[channel][lineCount] = ReadBinaryValue(data, channelDataStart);
+                    }
+
+                    lineCount++;
+                    i += sequenceLength;
+                    lastSequenceEnd = i;
+                }
+                else
+                {
+                    i++;
+                }
+            }
+
+            // Residue is everything after the last complete sequence; if none was found the whole
+            // buffer is residue (a frame start may still be completed by the next read).
+            if (lineCount > 0)
+                residueLength = data.Length - lastSequenceEnd;
+            else
+                residueLength = data.Length;
+
+            if (residueLength > 0)
+                data.Slice(data.Length - residueLength, residueLength).CopyTo(residueBuffer);
+
+            return lineCount;
         }
 
         private ParsedData ParseSimpleBinary(Span<byte> data)

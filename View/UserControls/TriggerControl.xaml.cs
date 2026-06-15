@@ -58,39 +58,28 @@ namespace PowerScope.View.UserControls
 
         private void TriggerControl_Loaded(object sender, RoutedEventArgs e)
         {
-            UpdateTriggerEdgeSelection();
+            UpdateTriggerChannelSelection();
         }
 
         private void TriggerControl_DataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
         {
-            // Unsubscribe from old settings
             if (e.OldValue is PlotSettings oldSettings)
             {
                 oldSettings.PropertyChanged -= Settings_PropertyChanged;
             }
 
-            // Subscribe to new settings
             if (e.NewValue is PlotSettings newSettings)
             {
                 newSettings.PropertyChanged += Settings_PropertyChanged;
-                UpdateTriggerEdgeSelection();
                 UpdateTriggerChannelSelection();
             }
         }
 
         private void Settings_PropertyChanged(object sender, PropertyChangedEventArgs e)
         {
-            if (e.PropertyName == nameof(PlotSettings.TriggerEdge))
-            {
-                UpdateTriggerEdgeSelection();
-            }
-            else if (e.PropertyName == nameof(PlotSettings.TriggerSourceChannel))
+            if (e.PropertyName == nameof(PlotSettings.TriggerSourceChannel))
             {
                 UpdateTriggerChannelSelection();
-            }
-            else if (e.PropertyName == nameof(PlotSettings.EnableEdgeTrigger))
-            {
-                UpdateTriggerEdgeSelection();
             }
         }
 
@@ -123,51 +112,6 @@ namespace PowerScope.View.UserControls
 
             // Directly set selected item to the trigger source channel (may be null)
             TriggerChannelComboBox.SelectedItem = Settings.TriggerSourceChannel;
-        }
-
-        /// <summary>
-        /// Updates the button selection based on trigger edge type
-        /// Only one button can be active at a time (radio-button style)
-        /// Active button is lime green, inactive buttons use default style
-        /// When trigger is disabled (Roll mode), no buttons are highlighted
-        /// </summary>
-        private void UpdateTriggerEdgeSelection()
-        {
-            if (Settings != null && RisingEdgeButton != null && AlternatingEdgeButton != null && FallingEdgeButton != null)
-            {
-                System.Windows.Media.Brush activeBrush = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Colors.LimeGreen);
-                System.Windows.Media.Brush inactiveBrush = (System.Windows.Media.Brush)FindResource("PlotSettings_TitleBarBrush");
-
-                if (!Settings.EnableEdgeTrigger)
-                {
-                    // Trigger mode is disabled (Roll mode active), no buttons should be highlighted
-                    RisingEdgeButton.Background = inactiveBrush;
-                    AlternatingEdgeButton.Background = inactiveBrush;
-                    FallingEdgeButton.Background = inactiveBrush;
-                    return;
-                }
-
-                switch (Settings.TriggerEdge)
-                {
-                    case TriggerEdgeType.Rising:
-                        RisingEdgeButton.Background = activeBrush;
-                        AlternatingEdgeButton.Background = inactiveBrush;
-                        FallingEdgeButton.Background = inactiveBrush;
-                        break;
-
-                    case TriggerEdgeType.Alternating:
-                        RisingEdgeButton.Background = inactiveBrush;
-                        AlternatingEdgeButton.Background = activeBrush;
-                        FallingEdgeButton.Background = inactiveBrush;
-                        break;
-
-                    case TriggerEdgeType.Falling:
-                        RisingEdgeButton.Background = inactiveBrush;
-                        AlternatingEdgeButton.Background = inactiveBrush;
-                        FallingEdgeButton.Background = activeBrush;
-                        break;
-                }
-            }
         }
 
         private void TriggerChannelComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)

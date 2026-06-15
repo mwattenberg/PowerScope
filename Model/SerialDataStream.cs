@@ -51,9 +51,22 @@ namespace PowerScope.Model
     public class SerialDataStream : IDataStream, IChannelConfigurable, IBufferResizable, IUpDownSampling
     {
         private readonly SerialPort _port;
-        private byte[] _residue;
         private readonly byte[] _readBuffer;
         private readonly byte[] _workingBuffer;
+
+        // Zero-allocation binary parse path (see DataParser.ParseInto).
+        // These are allocated once and reused on every read; only used when the parser is in a
+        // binary mode. ASCII parsers fall back to the allocating DataParser.ParseData path.
+        //   _parseOutput[channel][0.._parsedSampleCount)  — samples decoded by the last ParseInto call
+        //   _processedSamples[0.._parsedSampleCount)       — gain/offset/filter scratch, reused per channel
+        //   _residueBuffer[0.._residueLength)              — incomplete trailing bytes carried to the next read
+        // All three are written only on the background read thread.
+        private readonly bool _useFastBinaryPath;
+        private readonly double[][] _parseOutput;
+        private readonly double[] _processedSamples;
+        private readonly byte[] _residueBuffer;
+        private int _residueLength;
+
         private Thread _readSerialPortThread;
         private bool _disposed = false;
         private bool _isConnected;
@@ -213,7 +226,25 @@ namespace PowerScope.Model
             // Larger buffers for better performance
             _readBuffer = new byte[16384]; // Fixed 16KB chunks
             _workingBuffer = new byte[32768]; // Fixed 32KB working space
-            _residue = new byte[1024]; // Fixed 1KB residue
+
+            // Residue can be at most one full working buffer (when no complete frame is found).
+            _residueBuffer = new byte[_workingBuffer.Length];
+            _residueLength = 0;
+
+            // Pre-allocate the zero-allocation parse buffers for binary parsers. Worst case is one
+            // full working buffer of the smallest sample, so size to (working buffer / bytes-per-sample).
+            _useFastBinaryPath = Parser.Mode == DataParser.ParserMode.Binary;
+            if (_useFastBinaryPath)
+            {
+                int maxSamplesPerBatch = (_workingBuffer.Length / Parser.BytesPerSample) + 1;
+                _parseOutput = new double[ChannelCount][];
+                for (int channel = 0; channel < ChannelCount; channel++)
+                {
+                    _parseOutput[channel] = new double[maxSamplesPerBatch];
+                }
+                _processedSamples = new double[maxSamplesPerBatch];
+            }
+
             _isConnected = false;
             _isStreaming = false;
             StatusMessage = "Disconnected";
@@ -548,6 +579,7 @@ namespace PowerScope.Model
             }
             TotalSamples = 0;
             TotalBits = 0;
+            _residueLength = 0;
 
             // Reset sample rate calculation when clearing data
             lock (_sampleRateCalculationLock)
@@ -689,120 +721,173 @@ namespace PowerScope.Model
             int totalDataLength = bytesRead;
             int workingBufferOffset = 0;
 
-            // Handle residue from previous processing
-            if (_residue != null && _residue.Length > 0)
+            // Prepend the unparsed tail from the previous read so samples/frames spanning a read
+            // boundary are reassembled before parsing. Residue lives in _residueBuffer[0.._residueLength).
+            if (_residueLength > 0)
             {
-                // Check if residue + new data will fit in working buffer
-                if (_residue.Length + bytesRead > workingBuffer.Length)
+                if (_residueLength + bytesRead > workingBuffer.Length)
                 {
-                    // Residue is too large - this indicates a parsing problem
-                    // Reset residue and start fresh with just the new data
-                    _residue = null;
-                    workingBufferOffset = 0;
-                    totalDataLength = bytesRead;
+                    // Residue + new data would overflow the working buffer — drop residue and resync.
+                    _residueLength = 0;
                 }
                 else
                 {
-                    _residue.CopyTo(workingBuffer, 0);
-                    workingBufferOffset = _residue.Length;
-                    totalDataLength += _residue.Length;
+                    Array.Copy(_residueBuffer, 0, workingBuffer, 0, _residueLength);
+                    workingBufferOffset = _residueLength;
+                    totalDataLength += _residueLength;
                 }
             }
 
-            // Copy new data to working buffer
+            // Copy new data to working buffer, after any prepended residue
             Array.Copy(readBuffer, 0, workingBuffer, workingBufferOffset, bytesRead);
 
             try
             {
-                ParsedData parsedData = Parser.ParseData(workingBuffer.AsSpan(0, totalDataLength));
-                _residue = parsedData.Residue;
-
-                // Prevent residue from growing too large (safety check)
-                if (_residue != null && _residue.Length > workingBuffer.Length / 2)
+                if (_useFastBinaryPath)
                 {
-                    // If residue is more than half the working buffer, something is wrong
-                    // Reset to prevent future overflows
-                    _residue = null;
+                    // Zero-allocation path: ParseInto fills _parseOutput and refills _residueBuffer in place.
+                    int sampleCount = Parser.ParseInto(
+                        workingBuffer.AsSpan(0, totalDataLength),
+                        _parseOutput,
+                        _residueBuffer,
+                        out _residueLength);
+
+                    // Safety: a runaway residue (more than half the buffer) indicates a format mismatch.
+                    if (_residueLength > workingBuffer.Length / 2)
+                        _residueLength = 0;
+
+                    if (sampleCount > 0)
+                        AddProcessedToRingBuffers(sampleCount);
                 }
-
-                if (parsedData.Data != null)
+                else
                 {
-                    AddDataToRingBuffers(parsedData.Data);
+                    // Legacy allocating path for ASCII (not throughput-critical). ParseData returns a
+                    // freshly allocated double[][] and residue byte[]; copy the residue into our reusable
+                    // buffer so the prepend logic above stays uniform across both paths.
+                    ParsedData parsedData = Parser.ParseData(workingBuffer.AsSpan(0, totalDataLength));
+
+                    _residueLength = 0;
+                    if (parsedData.Residue != null &&
+                        parsedData.Residue.Length > 0 &&
+                        parsedData.Residue.Length <= workingBuffer.Length / 2)
+                    {
+                        _residueLength = parsedData.Residue.Length;
+                        Array.Copy(parsedData.Residue, 0, _residueBuffer, 0, _residueLength);
+                    }
+
+                    if (parsedData.Data != null)
+                        AddDataToRingBuffers(parsedData.Data);
                 }
             }
             catch (Exception)
             {
                 // Parser failed - reset residue to recover
-                _residue = null;
+                _residueLength = 0;
             }
         }
 
+        /// <summary>
+        /// Hot-path consumer for the zero-allocation binary parse. Applies gain/offset/filter to the
+        /// freshly decoded samples in <see cref="_parseOutput"/> and pushes them to the ring buffers.
+        ///
+        /// <see cref="_processedSamples"/> is reused across channels rather than allocated per call.
+        /// This is safe because (1) each channel is fully processed and pushed before the next channel
+        /// overwrites the buffer, and (2) IDigitalFilter.Filter() is sample-by-sample — the filter owns
+        /// its own history, so we never need the whole input window resident at once (no block convolution).
+        ///
+        /// Up/down sampling, when enabled, still allocates inside UpDownSampling. That is an optional,
+        /// non-default feature, so it is intentionally left on the allocating path.
+        /// </summary>
+        /// <param name="sampleCount">Number of valid samples per channel in _parseOutput.</param>
+        private void AddProcessedToRingBuffers(int sampleCount)
+        {
+            int producedSamples = sampleCount;
+
+            for (int channel = 0; channel < ChannelCount; channel++)
+            {
+                double[] rawSamples = _parseOutput[channel];
+                for (int sample = 0; sample < sampleCount; sample++)
+                {
+                    double processed = ApplyChannelProcessing(channel, rawSamples[sample]);
+                    if (!double.IsFinite(processed))
+                        processed = 0.0; // Replace NaN/Infinity with zero
+                    _processedSamples[sample] = processed;
+                }
+
+                if (_upDownSampling.IsEnabled)
+                {
+                    // Optional resampling allocates a right-sized block; copy the live range first.
+                    double[] block = new double[sampleCount];
+                    Array.Copy(_processedSamples, 0, block, 0, sampleCount);
+
+                    double[] resampled = _upDownSampling.ProcessChannelData(channel, block);
+                    for (int i = 0; i < resampled.Length; i++)
+                    {
+                        if (!double.IsFinite(resampled[i]))
+                            resampled[i] = 0.0;
+                    }
+
+                    ReceivedData[channel].AddRange(resampled, resampled.Length);
+                    if (channel == 0)
+                        producedSamples = resampled.Length;
+                }
+                else
+                {
+                    ReceivedData[channel].AddRange(_processedSamples, sampleCount);
+                }
+            }
+
+            // Bookkeeping uses the final per-channel count (after optional resampling).
+            TotalSamples += producedSamples;
+            UpdateSampleRateCalculation(producedSamples);
+        }
+
+        /// <summary>
+        /// Legacy allocating consumer used only by the ASCII path. Mirrors <see cref="AddProcessedToRingBuffers"/>
+        /// but takes the freshly allocated double[][] from <see cref="DataParser.ParseData"/>.
+        /// </summary>
         private void AddDataToRingBuffers(double[][] parsedData)
         {
             int channelsToProcess = parsedData.Length;
             if (channelsToProcess > Parser.NumberOfChannels)
                 channelsToProcess = Parser.NumberOfChannels;
 
-            // Pre-allocate arrays for parallel processing
-            double[][] finalData = new double[channelsToProcess][];
+            int producedSamples = 0;
 
-            // Process all channels in parallel - same pattern as DemoDataStream
-            Parallel.For(0, channelsToProcess, channel =>
-            {
-                if (parsedData[channel] != null && parsedData[channel].Length > 0)
-                {
-                    // Apply channel processing (gain, offset, filtering) to each sample
-                    double[] channelProcessedSamples = new double[parsedData[channel].Length];
-                    for (int sample = 0; sample < parsedData[channel].Length; sample++)
-                    {
-                        double processedSample = ApplyChannelProcessing(channel, parsedData[channel][sample]);
-
-                        // Safety check for invalid values
-                        if (!double.IsFinite(processedSample))
-                        {
-                            processedSample = 0.0; // Replace NaN/Infinity with zero
-                        }
-
-                        channelProcessedSamples[sample] = processedSample;
-                    }
-
-                    // Apply up/down sampling per channel if enabled
-                    double[] channelFinalData = channelProcessedSamples;
-                    if (_upDownSampling.IsEnabled)
-                    {
-                        channelFinalData = _upDownSampling.ProcessChannelData(channel, channelProcessedSamples);
-
-                        // Safety check for up/down sampled data
-                        for (int i = 0; i < channelFinalData.Length; i++)
-                        {
-                            if (!double.IsFinite(channelFinalData[i]))
-                            {
-                                channelFinalData[i] = 0.0; // Replace NaN/Infinity with zero
-                            }
-                        }
-                    }
-
-                    finalData[channel] = channelFinalData;
-                }
-            });
-
-            // Add processed data to ring buffers
             for (int channel = 0; channel < channelsToProcess; channel++)
             {
-                if (finalData[channel] != null)
+                if (parsedData[channel] == null || parsedData[channel].Length == 0)
+                    continue;
+
+                double[] channelProcessedSamples = new double[parsedData[channel].Length];
+                for (int sample = 0; sample < parsedData[channel].Length; sample++)
                 {
-                    ReceivedData[channel].AddRange(finalData[channel]);
+                    double processedSample = ApplyChannelProcessing(channel, parsedData[channel][sample]);
+                    if (!double.IsFinite(processedSample))
+                        processedSample = 0.0;
+                    channelProcessedSamples[sample] = processedSample;
                 }
+
+                double[] channelFinalData = channelProcessedSamples;
+                if (_upDownSampling.IsEnabled)
+                {
+                    channelFinalData = _upDownSampling.ProcessChannelData(channel, channelProcessedSamples);
+                    for (int i = 0; i < channelFinalData.Length; i++)
+                    {
+                        if (!double.IsFinite(channelFinalData[i]))
+                            channelFinalData[i] = 0.0;
+                    }
+                }
+
+                ReceivedData[channel].AddRange(channelFinalData, channelFinalData.Length);
+                if (channel == 0)
+                    producedSamples = channelFinalData.Length;
             }
 
-            if (channelsToProcess > 0 && parsedData[0] != null)
+            if (producedSamples > 0)
             {
-                // Calculate final sample count based on final data (after up/down sampling)
-                int actualSamplesGenerated = finalData[0]?.Length ?? parsedData[0].Length;
-                TotalSamples += actualSamplesGenerated;
-
-                // Update sample rate calculation
-                UpdateSampleRateCalculation(actualSamplesGenerated);
+                TotalSamples += producedSamples;
+                UpdateSampleRateCalculation(producedSamples);
             }
         }
 
@@ -883,7 +968,7 @@ namespace PowerScope.Model
                 _upDownSampling.PropertyChanged -= OnUpDownSamplingPropertyChanged;
             }
 
-            _residue = null;
+            _residueLength = 0;
             _disposed = true;
             GC.SuppressFinalize(this);
         }

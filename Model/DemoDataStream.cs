@@ -23,6 +23,11 @@ namespace PowerScope.Model
         private double _timeAccumulator = 0;
         private Random _random = new Random();
 
+        // Reusable [channel][sample] generation buffer, allocated once per streaming session in
+        // StartStreaming (the chunk size is fixed for the session). Avoids allocating fresh arrays
+        // on every timer tick. Only written on the timer thread, guarded by _dataLock.
+        private double[][] _generationBuffer;
+
         // Channel-specific processing
         private ChannelSettings[] _channelSettings;
         private IDigitalFilter[] _channelFilters;
@@ -336,7 +341,14 @@ namespace PowerScope.Model
             // Generate data in chunks of ~100 samples at a time for smooth streaming
             int samplesPerChunk = Math.Max(1, DemoSettings.SampleRate / 100);
             int timerInterval = Math.Max(1, (samplesPerChunk * 1000) / DemoSettings.SampleRate);
-            
+
+            // Allocate the reusable generation buffer for this session's fixed chunk size.
+            _generationBuffer = new double[ChannelCount][];
+            for (int channel = 0; channel < ChannelCount; channel++)
+            {
+                _generationBuffer[channel] = new double[samplesPerChunk];
+            }
+
             _dataGenerationTimer = new Timer(GenerateData, samplesPerChunk, 0, timerInterval);
         }
 
@@ -357,74 +369,62 @@ namespace PowerScope.Model
                 return;
 
             int samplesPerChunk = (int)state;
-            double[][] newData = new double[ChannelCount][];
-            double[][] finalData = new double[ChannelCount][];
-            
+
             lock (_dataLock)
             {
-                // Pre-allocate arrays
-                for (int channel = 0; channel < ChannelCount; channel++)
-                {
-                    newData[channel] = new double[samplesPerChunk];
-                }
-                
-                // Generate, process, and apply up/down sampling for all channels in parallel
+                double[][] buffer = _generationBuffer;
+                int producedSamples = samplesPerChunk;
+
+                // Generate raw samples and apply channel processing for all channels in parallel,
+                // writing into the reusable per-channel buffers (each channel owns its own row).
                 Parallel.For(0, ChannelCount, channel =>
                 {
-                    // Generate raw samples for this channel
+                    double[] dest = buffer[channel];
                     for (int sample = 0; sample < samplesPerChunk; sample++)
                     {
                         double time = _timeAccumulator + (double)sample / DemoSettings.SampleRate;
                         double rawSample = GenerateSampleForChannel(channel, time);
-                        
-                        // Apply channel-specific processing (gain, offset, filtering)
-                        double processedSample = ApplyChannelProcessing(channel, rawSample);
-                        newData[channel][sample] = processedSample;
+                        dest[sample] = ApplyChannelProcessing(channel, rawSample);
                     }
-                    
-                    // Apply up/down sampling per channel if enabled
-                    double[] channelFinalData = newData[channel];
+                });
+
+                // Update time accumulator based on original sample rate
+                _timeAccumulator += (double)samplesPerChunk / DemoSettings.SampleRate;
+
+                // Push to ring buffers. The common path reuses the buffer; optional up/down sampling
+                // allocates a right-sized block (non-default feature, left on the allocating path).
+                for (int channel = 0; channel < ChannelCount; channel++)
+                {
                     if (_upDownSampling.IsEnabled)
                     {
+                        double[] resampled;
                         try
                         {
-                            channelFinalData = _upDownSampling.ProcessChannelData(channel, newData[channel]);
-                            
-                            // Safety check for up/down sampled data
-                            for (int i = 0; i < channelFinalData.Length; i++)
+                            resampled = _upDownSampling.ProcessChannelData(channel, buffer[channel]);
+                            for (int i = 0; i < resampled.Length; i++)
                             {
-                                if (!double.IsFinite(channelFinalData[i]))
-                                {
-                                    channelFinalData[i] = 0.0; // Replace NaN/Infinity with zero
-                                }
+                                if (!double.IsFinite(resampled[i]))
+                                    resampled[i] = 0.0; // Replace NaN/Infinity with zero
                             }
                         }
                         catch (Exception)
                         {
-                            // If up/down sampling fails, fall back to processed samples
-                            channelFinalData = newData[channel];
+                            resampled = buffer[channel]; // Fall back to processed samples
                         }
+
+                        ReceivedData[channel].AddRange(resampled, resampled.Length);
+                        if (channel == 0)
+                            producedSamples = resampled.Length;
                     }
-                    
-                    finalData[channel] = channelFinalData;
-                });
-                
-                // Update time accumulator based on original sample rate
-                _timeAccumulator += (double)samplesPerChunk / DemoSettings.SampleRate;
-                
-                // Add processed data to ring buffers
-                for (int channel = 0; channel < ChannelCount; channel++)
-                {
-                    if (finalData[channel] != null)
+                    else
                     {
-                        ReceivedData[channel].AddRange(finalData[channel]);
+                        ReceivedData[channel].AddRange(buffer[channel], samplesPerChunk);
                     }
                 }
-                
+
                 // Update statistics based on final data (after up/down sampling)
-                int actualSamplesGenerated = finalData[0]?.Length ?? samplesPerChunk;
-                TotalSamples += actualSamplesGenerated;
-                TotalBits += actualSamplesGenerated * ChannelCount * 16; // Assume 16 bits per sample
+                TotalSamples += producedSamples;
+                TotalBits += producedSamples * ChannelCount * 16; // Assume 16 bits per sample
             }
         }
 

@@ -28,6 +28,16 @@ namespace PowerScope.Model
         private RingBuffer<double>[] ReceivedData { get; set; }
         private readonly object _dataLock = new object();
 
+        // Reusable conversion/processing buffers, grown on demand. WASAPI delivers variable-size
+        // blocks, so these are sized to the largest block seen so far and reused on subsequent
+        // callbacks instead of allocating per callback. Written only on the audio callback thread
+        // (guarded by _dataLock).
+        //   _audioChannelData[channel][0..samples)  — raw samples after format conversion
+        //   _audioProcessed[0..samples)              — gain/offset/filter scratch, reused per channel
+        private double[][] _audioChannelData;
+        private double[] _audioProcessed;
+        private int _audioBufferCapacity;
+
         // Channel-specific processing
         private ChannelSettings[] _channelSettings;
         private IDigitalFilter[] _channelFilters;
@@ -365,14 +375,11 @@ namespace PowerScope.Model
 
             lock (_dataLock)
             {
-                // Pre-allocate arrays for each channel
-                double[][] channelData = new double[_channelCount][];
-                for (int ch = 0; ch < _channelCount; ch++)
-                {
-                    channelData[ch] = new double[samplesRecorded];
-                }
+                // Ensure the reusable buffers are large enough for this block, then convert + separate
+                // channels into them.
+                EnsureAudioBuffers(samplesRecorded);
+                double[][] channelData = _audioChannelData;
 
-                // Convert audio samples to double and separate channels
                 switch (format.BitsPerSample)
                 {
                     case 16:
@@ -393,34 +400,62 @@ namespace PowerScope.Model
                         break;
                 }
 
-                // Apply channel processing and up/down sampling, then add to ring buffers
-                double[][] finalData = new double[_channelCount][];
-
+                // Apply channel processing and up/down sampling, then add to ring buffers.
+                // _audioProcessed is reused across channels (each channel is pushed before the next
+                // overwrites it; filters are sample-by-sample and own their history).
+                int producedSamples = samplesRecorded;
                 for (int ch = 0; ch < _channelCount; ch++)
                 {
-                    // Apply channel processing (gain, offset, filtering) to each sample
-                    double[] channelProcessedSamples = new double[samplesRecorded];
                     for (int s = 0; s < samplesRecorded; s++)
                     {
-                        channelProcessedSamples[s] = ApplyChannelProcessing(ch, channelData[ch][s]);
+                        _audioProcessed[s] = ApplyChannelProcessing(ch, channelData[ch][s]);
                     }
 
-                    // Apply up/down sampling per channel if enabled
-                    double[] channelFinalData = channelProcessedSamples;
                     if (_upDownSampling.IsEnabled)
                     {
-                        channelFinalData = _upDownSampling.ProcessChannelData(ch, channelProcessedSamples);
-                    }
+                        // Optional resampling allocates a right-sized block; copy the live range first.
+                        double[] block = new double[samplesRecorded];
+                        Array.Copy(_audioProcessed, 0, block, 0, samplesRecorded);
 
-                    finalData[ch] = channelFinalData;
-                    ReceivedData[ch].AddRange(channelFinalData);
+                        double[] resampled = _upDownSampling.ProcessChannelData(ch, block);
+                        ReceivedData[ch].AddRange(resampled, resampled.Length);
+                        if (ch == 0)
+                            producedSamples = resampled.Length;
+                    }
+                    else
+                    {
+                        ReceivedData[ch].AddRange(_audioProcessed, samplesRecorded);
+                    }
                 }
 
                 // Update statistics based on final processed data
-                int actualSamplesGenerated = finalData[0].Length;
-                TotalSamples += actualSamplesGenerated;
+                TotalSamples += producedSamples;
                 TotalBits += bytesRecorded * 8;
             }
+        }
+
+        /// <summary>
+        /// Ensures <see cref="_audioChannelData"/> and <see cref="_audioProcessed"/> can hold a block of
+        /// <paramref name="samplesRecorded"/> samples per channel. Reallocates (growing only) when the
+        /// current capacity is too small or the channel count changed; otherwise reuses the buffers.
+        /// </summary>
+        private void EnsureAudioBuffers(int samplesRecorded)
+        {
+            if (_audioChannelData != null &&
+                _audioChannelData.Length == _channelCount &&
+                _audioBufferCapacity >= samplesRecorded)
+            {
+                return;
+            }
+
+            int capacity = Math.Max(samplesRecorded, _audioBufferCapacity);
+            _audioChannelData = new double[_channelCount][];
+            for (int ch = 0; ch < _channelCount; ch++)
+            {
+                _audioChannelData[ch] = new double[capacity];
+            }
+            _audioProcessed = new double[capacity];
+            _audioBufferCapacity = capacity;
         }
 
         private void ProcessInt16Samples(byte[] buffer, int bytesRecorded, int channels, double[][] channelData)

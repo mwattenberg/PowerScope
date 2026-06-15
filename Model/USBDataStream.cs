@@ -70,7 +70,20 @@ namespace PowerScope.Model
         // Data processing
         private byte[] _readBuffer;      // raw USB read chunk
         private byte[] _workingBuffer;   // residue + new bytes, handed to DataParser
-        private byte[] _residue;         // unparsed tail carried to the next read
+
+        // Zero-allocation binary parse path (see DataParser.ParseInto). Allocated once and reused on
+        // every read; only used when the parser is in a binary mode (USB streams are binary in practice).
+        // ASCII parsers fall back to the allocating DataParser.ParseData path.
+        //   _parseOutput[channel][0.._sampleCount)  — samples decoded by the last ParseInto call
+        //   _processedSamples[0.._sampleCount)        — gain/offset/filter scratch, reused per channel
+        //   _residueBuffer[0.._residueLength)         — incomplete trailing bytes carried to the next read
+        // All three are written only on the USB read thread.
+        private readonly bool _useFastBinaryPath;
+        private double[][] _parseOutput;
+        private double[] _processedSamples;
+        private byte[] _residueBuffer;
+        private int _residueLength;
+
         private Thread _readUsbThread;
         private bool _disposed = false;
         private bool _isConnected;
@@ -312,7 +325,24 @@ namespace PowerScope.Model
             // so it is sized larger than _readBuffer.
             _readBuffer = new byte[64 * 1024];      // 64KB USB read chunk
             _workingBuffer = new byte[128 * 1024];  // residue + new data assembly space
-            _residue = null;
+
+            // Residue can be at most one full working buffer (when no complete frame is found).
+            _residueBuffer = new byte[_workingBuffer.Length];
+            _residueLength = 0;
+
+            // Pre-allocate the zero-allocation parse buffers for binary parsers. Worst case is one
+            // full working buffer of the smallest sample, so size to (working buffer / bytes-per-sample).
+            _useFastBinaryPath = Parser.Mode == DataParser.ParserMode.Binary;
+            if (_useFastBinaryPath)
+            {
+                int maxSamplesPerBatch = (_workingBuffer.Length / Parser.BytesPerSample) + 1;
+                _parseOutput = new double[dataParser.NumberOfChannels][];
+                for (int channel = 0; channel < dataParser.NumberOfChannels; channel++)
+                {
+                    _parseOutput[channel] = new double[maxSamplesPerBatch];
+                }
+                _processedSamples = new double[maxSamplesPerBatch];
+            }
 
             _isConnected = false;
             _isStreaming = false;
@@ -599,7 +629,7 @@ namespace PowerScope.Model
             Interlocked.Exchange(ref _totalSamples, 0);
             Interlocked.Exchange(ref _totalBits, 0);
             Interlocked.Exchange(ref _totalFrames, 0);
-            _residue = null;
+            _residueLength = 0;
             lock (_metricsLock)
             {
                 _pendingSampleCount = 0;
@@ -723,22 +753,20 @@ namespace PowerScope.Model
             int totalDataLength = bytesRead;
             int workingBufferOffset = 0;
 
-            // Prepend the unparsed tail from the previous read so frames spanning a
-            // read boundary are reassembled before parsing.
-            if (_residue != null && _residue.Length > 0)
+            // Prepend the unparsed tail from the previous read so frames spanning a read boundary are
+            // reassembled before parsing. Residue lives in _residueBuffer[0.._residueLength).
+            if (_residueLength > 0)
             {
-                if (_residue.Length + bytesRead > _workingBuffer.Length)
+                if (_residueLength + bytesRead > _workingBuffer.Length)
                 {
                     // Residue unexpectedly large — drop it and resync on the fresh data.
-                    _residue = null;
-                    workingBufferOffset = 0;
-                    totalDataLength = bytesRead;
+                    _residueLength = 0;
                 }
                 else
                 {
-                    _residue.CopyTo(_workingBuffer, 0);
-                    workingBufferOffset = _residue.Length;
-                    totalDataLength += _residue.Length;
+                    Array.Copy(_residueBuffer, 0, _workingBuffer, 0, _residueLength);
+                    workingBufferOffset = _residueLength;
+                    totalDataLength += _residueLength;
                 }
             }
 
@@ -746,23 +774,80 @@ namespace PowerScope.Model
 
             try
             {
-                ParsedData parsedData = Parser.ParseData(_workingBuffer.AsSpan(0, totalDataLength));
-                _residue = parsedData.Residue;
+                if (_useFastBinaryPath)
+                {
+                    // Zero-allocation path: ParseInto fills _parseOutput and refills _residueBuffer in place.
+                    int sampleCount = Parser.ParseInto(
+                        _workingBuffer.AsSpan(0, totalDataLength),
+                        _parseOutput,
+                        _residueBuffer,
+                        out _residueLength);
 
-                // Safety: never let residue grow unbounded (indicates a sync/format mismatch).
-                if (_residue != null && _residue.Length > _workingBuffer.Length / 2)
-                    _residue = null;
+                    // Safety: never let residue grow unbounded (indicates a sync/format mismatch).
+                    if (_residueLength > _workingBuffer.Length / 2)
+                        _residueLength = 0;
 
-                if (parsedData.Data != null)
-                    AddDataToRingBuffers(parsedData.Data);
+                    if (sampleCount > 0)
+                        AddProcessedToRingBuffers(sampleCount);
+                }
+                else
+                {
+                    // Legacy allocating path for ASCII (not throughput-critical). Copy ParseData's residue
+                    // into our reusable buffer so the prepend logic above stays uniform across both paths.
+                    ParsedData parsedData = Parser.ParseData(_workingBuffer.AsSpan(0, totalDataLength));
+
+                    _residueLength = 0;
+                    if (parsedData.Residue != null &&
+                        parsedData.Residue.Length > 0 &&
+                        parsedData.Residue.Length <= _workingBuffer.Length / 2)
+                    {
+                        _residueLength = parsedData.Residue.Length;
+                        Array.Copy(parsedData.Residue, 0, _residueBuffer, 0, _residueLength);
+                    }
+
+                    if (parsedData.Data != null)
+                        AddDataToRingBuffers(parsedData.Data);
+                }
             }
             catch (Exception)
             {
                 // Parser failure — drop residue to recover on the next read.
-                _residue = null;
+                _residueLength = 0;
             }
         }
 
+        /// <summary>
+        /// Hot-path consumer for the zero-allocation binary parse. Applies gain/offset/filter to the
+        /// freshly decoded samples in <see cref="_parseOutput"/> and pushes them to the ring buffers.
+        ///
+        /// <see cref="_processedSamples"/> is reused across channels rather than allocated per call.
+        /// This is safe because (1) each channel is fully processed and pushed before the next channel
+        /// overwrites the buffer, and (2) IDigitalFilter.Filter() is sample-by-sample — the filter owns
+        /// its own history, so we never need the whole input window resident at once (no block convolution).
+        /// </summary>
+        /// <param name="sampleCount">Number of valid samples per channel in _parseOutput.</param>
+        private void AddProcessedToRingBuffers(int sampleCount)
+        {
+            for (int channel = 0; channel < ChannelCount; channel++)
+            {
+                double[] rawSamples = _parseOutput[channel];
+                for (int sample = 0; sample < sampleCount; sample++)
+                {
+                    _processedSamples[sample] = ApplyChannelProcessing(channel, rawSamples[sample]);
+                }
+
+                ReceivedData[channel].AddRange(_processedSamples, sampleCount);
+            }
+
+            Interlocked.Add(ref _totalSamples, sampleCount);
+            Interlocked.Add(ref _totalFrames, sampleCount);
+            UpdateStreamingMetrics(sampleCount);
+        }
+
+        /// <summary>
+        /// Legacy allocating consumer used only by the ASCII path. Mirrors <see cref="AddProcessedToRingBuffers"/>
+        /// but takes the freshly allocated double[][] from <see cref="DataParser.ParseData"/>.
+        /// </summary>
         private void AddDataToRingBuffers(double[][] parsedData)
         {
             int channelsToProcess = Math.Min(parsedData.Length, Parser.NumberOfChannels);
@@ -771,15 +856,13 @@ namespace PowerScope.Model
             {
                 if (parsedData[channel] != null && parsedData[channel].Length > 0)
                 {
-                    // Apply channel processing (gain, offset, filtering) to each sample
                     double[] processedSamples = new double[parsedData[channel].Length];
                     for (int sample = 0; sample < parsedData[channel].Length; sample++)
                     {
                         processedSamples[sample] = ApplyChannelProcessing(channel, parsedData[channel][sample]);
                     }
 
-                    // Add processed data to ring buffer
-                    ReceivedData[channel].AddRange(processedSamples);
+                    ReceivedData[channel].AddRange(processedSamples, processedSamples.Length);
                 }
             }
 

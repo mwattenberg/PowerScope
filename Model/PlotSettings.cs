@@ -319,9 +319,6 @@ namespace PowerScope.Model
                 {
                     _enableEdgeTrigger = value;
                     OnPropertyChanged(nameof(EnableEdgeTrigger));
-                    // Notify button color properties
-                    OnPropertyChanged(nameof(NormalModeButtonBackground));
-                    OnPropertyChanged(nameof(SingleModeButtonBackground));
                 }
             }
         }
@@ -385,9 +382,6 @@ namespace PowerScope.Model
                 {
                     _singleShotMode = value;
                     OnPropertyChanged(nameof(SingleShotMode));
-                    // Notify button color properties
-                    OnPropertyChanged(nameof(NormalModeButtonBackground));
-                    OnPropertyChanged(nameof(SingleModeButtonBackground));
                 }
             }
         }
@@ -463,51 +457,11 @@ namespace PowerScope.Model
         /// </summary>
         public double TimerInterval => 1000.0 / PlotUpdateRateFPS;
 
-        #region Trigger Mode Button Colors (Computed Properties for MVVM)
+        #region Trigger Mode Button Colors
 
-        /// <summary>
-        /// Gets the background brush for the Normal trigger mode button.
-        /// LimeGreen when NOT single-shot AND trigger enabled, DarkGray otherwise.
-        /// </summary>
-        public System.Windows.Media.Brush NormalModeButtonBackground
-        {
-            get
-            {
-                if (!_enableEdgeTrigger)
-                {
-                    // Return the default button background from global style
-                    return (System.Windows.Media.Brush)System.Windows.Application.Current.Resources["PlotSettings_TitleBarBrush"] 
-                        ?? new System.Windows.Media.SolidColorBrush(System.Windows.Media.Colors.DarkGray);
-                }
-
-                return !_singleShotMode
-                    ? new System.Windows.Media.SolidColorBrush(System.Windows.Media.Colors.LimeGreen)
-                    : (System.Windows.Media.Brush)System.Windows.Application.Current.Resources["PlotSettings_TitleBarBrush"]
-                        ?? new System.Windows.Media.SolidColorBrush(System.Windows.Media.Colors.DarkGray);
-            }
-        }
-
-        /// <summary>
-        /// Gets the background brush for the Single trigger mode button.
-        /// LimeGreen when single-shot AND trigger enabled, DarkGray otherwise.
-        /// </summary>
-        public System.Windows.Media.Brush SingleModeButtonBackground
-        {
-            get
-            {
-                if (!_enableEdgeTrigger)
-                {
-                    // Return the default button background from global style
-                    return (System.Windows.Media.Brush)System.Windows.Application.Current.Resources["PlotSettings_TitleBarBrush"]
-                        ?? new System.Windows.Media.SolidColorBrush(System.Windows.Media.Colors.DarkGray);
-                }
-
-                return _singleShotMode
-                    ? new System.Windows.Media.SolidColorBrush(System.Windows.Media.Colors.LimeGreen)
-                    : (System.Windows.Media.Brush)System.Windows.Application.Current.Resources["PlotSettings_TitleBarBrush"]
-                        ?? new System.Windows.Media.SolidColorBrush(System.Windows.Media.Colors.DarkGray);
-            }
-        }
+        // ButtonBackground values are now handled via DataTriggers in TriggerControl.xaml
+        // based on EnableEdgeTrigger and SingleShotMode boolean properties.
+        // This removes Model dependency on WPF resources and improves testability.
 
         #endregion
 

@@ -7,8 +7,9 @@
              FontFamily="{DynamicResource {x:Static SystemFonts.MessageFontFamily}}"
              FontSize="{DynamicResource {x:Static SystemFonts.MessageFontSize}}">
     <UserControl.Resources>
-        <!-- Value converter -->
+        <!-- Value converters -->
         <converters:ColorToBrushConverter x:Key="ColorToBrushConverter"/>
+        <converters:ChannelColorBarBrushConverter x:Key="ChannelColorBarBrushConverter"/>
         <converters:ExponentialNotationConverter x:Key="ExponentialNotationConverter"/>
 
         <!-- Use global button style -->
@@ -135,6 +136,14 @@
         </Grid.RowDefinitions>
         <!-- Top color bar with channel label and play/pause button -->
         <Border x:Name="TopColorBar" Grid.Row="0" CornerRadius="3" Height="20">
+            <Border.Background>
+                <MultiBinding Converter="{StaticResource ChannelColorBarBrushConverter}">
+                    <Binding Path="DisplayColor"/>
+                    <Binding Path="IsVirtual"/>
+                    <Binding Path="ParentChannelA"/>
+                    <Binding Path="ParentChannelB"/>
+                </MultiBinding>
+            </Border.Background>
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="20"/>
@@ -212,12 +221,34 @@
                 <RowDefinition Height="*"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
-            <!-- Filters button -->
+            <!-- Filters button — green when a filter is active -->
             <Button x:Name="ButtonFilters" Grid.Row="0" Content="Filters" Margin="0,0,0,2"
-                    Style="{StaticResource SecondaryButtonStyle}" Click="ButtonFilters_Click"/>
-            <!-- Measure button -->
+                    Click="ButtonFilters_Click">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
+                        <Setter Property="Background" Value="{DynamicResource PlotSettings_TextBoxBackgroundBrush}"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding HasFilter}" Value="True">
+                                <Setter Property="Background" Value="LimeGreen"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+            <!-- Measure button — green when measurements are active -->
             <Button x:Name="ButtonMeasure" Grid.Row="1" Content="Measure" Margin="0,2,0,0"
-                    Style="{StaticResource SecondaryButtonStyle}" Click="ButtonMeasure_Click"/>
+                    Click="ButtonMeasure_Click">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
+                        <Setter Property="Background" Value="{DynamicResource PlotSettings_TextBoxBackgroundBrush}"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding HasMeasurements}" Value="True">
+                                <Setter Property="Background" Value="LimeGreen"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
         </Grid>
     </Grid>
 </UserControl>

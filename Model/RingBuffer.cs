@@ -1,10 +1,8 @@
 ﻿using System;
-using System.Collections;
-using System.Collections.Generic;
 
 namespace PowerScope.Model
 {
-    public class RingBuffer<T> : IEnumerable<T>
+    public class RingBuffer<T>
     {
         private T[] _buffer;
         private readonly int _capacity;
@@ -82,18 +80,30 @@ namespace PowerScope.Model
             }
         }
 
-        public IEnumerable<T> GetLatest(int count)
+        /// <summary>
+        /// Adds the first <paramref name="count"/> elements of <paramref name="source"/> without
+        /// allocating an enumerator or a right-sized copy. Used by the zero-allocation acquisition
+        /// path, where the producer fills a reusable scratch buffer larger than the live sample run.
+        /// </summary>
+        /// <param name="source">Backing array holding the samples to add.</param>
+        /// <param name="count">Number of leading elements of <paramref name="source"/> to add.</param>
+        public void AddRange(T[] source, int count)
         {
-            if (count <= 0)
-                yield break;
-
             lock (_lock)
             {
-                int actualCount = Math.Min(count, _count);
-                for (int i = 0; i < actualCount; i++)
+                for (int i = 0; i < count; i++)
                 {
-                    int index = (_head - actualCount + i + _capacity) % _capacity;
-                    yield return _buffer[index];
+                    _buffer[_head] = source[i];
+                    _head = (_head + 1) % _capacity;
+
+                    if (_count < _capacity)
+                    {
+                        _count++;
+                    }
+                    else
+                    {
+                        _tail = (_tail + 1) % _capacity;
+                    }
                 }
             }
         }
@@ -140,22 +150,6 @@ namespace PowerScope.Model
             }
         }
 
-        public IEnumerable<T> GetNewData(ref int lastReadPosition)
-        {
-            List<T> result = new List<T>();
-            
-            lock (_lock)
-            {
-                while (lastReadPosition != _head)
-                {
-                    result.Add(_buffer[lastReadPosition]);
-                    lastReadPosition = (lastReadPosition + 1) % _capacity;
-                }
-            }
-            
-            return result;
-        }
-
         public void Clear()
         {
             lock (_lock)
@@ -167,21 +161,5 @@ namespace PowerScope.Model
             }
         }
 
-        public IEnumerator<T> GetEnumerator()
-        {
-            lock (_lock)
-            {
-                for (int i = 0; i < _count; i++)
-                {
-                    int index = (_tail + i) % _capacity;
-                    yield return _buffer[index];
-                }
-            }
-        }
-
-        IEnumerator IEnumerable.GetEnumerator()
-        {
-            return GetEnumerator();
-        }
     }
 }

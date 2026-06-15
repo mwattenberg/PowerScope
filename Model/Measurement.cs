@@ -161,8 +161,9 @@ namespace PowerScope.Model
             {
                 if (_measurementWindowLength != value)
                 {
-                    _measurementWindowLength = Math.Max(100000,value);  //Limit to reasonable max value
-                    _dataBuffer = new double[_measurementWindowLength];
+                    _measurementWindowLength = Math.Min(100000, Math.Max(1, value));
+                    if (_dataBuffer == null || _measurementWindowLength > _dataBuffer.Length)
+                        _dataBuffer = new double[_measurementWindowLength];
                     OnPropertyChanged(nameof(MeasurementWindowLength));
                 }
             }
@@ -792,39 +793,31 @@ namespace PowerScope.Model
             else return 0.0;
         }
 
-        private static double CalculateStandardDeviation(ReadOnlySpan<double> data)
+        // Welford's online algorithm: accumulates mean and variance in one pass with good
+        // numerical stability (avoids catastrophic cancellation from (x - mean)^2 on large data).
+        private static double WelfordVariance(ReadOnlySpan<double> data)
         {
-            double mean = CalculateMean(data);
-            double sumOfSquaredDifferences = 0.0;
             int count = 0;
-
+            double mean = 0.0;
+            double m2 = 0.0;
             foreach (double value in data)
             {
-                double diff = value - mean;
-                sumOfSquaredDifferences += diff * diff;
                 count++;
+                double delta = value - mean;
+                mean += delta / count;
+                m2 += delta * (value - mean); // second delta uses updated mean — this is intentional
             }
-            if (count > 0) 
-                return Math.Sqrt(sumOfSquaredDifferences / count);
-            else 
-                return 0.0;
+            return count > 0 ? m2 / count : 0.0;
+        }
+
+        private static double CalculateStandardDeviation(ReadOnlySpan<double> data)
+        {
+            return Math.Sqrt(WelfordVariance(data));
         }
 
         private static double CalculateVariance(ReadOnlySpan<double> data)
         {
-            double mean = CalculateMean(data);
-            double sumOfSquaredDifferences = 0.0;
-            int count = 0;
-            foreach (double value in data)
-            {
-                double diff = value - mean;
-                sumOfSquaredDifferences += diff * diff;
-                count++;
-            }
-            if (count > 0) 
-                return sumOfSquaredDifferences / count; 
-            else 
-                return 0.0;
+            return WelfordVariance(data);
         }
 
         private static double CalculatePeakToPeak(ReadOnlySpan<double> data)

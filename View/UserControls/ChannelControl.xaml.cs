@@ -15,10 +15,6 @@ namespace PowerScope.View.UserControls
 {
     public partial class ChannelControl : UserControl
     {
-        private static readonly Color DisabledColor = Colors.Gray;
-        private static readonly Brush SelectedBrush = new SolidColorBrush(Colors.LimeGreen);
-        private static readonly Brush DefaultBrush = new SolidColorBrush(DisabledColor);
-
         /// <summary>
         /// Gets the ChannelSettings from DataContext
         /// </summary>
@@ -42,26 +38,19 @@ namespace PowerScope.View.UserControls
         private void ChannelControl_Loaded(object sender, RoutedEventArgs e)
         {
             UpdatePlayPauseButton();
-            UpdateFilterButtonStyle();
-            UpdateMeasureButtonStyle();
         }
 
         private void ChannelControl_DataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
         {
-            // Unsubscribe from old settings
             if (e.OldValue is ChannelSettings oldSettings)
             {
                 oldSettings.PropertyChanged -= Settings_PropertyChanged;
             }
 
-            // Subscribe to new settings
             if (e.NewValue is ChannelSettings newSettings)
             {
                 newSettings.PropertyChanged += Settings_PropertyChanged;
-                UpdatePlayPauseButton(); // Update button when DataContext changes
-                UpdateTopColorBar();  // Update gradient when DataContext changes
-                UpdateFilterButtonStyle();  // Update filter button styling
-                UpdateMeasureButtonStyle();  // Update measure button styling
+                UpdatePlayPauseButton();
             }
         }
 
@@ -70,79 +59,6 @@ namespace PowerScope.View.UserControls
             if (e.PropertyName == nameof(ChannelSettings.IsEnabled))
             {
                 UpdatePlayPauseButton();
-            }
-            else if (e.PropertyName == nameof(ChannelSettings.DisplayColor) || e.PropertyName == nameof(ChannelSettings.IsVirtual))
-            {
-                UpdateTopColorBar();
-            }
-            else if (e.PropertyName == nameof(ChannelSettings.Filter))
-            {
-                UpdateFilterButtonStyle();
-            }
-            else if (e.PropertyName == nameof(ChannelSettings.HasMeasurements) || 
-            e.PropertyName == nameof(ChannelSettings.MeasurementCount))
-            {
-                UpdateMeasureButtonStyle();
-            }
-        }
-
-        /// <summary>
-        /// Updates the filter button background color based on whether a filter is active
-        /// </summary>
-        private void UpdateFilterButtonStyle()
-        {
-            Button filterButton = this.FindName("ButtonFilters") as Button;
-
-            if (filterButton != null && Settings != null)
-            {
-                if (Settings.Filter != null)
-                {
-                    // Filter is active - use LimeGreen background
-                    filterButton.Background = new SolidColorBrush(Colors.LimeGreen);
-                }
-                else
-                {
-                    // Filter is inactive - use default button background
-                    object defaultBrush = Application.Current.Resources["PlotSettings_TextBoxBackgroundBrush"];
-                    if (defaultBrush != null)
-                    {
-                        filterButton.Background = (Brush)defaultBrush;
-                    }
-                    else
-                    {
-                        filterButton.Background = new SolidColorBrush(Colors.Gray);
-                    }
-                }
-            }
-        }
-
-        /// <summary>
-        /// Updates the measure button background color based on whether measurements are active
-        /// </summary>
-        private void UpdateMeasureButtonStyle()
-        {
-            Button measureButton = this.FindName("ButtonMeasure") as Button;
-
-            if (measureButton != null && Settings != null)
-            {
-                if (Settings.HasMeasurements)
-                {
-                    // Measurements are active - use LimeGreen background
-                    measureButton.Background = new SolidColorBrush(Colors.LimeGreen);
-                }
-                else
-                {
-                    // Measurements are inactive - use default button background
-                    object defaultBrush = Application.Current.Resources["PlotSettings_TextBoxBackgroundBrush"];
-                    if (defaultBrush != null)
-                    {
-                        measureButton.Background = (Brush)defaultBrush;
-                    }
-                    else
-                    {
-                        measureButton.Background = new SolidColorBrush(Colors.Gray);
-                    }
-                }
             }
         }
 
@@ -382,97 +298,5 @@ namespace PowerScope.View.UserControls
             e.Handled = true;
         }
 
-        /// <summary>
-        /// Updates the TopColorBar gradient when Channel or Color changes
-        /// Uses the IsVirtual flag from ChannelSettings
-        /// For virtual channels, creates gradient from parent channel color(s) to virtual channel color
-        /// Constants are shown in neutral gray to indicate they're not visible user channels
-        /// </summary>
-        private void UpdateTopColorBar()
-        {
-            Border topColorBar = this.FindName("TopColorBar") as Border;
-            
-            if (topColorBar != null && Settings != null)
-            {
-                if (Settings.IsVirtual)
-                {
-                    Color startColor = Colors.Black;
-                    
-                    Channel parentA = Settings.ParentChannelA;
-                    if (parentA != null)
-                    {
-                        if (parentA.OwnerStream is ConstantDataStream)
-                        {
-                            startColor = Colors.DimGray;
-                        }
-                        else
-                        {
-                            startColor = parentA.Settings.DisplayColor;
-                        }
-                    }
-                    
-                    Channel parentB = Settings.ParentChannelB;
-                    
-                    if (parentB != null)
-                    {
-                        Color parentBColor;
-                        if (parentB.OwnerStream is ConstantDataStream)
-                        {
-                            parentBColor = Colors.DimGray;
-                        }
-                        else
-                        {
-                            parentBColor = parentB.Settings.DisplayColor;
-                        }
-                        
-                        LinearGradientBrush gradientBrush = new LinearGradientBrush();
-                        gradientBrush.StartPoint = new Point(0, 0.5);
-                        gradientBrush.EndPoint = new Point(1, 0.5);
-
-                        GradientStop parentAStop = new GradientStop();
-                        parentAStop.Color = startColor;
-                        parentAStop.Offset = 0.0;
-
-                        GradientStop parentBStop = new GradientStop();
-                        parentBStop.Color = parentBColor;
-                        parentBStop.Offset = 0.25;
-
-                        GradientStop virtualStop = new GradientStop();
-                        virtualStop.Color = Settings.DisplayColor;
-                        virtualStop.Offset = 0.5;
-
-                        gradientBrush.GradientStops.Add(parentAStop);
-                        gradientBrush.GradientStops.Add(parentBStop);
-                        gradientBrush.GradientStops.Add(virtualStop);
-
-                        topColorBar.Background = gradientBrush;
-                    }
-                    else
-                    {
-                        LinearGradientBrush gradientBrush = new LinearGradientBrush();
-                        gradientBrush.StartPoint = new Point(0, 0.5);
-                        gradientBrush.EndPoint = new Point(1, 0.5);
-
-                        GradientStop sourceStop = new GradientStop();
-                        sourceStop.Color = startColor;
-                        sourceStop.Offset = 0.0;
-
-                        GradientStop virtualStop = new GradientStop();
-                        virtualStop.Color = Settings.DisplayColor;
-                        virtualStop.Offset = 0.5;
-
-                        gradientBrush.GradientStops.Add(sourceStop);
-                        gradientBrush.GradientStops.Add(virtualStop);
-
-                        topColorBar.Background = gradientBrush;
-                    }
-                }
-                else
-                {
-                    SolidColorBrush solidBrush = new SolidColorBrush(Settings.DisplayColor);
-                    topColorBar.Background = solidBrush;
-                }
-            }
-        }
     }
 }
