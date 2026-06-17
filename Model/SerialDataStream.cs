@@ -580,15 +580,7 @@ namespace PowerScope.Model
             if (!_isConnected && !_isStreaming)
                 return 0;
 
-            // try
-            // {
             return ReceivedData[channel].CopyLatestTo(destination, n);
-            // }
-            // catch (Exception)
-            // {
-            //     // If there's an error accessing the buffer, return 0
-            //     return 0;
-            // }
         }
 
         private void clearData()
@@ -615,7 +607,7 @@ namespace PowerScope.Model
 
             // Reset filters and up/down sampling when clearing data
             ResetChannelFilters();
-            _upDownSampling?.Reset();
+            _upDownSampling.Reset();
         }
 
         private void ReadSerialData()
@@ -967,10 +959,7 @@ namespace PowerScope.Model
             }
 
             // Unsubscribe from up/down sampling events
-            if (_upDownSampling != null)
-            {
-                _upDownSampling.PropertyChanged -= OnUpDownSamplingPropertyChanged;
-            }
+            _upDownSampling.PropertyChanged -= OnUpDownSamplingPropertyChanged;
 
             _residueLength = 0;
             _disposed = true;

@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel;
+using System.Numerics;
 
 namespace PowerScope.Model
 {
@@ -10,6 +11,9 @@ namespace PowerScope.Model
         // Sampling factor: -9..+9 (StreamSettings already clamps; we clamp again defensively) <source_id data="2" title="StreamSettings.cs" />
         private int _samplingFactor;
         private double[] _sincKernel;
+        // Same taps as _sincKernel but in reverse order, so that y[i] = sum_j hReversed[j] * x[i-kernelTailLen+j]
+        // becomes a dot product of two contiguous, increasing-index slices - the layout SIMD wants.
+        private double[] _sincKernelReversed;
         private int _kernelLen; // convenience
         private int _kernelTailLen; // = _kernelLen - 1
 
@@ -197,6 +201,11 @@ namespace PowerScope.Model
             _sincKernel = h;
             _kernelLen = len;
             _kernelTailLen = len - 1;
+
+            double[] hReversed = new double[len];
+            for (int i = 0; i < len; i++)
+                hReversed[i] = h[len - 1 - i];
+            _sincKernelReversed = hReversed;
         }
 
         // Upsampling: insert L zeros then filter with FIR.
@@ -223,7 +232,7 @@ namespace PowerScope.Model
 
             // FIR filtering over the upsampled stream
             var y = new double[totalUpLen];
-            ConvolveFIRStreaming(up, y, _sincKernel);
+            ConvolveFIRSteadyState(up, y, _sincKernelReversed);
 
             // Update tail for next block: last (kernelLen-1) of upsampled sequence
             int tailCopy = Math.Min(state.UpTail.Length, totalUpLen);
@@ -250,7 +259,7 @@ namespace PowerScope.Model
 
             // Filter raw
             var y = new double[totalRawLen];
-            ConvolveFIRStreaming(raw, y, _sincKernel);
+            ConvolveFIRSteadyState(raw, y, _sincKernelReversed);
 
             // Update raw tail for next block
             int tailCopy = Math.Min(state.DownTail.Length, totalRawLen);
@@ -286,22 +295,43 @@ namespace PowerScope.Model
             return outBlock;
         }
 
-        // Simple FIR with causal convolution using provided input buffer (already includes needed tail)
-        private static void ConvolveFIRStreaming(double[] x, double[] y, double[] h)
+        /// <summary>
+        /// FIR convolution over x, writing only the indices that callers actually read.
+        ///
+        /// x is always [tail (kernelTailLen samples) | new data]. Callers only ever read
+        /// y[kernelTailLen..] - the tail-prefix outputs y[0..kernelTailLen-2] are never used for
+        /// the result and never feed the next block's tail (that comes from the raw/zero-stuffed
+        /// input, not from y), so they are not computed at all. Every index this function does
+        /// write has a full, always-valid kernel-length window behind it (guaranteed by the
+        /// caller-supplied tail), so the inner loop never needs a bounds check and is a fixed-width
+        /// dot product - straightforward to vectorize.
+        /// </summary>
+        private static void ConvolveFIRSteadyState(double[] x, double[] y, double[] hReversed)
         {
             int len = x.Length;
-            int kLen = h.Length;
+            int kLen = hReversed.Length;
+            int startIndex = kLen - 1;
+            int vectorSize = Vector<double>.Count;
+            int vectorBound = kLen - (kLen % vectorSize);
 
-            for (int i = 0; i < len; i++)
+            for (int i = startIndex; i < len; i++)
             {
+                int baseIndex = i - kLen + 1;
                 double acc = 0.0;
-                // h[0] aligns with x[i], h<source_id data="1" title="UpDownSampling.cs" /> with x[i-1], ...
-                int xIdx = i;
-                for (int k = 0; k < kLen; k++, xIdx--)
+
+                int j = 0;
+                for (; j < vectorBound; j += vectorSize)
                 {
-                    if (xIdx < 0) break;
-                    acc += h[k] * x[xIdx];
+                    Vector<double> hVec = new Vector<double>(hReversed, j);
+                    Vector<double> xVec = new Vector<double>(x, baseIndex + j);
+                    acc += Vector.Dot(hVec, xVec);
                 }
+
+                for (; j < kLen; j++)
+                {
+                    acc += hReversed[j] * x[baseIndex + j];
+                }
+
                 y[i] = acc;
             }
         }

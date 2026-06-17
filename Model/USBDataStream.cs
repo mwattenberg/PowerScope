@@ -44,7 +44,7 @@ namespace PowerScope.Model
         }
     }
 
-    public class USBDataStream : IDataStream, IChannelConfigurable
+    public class USBDataStream : IDataStream, IChannelConfigurable, IUpDownSampling
     {
         // Constants from your example
         public const string DeviceInterfaceGuid = "{8D2C9D52-5C6B-4F0B-9F1B-3EBE8C4F9A61}";
@@ -212,6 +212,9 @@ namespace PowerScope.Model
         private IDigitalFilter[] _channelFilters;
         private readonly object _channelConfigLock = new object();
 
+        // Up/Down sampling
+        private readonly UpDownSampling _upDownSampling;
+
         // INotifyPropertyChanged implementation
         public event PropertyChangedEventHandler PropertyChanged;
     
@@ -302,6 +305,10 @@ namespace PowerScope.Model
             Parser = dataParser;
             _deviceGuid = new Guid(source.DeviceGuid);
 
+            // Initialize up/down sampling
+            _upDownSampling = new UpDownSampling(1);
+            _upDownSampling.PropertyChanged += OnUpDownSamplingPropertyChanged;
+
             int ringBufferSize = Math.Max(500000, 1000000); // Large buffer for USB throughput
             ReceivedData = new RingBuffer<double>[dataParser.NumberOfChannels];
 
@@ -342,6 +349,22 @@ namespace PowerScope.Model
             StatusMessage = "Disconnected";
         }
 
+        private void OnUpDownSamplingPropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            // Forward up/down sampling property change notifications
+            if (e.PropertyName == nameof(UpDownSampling.SamplingFactor))
+            {
+                OnPropertyChanged(nameof(UpDownSamplingFactor));
+                OnPropertyChanged(nameof(SampleRateMultiplier));
+                OnPropertyChanged(nameof(IsUpDownSamplingEnabled));
+                OnPropertyChanged(nameof(UpDownSamplingDescription));
+                OnPropertyChanged(nameof(SampleRate));
+
+                // Reinitialize for new sampling factor
+                _upDownSampling.InitializeChannels(ChannelCount);
+            }
+        }
+
         #region IChannelConfigurable Implementation
 
         public void SetChannelSetting(int channelIndex, ChannelSettings settings)
@@ -354,7 +377,7 @@ namespace PowerScope.Model
                 _channelSettings[channelIndex] = settings;
 
                 // Update filter reference and reset if filter type changed
-                var newFilter = settings?.Filter;
+                IDigitalFilter newFilter = settings?.Filter;
                 if (_channelFilters[channelIndex] != newFilter)
                 {
                     _channelFilters[channelIndex] = newFilter;
@@ -392,9 +415,16 @@ namespace PowerScope.Model
 
         #region Data Processing
 
-        private double ApplyChannelProcessing(int channel, double rawSample)
+        /// <summary>
+        /// Applies gain/offset and filtering for one channel across a whole batch of samples.
+        /// Settings/filter are fetched once per batch rather than once per sample: a config
+        /// change landing mid-batch is visible on the next batch instead of immediately, which
+        /// is an acceptable tradeoff for a live data stream and avoids per-sample lock overhead.
+        /// The gain/offset pass has no cross-sample dependency and auto-vectorizes; the filter
+        /// pass is inherently sequential (IIR state) so it stays as a separate loop.
+        /// </summary>
+        private void ApplyChannelProcessing(int channel, double[] rawSamples, double[] destination, int sampleCount)
         {
-            // Get channel settings safely
             ChannelSettings settings;
             IDigitalFilter filter;
 
@@ -405,18 +435,32 @@ namespace PowerScope.Model
             }
 
             if (settings == null)
-                return rawSample;
-
-            // Apply offset and gain
-            double processed = (rawSample + settings.Offset) * settings.Gain;
-
-            // Apply filter if configured
-            if (filter != null)
             {
-                processed = filter.Filter(processed);
+                Array.Copy(rawSamples, destination, sampleCount);
+            }
+            else
+            {
+                double gain = settings.Gain;
+                double offset = settings.Offset;
+                for (int i = 0; i < sampleCount; i++)
+                {
+                    double processed = gain * (rawSamples[i] + offset);
+                    if (!double.IsFinite(processed))
+                        processed = 0.0;
+                    destination[i] = processed;
+                }
             }
 
-            return processed;
+            if (filter != null)
+            {
+                for (int i = 0; i < sampleCount; i++)
+                {
+                    double filtered = filter.Filter(destination[i]);
+                    if (!double.IsFinite(filtered))
+                        filtered = 0.0;
+                    destination[i] = filtered;
+                }
+            }
         }
 
         #endregion
@@ -429,7 +473,7 @@ namespace PowerScope.Model
                 if (path == null)
                     throw new UsbDeviceNotFoundException(_deviceGuid.ToString());
 
-                var (dev, winusb) = OpenPath(path);
+                (SafeFileHandle dev, IntPtr winusb) = OpenPath(path);
                 _deviceHandle = dev;
                 _winUsbHandle = winusb;
 
@@ -540,6 +584,10 @@ namespace PowerScope.Model
                 // Reset filters when starting streaming
                 ResetChannelFilters();
 
+                // Initialize up/down sampling for current channel configuration
+                _upDownSampling.InitializeChannels(ChannelCount);
+                _upDownSampling.Reset();
+
                 if (_readUsbThread != null && _readUsbThread.IsAlive)
                 {
                     IsStreaming = false;
@@ -598,15 +646,7 @@ namespace PowerScope.Model
             if (!_isConnected && !_isStreaming)
                 return 0;
 
-            try
-            {
-                return ReceivedData[channel].CopyLatestTo(destination, n);
-            }
-            catch (Exception)
-            {
-                // If there's an error accessing the buffer, return 0
-                return 0;
-            }
+            return ReceivedData[channel].CopyLatestTo(destination, n);
         }
 
         private void clearData()
@@ -634,8 +674,9 @@ namespace PowerScope.Model
             OnPropertyChanged(nameof(SampleRate));
             OnPropertyChanged(nameof(ThroughputKBps));
 
-            // Reset filters when clearing data
+            // Reset filters and up/down sampling when clearing data
             ResetChannelFilters();
+            _upDownSampling.Reset();
         }
 
         private void ReadUsbData()
@@ -712,27 +753,19 @@ namespace PowerScope.Model
 
         private void HandleRuntimeDisconnection(string reason)
         {
+            StatusMessage = $"Disconnected: {reason}";
+            IsStreaming = false;
+
             try
             {
-                StatusMessage = $"Disconnected: {reason}";
-                IsStreaming = false;
                 CleanupHandles();
-                IsConnected = false;
             }
-            catch (Exception ex)
+            catch
             {
-                try
-                {
-                    StatusMessage = $"Error during disconnection handling: {ex.Message}";
-                    IsConnected = false;
-                    IsStreaming = false;
-                }
-                catch
-                {
-                    _isConnected = false;
-                    _isStreaming = false;
-                }
+                // Handles might already be invalid; ignore errors
             }
+
+            IsConnected = false;
         }
 
         /// <summary>
@@ -765,47 +798,39 @@ namespace PowerScope.Model
 
             Array.Copy(readBuffer, 0, _workingBuffer, workingBufferOffset, bytesRead);
 
-            try
+            if (_useFastBinaryPath)
             {
-                if (_useFastBinaryPath)
-                {
-                    // Zero-allocation path: ParseInto fills _parseOutput and refills _residueBuffer in place.
-                    int sampleCount = Parser.ParseInto(
-                        _workingBuffer.AsSpan(0, totalDataLength),
-                        _parseOutput,
-                        _residueBuffer,
-                        out _residueLength);
+                // Zero-allocation path: ParseInto fills _parseOutput and refills _residueBuffer in place.
+                int sampleCount = Parser.ParseInto(
+                    _workingBuffer.AsSpan(0, totalDataLength),
+                    _parseOutput,
+                    _residueBuffer,
+                    out _residueLength);
 
-                    // Safety: never let residue grow unbounded (indicates a sync/format mismatch).
-                    if (_residueLength > _workingBuffer.Length / 2)
-                        _residueLength = 0;
-
-                    if (sampleCount > 0)
-                        AddProcessedToRingBuffers(sampleCount);
-                }
-                else
-                {
-                    // Legacy allocating path for ASCII (not throughput-critical). Copy ParseData's residue
-                    // into our reusable buffer so the prepend logic above stays uniform across both paths.
-                    ParsedData parsedData = Parser.ParseData(_workingBuffer.AsSpan(0, totalDataLength));
-
+                // Safety: never let residue grow unbounded (indicates a sync/format mismatch).
+                if (_residueLength > _workingBuffer.Length / 2)
                     _residueLength = 0;
-                    if (parsedData.Residue != null &&
-                        parsedData.Residue.Length > 0 &&
-                        parsedData.Residue.Length <= _workingBuffer.Length / 2)
-                    {
-                        _residueLength = parsedData.Residue.Length;
-                        Array.Copy(parsedData.Residue, 0, _residueBuffer, 0, _residueLength);
-                    }
 
-                    if (parsedData.Data != null)
-                        AddDataToRingBuffers(parsedData.Data);
-                }
+                if (sampleCount > 0)
+                    AddProcessedToRingBuffers(sampleCount);
             }
-            catch (Exception)
+            else
             {
-                // Parser failure — drop residue to recover on the next read.
+                // Legacy allocating path for ASCII (not throughput-critical). Copy ParseData's residue
+                // into our reusable buffer so the prepend logic above stays uniform across both paths.
+                ParsedData parsedData = Parser.ParseData(_workingBuffer.AsSpan(0, totalDataLength));
+
                 _residueLength = 0;
+                if (parsedData.Residue != null &&
+                    parsedData.Residue.Length > 0 &&
+                    parsedData.Residue.Length <= _workingBuffer.Length / 2)
+                {
+                    _residueLength = parsedData.Residue.Length;
+                    Array.Copy(parsedData.Residue, 0, _residueBuffer, 0, _residueLength);
+                }
+
+                if (parsedData.Data != null)
+                    AddDataToRingBuffers(parsedData.Data);
             }
         }
 
@@ -817,24 +842,47 @@ namespace PowerScope.Model
         /// This is safe because (1) each channel is fully processed and pushed before the next channel
         /// overwrites the buffer, and (2) IDigitalFilter.Filter() is sample-by-sample — the filter owns
         /// its own history, so we never need the whole input window resident at once (no block convolution).
+        ///
+        /// Up/down sampling, when enabled, still allocates inside UpDownSampling. That is an optional,
+        /// non-default feature, so it is intentionally left on the allocating path.
         /// </summary>
         /// <param name="sampleCount">Number of valid samples per channel in _parseOutput.</param>
         private void AddProcessedToRingBuffers(int sampleCount)
         {
+            int producedSamples = sampleCount;
+
             for (int channel = 0; channel < ChannelCount; channel++)
             {
                 double[] rawSamples = _parseOutput[channel];
-                for (int sample = 0; sample < sampleCount; sample++)
-                {
-                    _processedSamples[sample] = ApplyChannelProcessing(channel, rawSamples[sample]);
-                }
+                ApplyChannelProcessing(channel, rawSamples, _processedSamples, sampleCount);
 
-                ReceivedData[channel].AddRange(_processedSamples, sampleCount);
+                if (_upDownSampling.IsEnabled)
+                {
+                    // Optional resampling allocates a right-sized block; copy the live range first.
+                    double[] block = new double[sampleCount];
+                    Array.Copy(_processedSamples, 0, block, 0, sampleCount);
+
+                    double[] resampled = _upDownSampling.ProcessChannelData(channel, block);
+                    for (int i = 0; i < resampled.Length; i++)
+                    {
+                        if (!double.IsFinite(resampled[i]))
+                            resampled[i] = 0.0;
+                    }
+
+                    ReceivedData[channel].AddRange(resampled, resampled.Length);
+                    if (channel == 0)
+                        producedSamples = resampled.Length;
+                }
+                else
+                {
+                    ReceivedData[channel].AddRange(_processedSamples, sampleCount);
+                }
             }
 
-            Interlocked.Add(ref _totalSamples, sampleCount);
-            Interlocked.Add(ref _totalFrames, sampleCount);
-            UpdateStreamingMetrics(sampleCount);
+            // Bookkeeping uses the final per-channel count (after optional resampling).
+            Interlocked.Add(ref _totalSamples, producedSamples);
+            Interlocked.Add(ref _totalFrames, producedSamples);
+            UpdateStreamingMetrics(producedSamples);
         }
 
         /// <summary>
@@ -845,27 +893,37 @@ namespace PowerScope.Model
         {
             int channelsToProcess = Math.Min(parsedData.Length, Parser.NumberOfChannels);
 
+            int producedSamples = 0;
+
             for (int channel = 0; channel < channelsToProcess; channel++)
             {
-                if (parsedData[channel] != null && parsedData[channel].Length > 0)
-                {
-                    double[] processedSamples = new double[parsedData[channel].Length];
-                    for (int sample = 0; sample < parsedData[channel].Length; sample++)
-                    {
-                        processedSamples[sample] = ApplyChannelProcessing(channel, parsedData[channel][sample]);
-                    }
+                if (parsedData[channel] == null || parsedData[channel].Length == 0)
+                    continue;
 
-                    ReceivedData[channel].AddRange(processedSamples, processedSamples.Length);
+                double[] channelProcessedSamples = new double[parsedData[channel].Length];
+                ApplyChannelProcessing(channel, parsedData[channel], channelProcessedSamples, parsedData[channel].Length);
+
+                double[] channelFinalData = channelProcessedSamples;
+                if (_upDownSampling.IsEnabled)
+                {
+                    channelFinalData = _upDownSampling.ProcessChannelData(channel, channelProcessedSamples);
+                    for (int i = 0; i < channelFinalData.Length; i++)
+                    {
+                        if (!double.IsFinite(channelFinalData[i]))
+                            channelFinalData[i] = 0.0;
+                    }
                 }
+
+                ReceivedData[channel].AddRange(channelFinalData, channelFinalData.Length);
+                if (channel == 0)
+                    producedSamples = channelFinalData.Length;
             }
 
-            if (channelsToProcess > 0 && parsedData[0] != null)
+            if (producedSamples > 0)
             {
-                int newSamples = parsedData[0].Length;
-                Interlocked.Add(ref _totalSamples, newSamples);
-                Interlocked.Add(ref _totalFrames, newSamples);
-
-                UpdateStreamingMetrics(newSamples);
+                Interlocked.Add(ref _totalSamples, producedSamples);
+                Interlocked.Add(ref _totalFrames, producedSamples);
+                UpdateStreamingMetrics(producedSamples);
             }
         }
 
@@ -928,6 +986,9 @@ namespace PowerScope.Model
                 }
             }
 
+            // Unsubscribe from up/down sampling events
+            _upDownSampling.PropertyChanged -= OnUpDownSamplingPropertyChanged;
+
             _disposed = true;
             GC.SuppressFinalize(this);
         }
@@ -936,6 +997,31 @@ namespace PowerScope.Model
         {
             clearData();
         }
+
+        #region IUpDownSampling Implementation
+
+        public int UpDownSamplingFactor
+        {
+            get { return _upDownSampling.SamplingFactor; }
+            set { _upDownSampling.SamplingFactor = value; }
+        }
+
+        public double SampleRateMultiplier
+        {
+            get { return _upDownSampling.SampleRateMultiplier; }
+        }
+
+        public bool IsUpDownSamplingEnabled
+        {
+            get { return _upDownSampling.IsEnabled; }
+        }
+
+        public string UpDownSamplingDescription
+        {
+            get { return _upDownSampling.GetDescription(); }
+        }
+
+        #endregion
 
         #region WinUSB P/Invoke - Based on your example code
 
@@ -1083,9 +1169,10 @@ namespace PowerScope.Model
                 if (segments.Length >= 3)
                     instance = segments[2]; // e.g. "7&49e5708&0&4"
 
-                displayNames[i] = paths.Count == 1
-                    ? "FX2G3 PowerScope"
-                    : $"FX2G3 PowerScope [{instance}]";
+                if (paths.Count == 1)
+                    displayNames[i] = "FX2G3 PowerScope";
+                else
+                    displayNames[i] = $"FX2G3 PowerScope [{instance}]";
             }
 
             return displayNames;
@@ -1121,7 +1208,9 @@ namespace PowerScope.Model
                 }
 
                 // Selected device not present. Disambiguate only when there is no ambiguity.
-                return paths.Count == 1 ? paths[0] : null;
+                if (paths.Count == 1)
+                    return paths[0];
+                return null;
             }
 
             return paths[0]; // no explicit selection — first available
@@ -1132,7 +1221,7 @@ namespace PowerScope.Model
             if (string.IsNullOrEmpty(path))
                 throw new UsbDeviceNotFoundException(DeviceInterfaceGuid);
 
-            var dev = CreateFile(path, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, IntPtr.Zero, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED, IntPtr.Zero);
+            SafeFileHandle dev = CreateFile(path, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, IntPtr.Zero, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED, IntPtr.Zero);
             if (dev.IsInvalid)
             {
                 int err = Marshal.GetLastWin32Error();
@@ -1142,7 +1231,7 @@ namespace PowerScope.Model
                 throw new System.ComponentModel.Win32Exception(err, $"CreateFile failed for path '{path}' (Win32 error {err})");
             }
 
-            if (!WinUsb_Initialize(dev, out var h))
+            if (!WinUsb_Initialize(dev, out IntPtr h))
                 throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
 
             // ALLOW_PARTIAL_READS: ReadPipe completes as soon as any data arrives,
@@ -1160,7 +1249,7 @@ namespace PowerScope.Model
 
         private static void SendStart(IntPtr h)
         {
-            var setup = new WINUSB_SETUP_PACKET
+            WINUSB_SETUP_PACKET setup = new WINUSB_SETUP_PACKET
             {
                 RequestType = 0x40, // Host-to-device | Vendor | Recipient: Device
                 Request = REQ_START,
@@ -1175,7 +1264,7 @@ namespace PowerScope.Model
 
         private static void SendSetBufThreshold(IntPtr h, ushort threshold)
         {
-            var setup = new WINUSB_SETUP_PACKET
+            WINUSB_SETUP_PACKET setup = new WINUSB_SETUP_PACKET
             {
                 RequestType = 0x40, // Host-to-device | Vendor | Recipient: Device
                 Request = REQ_SET_BUF_THRESHOLD,
@@ -1195,7 +1284,7 @@ namespace PowerScope.Model
         /// </summary>
         private static void SendSetBaudRate(IntPtr h, uint baudRate)
         {
-            var setup = new WINUSB_SETUP_PACKET
+            WINUSB_SETUP_PACKET setup = new WINUSB_SETUP_PACKET
             {
                 RequestType = 0x40, // Host-to-device | Vendor | Device
                 Request     = REQ_SET_BAUD,
@@ -1221,7 +1310,7 @@ namespace PowerScope.Model
             else
                 wValue = 0; // UART (default); I2C not yet supported in firmware
 
-            var setup = new WINUSB_SETUP_PACKET
+            WINUSB_SETUP_PACKET setup = new WINUSB_SETUP_PACKET
             {
                 RequestType = 0x40, // Host-to-device | Vendor | Recipient: Device
                 Request     = REQ_SET_INTERFACE,
@@ -1236,7 +1325,7 @@ namespace PowerScope.Model
 
         private static void SendStop(IntPtr h)
         {
-            var setup = new WINUSB_SETUP_PACKET
+            WINUSB_SETUP_PACKET setup = new WINUSB_SETUP_PACKET
             {
                 RequestType = 0x40,
                 Request = REQ_STOP,
