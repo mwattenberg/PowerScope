@@ -1,9 +1,6 @@
-﻿using System;
-using System.IO;
+﻿using System.IO;
 using System.Xml.Linq;
 using PowerScope.View.UserControls;
-using System.Collections.Generic;
-using System.Linq;
 using System.Windows.Media;
 using System.IO.Ports;
 
@@ -11,7 +8,7 @@ namespace PowerScope.Model
 {
     public static class Serializer
     {
-        public static void WriteSettingsToXML(string filePath, PlotManager plotManager, DataStreamBar dataStreamBar)
+        public static void SaveSessionToXML(string filePath, PlotManager plotManager, DataStreamBar dataStreamBar)
         {
             XElement settingsXml = new XElement("PlotSettings");
             WritePlotSettings(settingsXml, plotManager);
@@ -19,17 +16,28 @@ namespace PowerScope.Model
             settingsXml.Save(filePath);
         }
 
-        public static void ReadSettingsFromXML(string filePath, PlotManager plotManager, DataStreamBar dataStreamBar)
+        /// <param name="resolveMissingPort">
+        /// Called when a saved serial stream's COM port no longer exists on this system. Receives the
+        /// parsed settings for that stream and should return updated settings with a valid port to retry,
+        /// or null to skip restoring that stream. Pass null to skip silently (e.g. non-interactive loads).
+        /// </param>
+        /// <returns>
+        /// Human-readable descriptions of streams that could not be restored (e.g. missing COM port),
+        /// in file order. Empty if every stream restored successfully.
+        /// </returns>
+        public static List<string> LoadSessionFromXML(string filePath, PlotManager plotManager, DataStreamBar dataStreamBar, Func<StreamSettings, StreamSettings> resolveMissingPort = null)
         {
             if (!File.Exists(filePath))
-                return;
+                return new List<string>();
 
             XElement settingsXml = XElement.Load(filePath);
-            ReadPlotSettings(settingsXml, plotManager);
-            ReadDataStreamsWithChannels(settingsXml, dataStreamBar);
+            ApplyPlotSettings(settingsXml, plotManager);
+            List<string> skippedStreams = LoadDataStreamsWithChannels(settingsXml, dataStreamBar, resolveMissingPort);
 
             // Restore trigger source channel after channels are loaded
             RestoreTriggerSourceChannel(settingsXml, plotManager, dataStreamBar);
+
+            return skippedStreams;
         }
 
         private static void WritePlotSettings(XElement parent, PlotManager plotManager)
@@ -253,7 +261,7 @@ namespace PowerScope.Model
             return bool.Parse(value);
         }
 
-        private static void ReadPlotSettings(XElement settingsXml, PlotManager plotManager)
+        private static void ApplyPlotSettings(XElement settingsXml, PlotManager plotManager)
         {
             double plotUpdateRateFPS = GetElementValueDouble(settingsXml, "PlotUpdateRateFPS", 30.0);
             int lineWidth = GetElementValueInt(settingsXml, "LineWidth", 1);
@@ -328,17 +336,47 @@ namespace PowerScope.Model
             plotManager.Settings.TriggerSourceChannel = null;
         }
 
-        private static void ReadDataStreamsWithChannels(XElement settingsXml, DataStreamBar dataStreamBar)
+        private static List<string> LoadDataStreamsWithChannels(XElement settingsXml, DataStreamBar dataStreamBar, Func<StreamSettings, StreamSettings> resolveMissingPort)
         {
+            List<string> skippedStreams = new List<string>();
+
             XElement dataStreamsElement = settingsXml.Element("DataStreams");
             if (dataStreamsElement == null)
-                return;
+                return skippedStreams;
 
             foreach (XElement streamElement in dataStreamsElement.Elements("Stream"))
             {
                 StreamSettings streamSettings = ParseStreamSettings(streamElement);
-                IDataStream dataStream = CreateAndConfigureDataStream(streamSettings, dataStreamBar);
-                
+                IDataStream dataStream;
+                string originalPort = streamSettings.Port;
+
+                try
+                {
+                    dataStream = CreateAndConfigureDataStream(streamSettings, dataStreamBar);
+                }
+                catch (PortNotFoundException)
+                {
+                    // Saved COM port no longer exists (e.g. virtual port removed, USB-serial adapter
+                    // unplugged). Let the caller resolve a replacement port instead of aborting the
+                    // restore of every other stream in the file.
+                    streamSettings = resolveMissingPort?.Invoke(streamSettings);
+                    if (streamSettings == null)
+                    {
+                        skippedStreams.Add($"SerialPort stream: port '{originalPort}' not found and was not resolved");
+                        continue;
+                    }
+
+                    try
+                    {
+                        dataStream = CreateAndConfigureDataStream(streamSettings, dataStreamBar);
+                    }
+                    catch (PortNotFoundException)
+                    {
+                        skippedStreams.Add($"SerialPort stream: port '{originalPort}' not found; replacement port '{streamSettings.Port}' was also not found");
+                        continue;
+                    }
+                }
+
                 if (dataStream == null)
                     continue;
 
@@ -346,6 +384,8 @@ namespace PowerScope.Model
                 if (channelsElement != null)
                     RestoreChannelsForStream(channelsElement, dataStream, dataStreamBar, streamSettings);
             }
+
+            return skippedStreams;
         }
 
         /// <summary>

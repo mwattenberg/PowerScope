@@ -1,8 +1,6 @@
-using System;
 using System.Windows;
 using System.Windows.Media;
 using PowerScope.Model;
-using System.Collections.Generic;
 
 namespace PowerScope.View.UserForms
 {

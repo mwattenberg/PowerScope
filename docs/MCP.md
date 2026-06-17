@@ -48,6 +48,7 @@ MCP server over the process's stdin/stdout.
 | `clear_data` | Clear all ring buffers (streams keep running). Call right before provoking a transient so subsequent reads contain only the event. |
 | `add_demo_stream` | Add a synthetic stream (sine/square/triangle/noise/chirp/...) for testing without hardware. |
 | `load_config` | Load a PowerScope session XML — creates and starts the configured streams. This is how an agent connects to real hardware that was set up in the GUI. |
+| `remove_stream` | Stop and remove a single stream and its channels (identified by any one of its channels via `channel`), leaving other streams running. |
 | `remove_all_streams` | Stop and remove all streams. |
 
 ## Typical agent loop (firmware tuning)

@@ -55,7 +55,7 @@ namespace PowerScope.Tests
             return numberOfChannels;
         }
 
-        public void LoadConfiguration(string filePath)
+        public IReadOnlyList<string> LoadConfiguration(string filePath)
         {
             throw new NotSupportedException("load_config is not available in the test host");
         }
@@ -80,6 +80,27 @@ namespace PowerScope.Tests
                     stream.Dispose();
                 }
                 _streams.Clear();
+            }
+        }
+
+        public void RemoveStream(IDataStream stream)
+        {
+            lock (_lock)
+            {
+                _channels.RemoveAll(channel =>
+                {
+                    if (channel.OwnerStream != stream)
+                        return false;
+                    channel.Dispose();
+                    return true;
+                });
+
+                if (_streams.Remove(stream))
+                {
+                    stream.StopStreaming();
+                    stream.Disconnect();
+                    stream.Dispose();
+                }
             }
         }
 

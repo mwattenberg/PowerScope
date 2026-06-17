@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-
 namespace PowerScope.Model.Mcp
 {
     /// <summary>
@@ -26,13 +23,20 @@ namespace PowerScope.Model.Mcp
         /// <summary>
         /// Loads a full session configuration (streams, channels, plot settings)
         /// from a PowerScope XML settings file. Streams are connected and started.
+        /// Returns descriptions of any streams that could not be restored (e.g. a
+        /// saved COM port no longer exists on this system); empty if all succeeded.
         /// </summary>
-        void LoadConfiguration(string filePath);
+        IReadOnlyList<string> LoadConfiguration(string filePath);
 
         /// <summary>
         /// Stops, disconnects and removes all active streams and their channels.
         /// </summary>
         void RemoveAllStreams();
+
+        /// <summary>
+        /// Stops, disconnects and removes a single stream and its channels.
+        /// </summary>
+        void RemoveStream(IDataStream stream);
 
         /// <summary>
         /// Renders the current plot to a file and returns the absolute path written.

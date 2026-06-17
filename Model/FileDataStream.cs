@@ -1,10 +1,5 @@
-using System;
 using System.ComponentModel;
-using System.Threading;
-using System.Threading.Tasks;
-using System.Collections.Generic;
 using System.IO;
-using System.CodeDom.Compiler;
 
 namespace PowerScope.Model
 {

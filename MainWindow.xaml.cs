@@ -1,23 +1,12 @@
-﻿using System;
-using System.Collections.Specialized;
-using System.ComponentModel;
-using System.Diagnostics;
+﻿using System.ComponentModel;
 using System.IO;
-using System.IO.Ports; // Add for Parity enum
-using System.Linq;
-using System.Management;
-using System.Timers;
 using System.Windows;
 using System.Windows.Input;
-using System.Windows.Media;
-using System.Xml.Linq;
-using ScottPlot.Plottables;
 using PowerScope.Model;
 using PowerScope.Model.Mcp;
 using PowerScope.View.UserControls;
 using PowerScope.View.UserForms;
 using Aelian.FFT;
-using System.Windows.Media.Effects; // Add for VisualTreeHelper
 using Microsoft.Win32;
 
 namespace PowerScope
@@ -56,16 +45,27 @@ namespace PowerScope
             InitializeControls();
             InitializeEventHandlers();
 
-            // Try to read previous settings, but don't crash if they're invalid
+            // A corrupted or outdated session file shouldn't prevent the app from starting,
+            // so only catch the exceptions an old/malformed XML file can actually cause.
+            // Anything else (e.g. a NullReferenceException from a real bug) should surface.
             try
             {
-                readSettingsXML();
+                RestoreSessionFromXML();
             }
-            catch (Exception ex)
+            catch (System.Xml.XmlException ex)
             {
-                // Log the error but don't crash
-                System.Diagnostics.Debug.WriteLine($"Warning: Failed to restore previous settings: {ex.Message}");
-                // Application will continue with default settings
+                MessageBox.Show($"Could not restore previous settings: the session file is not valid XML.\n\n{ex.Message}",
+                    "Restore Settings Warning", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+            catch (FormatException ex)
+            {
+                MessageBox.Show($"Could not restore previous settings: the session file contains an invalid value.\n\n{ex.Message}",
+                    "Restore Settings Warning", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+            catch (IOException ex)
+            {
+                MessageBox.Show($"Could not restore previous settings: the session file could not be read.\n\n{ex.Message}",
+                    "Restore Settings Warning", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
 
 
@@ -154,7 +154,7 @@ namespace PowerScope
 
                 if (saveFileDialog.ShowDialog() == true)
                 {
-                    Serializer.WriteSettingsToXML(saveFileDialog.FileName, _plotManager, DataStreamBar);
+                    Serializer.SaveSessionToXML(saveFileDialog.FileName, _plotManager, DataStreamBar);
 
                 }
             }
@@ -176,7 +176,7 @@ namespace PowerScope
 
                 if (openFileDialog.ShowDialog() == true)
                 {
-                    Serializer.ReadSettingsFromXML(openFileDialog.FileName, _plotManager, DataStreamBar);
+                    Serializer.LoadSessionFromXML(openFileDialog.FileName, _plotManager, DataStreamBar, ResolveMissingSerialPort);
 
                 }
             }
@@ -208,21 +208,18 @@ namespace PowerScope
 
                 string extension = Path.GetExtension(saveFileDialog.FileName).ToLower();
 
-                if (extension == ".png")
+                switch (extension)
                 {
-                    WpfPlot1.Plot.SavePng(saveFileDialog.FileName, 1920, 1080);
-                }
-                else if (extension == ".svg")
-                {
-                    WpfPlot1.Plot.SaveSvg(saveFileDialog.FileName, 1920, 1080);
-                }
-                else if (extension == ".csv")
-                {
-                    ExportPlotDataToCsv(saveFileDialog.FileName);
-                }
-                else
-                {
-                    WpfPlot1.Plot.SavePng(saveFileDialog.FileName, 1920, 1080);
+                    case ".svg":
+                        WpfPlot1.Plot.SaveSvg(saveFileDialog.FileName, 1920, 1080);
+                        break;
+                    case ".csv":
+                        ExportPlotDataToCsv(saveFileDialog.FileName);
+                        break;
+                    case ".png":
+                    default:
+                        WpfPlot1.Plot.SavePng(saveFileDialog.FileName, 1920, 1080);
+                        break;
                 }
             }
             catch (Exception ex)
@@ -322,7 +319,7 @@ namespace PowerScope
 
         private void ShowAboutWindow()
         {
-            var aboutWindow = new View.UserForms.AboutWindow();
+            View.UserForms.AboutWindow aboutWindow = new View.UserForms.AboutWindow();
             aboutWindow.Owner = this;
             aboutWindow.ShowDialog();
         }
@@ -402,7 +399,7 @@ namespace PowerScope
         private void writeSettingsToXML()
         {
             string filePath = Path.Combine(Directory.GetCurrentDirectory(), "Settings.xml");
-            Serializer.WriteSettingsToXML(filePath, _plotManager, DataStreamBar);
+            Serializer.SaveSessionToXML(filePath, _plotManager, DataStreamBar);
         }
 
         /// <summary>
@@ -410,30 +407,53 @@ namespace PowerScope
         /// Uses the file given via the --config command line argument when present,
         /// otherwise Settings.xml in the application directory.
         /// </summary>
-        private void readSettingsXML()
+        private void RestoreSessionFromXML()
         {
-            string filePath = App.ConfigFilePath ?? Path.Combine(Directory.GetCurrentDirectory(), "Settings.xml");
-            Serializer.ReadSettingsFromXML(filePath, _plotManager, DataStreamBar);
+            string filePath;
+            if (App.ConfigFilePath != null)
+                filePath = App.ConfigFilePath;
+            else
+                filePath = Path.Combine(Directory.GetCurrentDirectory(), "Settings.xml");
+            Serializer.LoadSessionFromXML(filePath, _plotManager, DataStreamBar, ResolveMissingSerialPort);
+        }
+
+        /// <summary>
+        /// Prompts the user to pick a replacement COM port when a saved serial stream's port no
+        /// longer exists. All other settings parsed from the session file are kept and the
+        /// existing StreamConfigWindow is reused to let the user pick a new port.
+        /// </summary>
+        private StreamSettings ResolveMissingSerialPort(StreamSettings settings)
+        {
+            MessageBox.Show(
+                $"The serial port '{settings.Port}' used by a saved stream was not found on this system.\n\nSelect a different port in the next dialog, or Cancel to skip restoring that stream.",
+                "Serial Port Not Found", MessageBoxButton.OK, MessageBoxImage.Warning);
+
+            SerialConfigWindow window = new SerialConfigWindow(settings) { Owner = this };
+            bool? dialogResult = window.ShowDialog();
+            if (dialogResult == true)
+                return settings;
+            else
+                return null;
         }
 
         protected override void OnClosed(EventArgs e)
         {
-            // Stop accepting MCP requests before tearing anything down
+            // Stop accepting MCP requests before tearing anything down.
+            // _mcpServer can genuinely be null here (MCP server disabled or never started).
             _mcpServer?.Dispose();
 
             writeSettingsToXML(); // Save settings on exit
 
             // Stop updates
-            _plotManager?.StopUpdates();
-            MeasurementBar?.StopUpdates();
+            _plotManager.StopUpdates();
+            MeasurementBar.StopUpdates();
 
             // Dispose components
-            _plotManager?.Dispose();
-            MeasurementBar?.Dispose();
+            _plotManager.Dispose();
+            MeasurementBar.Dispose();
 
             // Dispose DataStreamBar which will handle all stream disposal
-            DataStreamBar?.Dispose();
-            _mcpServer?.Dispose();
+            DataStreamBar.Dispose();
             base.OnClosed(e);
         }
 
@@ -479,11 +499,14 @@ namespace PowerScope
                 });
             }
 
-            public void LoadConfiguration(string filePath)
+            public IReadOnlyList<string> LoadConfiguration(string filePath)
             {
-                _window.Dispatcher.Invoke(() =>
+                return _window.Dispatcher.Invoke(() =>
                 {
-                    Serializer.ReadSettingsFromXML(filePath, _window._plotManager, _window.DataStreamBar);
+                    // No resolveMissingPort callback: this path is driven by an MCP tool call, so
+                    // there may be no one watching a modal dialog. Streams with a missing COM port
+                    // are skipped and reported back in the returned list instead.
+                    return Serializer.LoadSessionFromXML(filePath, _window._plotManager, _window.DataStreamBar);
                 });
             }
 
@@ -495,6 +518,14 @@ namespace PowerScope
                     {
                         _window.DataStreamBar.RemoveStreamByDataStream(stream);
                     }
+                });
+            }
+
+            public void RemoveStream(IDataStream stream)
+            {
+                _window.Dispatcher.Invoke(() =>
+                {
+                    _window.DataStreamBar.RemoveStreamByDataStream(stream);
                 });
             }
 
@@ -528,7 +559,10 @@ namespace PowerScope
 
         public RelayCommand(Action execute, Func<bool> canExecute = null)
         {
-            _execute = execute ?? throw new ArgumentNullException(nameof(execute));
+            if (execute == null)
+                throw new ArgumentNullException(nameof(execute));
+
+            _execute = execute;
             _canExecute = canExecute;
         }
 

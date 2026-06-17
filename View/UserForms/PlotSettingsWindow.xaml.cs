@@ -1,10 +1,7 @@
-﻿using System;
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Input;
 using System.Text.RegularExpressions;
 using PowerScope.Model;
-using System.Linq;
-using System.Collections.Generic;
 
 namespace PowerScope.View.UserForms
 {

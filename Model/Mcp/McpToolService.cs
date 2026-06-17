@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -51,6 +49,7 @@ namespace PowerScope.Model.Mcp
                 case "add_demo_stream": return AddDemoStream(arguments);
                 case "load_config": return LoadConfig(arguments);
                 case "remove_all_streams": return RemoveAllStreams();
+                case "remove_stream": return RemoveStream(arguments);
                 case "capture_plot": return CapturePlot(arguments);
                 default:
                     throw new McpToolException($"Unknown tool '{name}'.");
@@ -247,10 +246,18 @@ namespace PowerScope.Model.Mcp
             if (!File.Exists(filePath))
                 throw new McpToolException($"Configuration file not found: {filePath}");
 
-            _host.LoadConfiguration(filePath);
+            IReadOnlyList<string> skippedStreams = _host.LoadConfiguration(filePath);
 
             JsonObject result = GetStatus();
             result["loaded"] = filePath;
+
+            JsonArray skippedArray = new JsonArray();
+            foreach (string skipped in skippedStreams)
+                skippedArray.Add(skipped);
+            result["skipped_streams"] = skippedArray;
+            if (skippedArray.Count > 0)
+                result["warning"] = $"{skippedArray.Count} stream(s) could not be restored. See 'skipped_streams' for details.";
+
             return result;
         }
 
@@ -258,6 +265,29 @@ namespace PowerScope.Model.Mcp
         {
             _host.RemoveAllStreams();
             return new JsonObject { ["removed"] = true };
+        }
+
+        private JsonObject RemoveStream(JsonObject args)
+        {
+            (Channel channel, _) = ResolveChannel(args);
+            IDataStream stream = channel.OwnerStream;
+            string streamType = stream.StreamType;
+
+            int removedChannels = 0;
+            foreach (Channel c in _host.GetChannels())
+            {
+                if (c.OwnerStream == stream)
+                    removedChannels++;
+            }
+
+            _host.RemoveStream(stream);
+
+            return new JsonObject
+            {
+                ["removed"] = true,
+                ["stream_type"] = streamType,
+                ["channels_removed"] = removedChannels
+            };
         }
 
         private JsonObject CapturePlot(JsonObject args)

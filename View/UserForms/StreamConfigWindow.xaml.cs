@@ -1,12 +1,9 @@
-﻿using System;
-using System.Linq;
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Controls;
 using System.IO.Ports;
 using NAudio.Wave;
 using NAudio.CoreAudioApi;
 using System.Management;
-using System.Collections.Generic;
 using System.Windows.Input;
 using System.Text.RegularExpressions;
 using PowerScope.Model;

@@ -1,11 +1,8 @@
-using System;
 using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.ComponentModel;
 using System.Text.Json.Nodes;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -165,6 +162,16 @@ namespace PowerScope.Model.Mcp
         [McpServerTool(Name = "remove_all_streams")]
         [Description("Stop, disconnect and remove all active streams and their channels.")]
         public string RemoveAllStreams() => _service.CallTool("remove_all_streams", new JsonObject()).ToJsonString();
+
+        [McpServerTool(Name = "remove_stream")]
+        [Description("Stop, disconnect and remove a single stream and all of its channels, identified by any one of its channels. Other streams are left running. Use get_status first to find the channel index or label.")]
+        public string RemoveStream(
+            [Description("Any channel belonging to the stream to remove: global index integer or label string from get_status.")] string channel)
+        {
+            var args = new JsonObject();
+            SetChannel(args, channel);
+            return _service.CallTool("remove_stream", args).ToJsonString();
+        }
 
         [McpServerTool(Name = "capture_plot")]
         [Description("Render the current PowerScope plot to a PNG or SVG file and return the file path. Use this to get a visual snapshot of the waveforms without transferring raw sample data.")]

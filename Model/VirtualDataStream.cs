@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using System.ComponentModel;
 
 namespace PowerScope.Model
@@ -412,8 +410,8 @@ namespace PowerScope.Model
             {
                 VirtualChannelOperationType.Add => "+",
                 VirtualChannelOperationType.Subtract => "-",
-                VirtualChannelOperationType.Multiply => "×",
-                VirtualChannelOperationType.Divide => "÷",
+                VirtualChannelOperationType.Multiply => "ï¿½",
+                VirtualChannelOperationType.Divide => "ï¿½",
                 _ => "?"
             };
         }

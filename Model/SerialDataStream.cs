@@ -1,10 +1,7 @@
 ﻿using System.Text;
 using System.IO.Ports;
-using System.Linq;
 using System.Diagnostics;
-using System.Threading;
 using System.ComponentModel;
-using System.Threading.Tasks;
 
 namespace PowerScope.Model
 {

@@ -1,5 +1,3 @@
-using System;
-using System.Linq;
 using ScottPlot.Plottables;
 
 namespace PowerScope.Model

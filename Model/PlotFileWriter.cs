@@ -1,8 +1,5 @@
-﻿using System;
-using System.Collections.ObjectModel;
-using System.Globalization;
+﻿using System.Collections.ObjectModel;
 using System.IO;
-using System.Collections.Generic;
 
 namespace PowerScope.Model
 {

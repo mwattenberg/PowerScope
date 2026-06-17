@@ -1,12 +1,7 @@
-﻿using System;
-using System.Linq;
-using System.Threading.Tasks;
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
 using System.Windows.Media;
-using System.Collections.ObjectModel;
-using System.Collections.Specialized;
 using PowerScope.Model;
 
 namespace PowerScope.View.UserControls

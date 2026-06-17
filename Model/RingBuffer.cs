@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace PowerScope.Model
+﻿namespace PowerScope.Model
 {
     public class RingBuffer<T>
     {

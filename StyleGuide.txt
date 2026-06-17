@@ -1,6 +1,5 @@
 ﻿Use these guide lines for code readably:
-- No tenary operators.
-- No null conditional operators.
+- No tenary operators. No null-coalescing operator (??) either - use explicit if-else.
 - explicit if-else statements.
 - Skip {} for single line if / else statements.
 - Do not use LINQ when a foreach loop is more readable.

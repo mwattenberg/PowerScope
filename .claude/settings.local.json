@@ -23,7 +23,9 @@
       "WebFetch(domain:raw.githubusercontent.com)",
       "WebFetch(domain:github.com)",
       "Bash(Remove-Item \"C:\\\\Users\\\\Martin\\\\source\\\\repos\\\\mwattenberg\\\\PowerScope\\\\Tests\\\\McpServerProtocolTests.cs\")",
-      "Bash(dotnet test *)"
+      "Bash(dotnet test *)",
+      "mcp__powerscope__get_status",
+      "mcp__powerscope__remove_stream"
     ]
   }
 }

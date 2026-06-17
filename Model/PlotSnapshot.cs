@@ -1,4 +1,3 @@
-using System;
 using System.Collections.ObjectModel;
 
 namespace PowerScope.Model
@@ -6,7 +5,7 @@ namespace PowerScope.Model
     /// <summary>
     /// A frozen snapshot of the data currently visible on the plot.
     /// Created by PlotManager and consumed by PlotFileWriter for export.
-    /// Carries no behaviour — data only.
+    /// Carries no behaviour ï¿½ data only.
     /// </summary>
     public class PlotSnapshot
     {
