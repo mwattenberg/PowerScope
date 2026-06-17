@@ -31,12 +31,14 @@ namespace PowerScope.Model
         private readonly int _maxChannels;
         private ObservableCollection<Channel> _channels;
 
-        // Recording functionality
-        private readonly PlotFileWriter _fileWriter;
+        // Recording functionality. Exposed directly so callers (e.g. RunControl via MainWindow)
+        // start/stop recording and check IsRecording on the recorder itself, instead of PlotManager
+        // re-exposing a parallel set of recording methods it would just forward.
+        private readonly PlotFileWriter _recorder;
 
-        internal PlotFileWriter FileWriter
+        public PlotFileWriter Recorder
         {
-            get { return _fileWriter; }
+            get { return _recorder; }
         }
 
         // DPI scaling for mouse handling
@@ -99,9 +101,9 @@ namespace PowerScope.Model
 
             _dpi = VisualTreeHelper.GetDpi(Plot);
 
-            // Initialize file writer
-            _fileWriter = new PlotFileWriter();
-            _fileWriter.Channels = _channels;
+            // Initialize recorder
+            _recorder = new PlotFileWriter();
+            _recorder.Channels = _channels;
         }
 
         /// <summary>
@@ -132,46 +134,16 @@ namespace PowerScope.Model
             // Update cursor channel data automatically
             _cursor.UpdateChannelData(_channels);
 
-            // Update writer channels
-            if (_fileWriter != null)
-            {
-                _fileWriter.Channels = _channels;
-            }
+            // Keep the recorder in sync with whatever channels are currently selected
+            _recorder.Channels = _channels;
+            if (_channels.Count > 0)
+                _recorder.SampleRate = _channels[0].OwnerStream.SampleRate;
 
             // Update the display
             UpdateChannelDisplay();
         }
 
         #region Recording
-        public bool IsRecording
-        {
-            get { return _fileWriter.IsRecording; }
-        }
-
-        public bool StartRecording(string filePath)
-        {
-            if (IsRecording)
-                return false;
-
-            _fileWriter.SampleRate = _channels[0].OwnerStream.SampleRate;
-            _fileWriter.Channels = _channels;
-
-            if (_fileWriter.StartRecording(filePath))
-            {
-                _fileWriter.WritePendingSamples();
-                return true;
-            }
-
-            return false;
-        }
-
-        public void StopRecording()
-        {
-            if (!IsRecording)
-                return;
-
-            _fileWriter.StopRecording();
-        }
 
         /// <summary>
         /// Returns a snapshot of the data currently visible on the plot.
@@ -507,9 +479,9 @@ namespace PowerScope.Model
             {
                 CopyChannelDataToPlot();
 
-                if (_fileWriter != null && _fileWriter.IsRecording)
+                if (_recorder.IsRecording)
                 {
-                    _fileWriter.WritePendingSamples();
+                    _recorder.WritePendingSamples();
                 }
 
                 if (Settings.YAutoScale)
@@ -615,7 +587,6 @@ namespace PowerScope.Model
             {
                 _disposed = true;
 
-                StopRecording();
                 DisableCursors();
                 _cursor?.Dispose();
                 StopUpdates();
@@ -634,7 +605,7 @@ namespace PowerScope.Model
                     Settings.PropertyChanged -= OnSettingsChanged;
                 }
 
-                _fileWriter?.Dispose();
+                _recorder.Dispose();
             }
         }
 

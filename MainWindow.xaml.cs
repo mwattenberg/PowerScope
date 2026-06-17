@@ -238,7 +238,7 @@ namespace PowerScope
                 return;
             }
 
-            _plotManager.FileWriter.ExportSnapshot(filePath, snapshot);
+            _plotManager.Recorder.ExportSnapshot(filePath, snapshot);
         }
 
         private void OpenWaveform()
@@ -371,20 +371,16 @@ namespace PowerScope
 
                 if (saveDialog.ShowDialog() == true)
                 {
-                    if (_plotManager.StartRecording(saveDialog.FileName))
-                    {
+                    if (_plotManager.Recorder.StartRecording(saveDialog.FileName))
                         RunControl.IsRecording = true;
-                    }
                     else
-                    {
                         MessageBox.Show("Failed to start recording. Please check that you have enabled channels and they are streaming data.",
                             "Recording Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                    }
                 }
             }
             else
             {
-                _plotManager.StopRecording();
+                _plotManager.Recorder.StopRecording();
             }
         }
 

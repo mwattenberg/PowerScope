@@ -204,12 +204,16 @@ namespace PowerScope.Model
                 RtsEnable = false
             };
 
-            if (source.StopBits == 1)
-                _port.StopBits = StopBits.One;
-            else if (source.StopBits == 2)
-                _port.StopBits = StopBits.Two;
-            else
-                _port.StopBits = StopBits.One;
+            switch (source.StopBits)
+            {
+                case 2:
+                    _port.StopBits = StopBits.Two;
+                    break;
+                case 1:
+                default:
+                    _port.StopBits = StopBits.One;
+                    break;
+            }
 
             // Initialize with smart default buffer size
             // PlotManager will call SetBufferSize() later with the actual PlotSettings.BufferSize
@@ -275,7 +279,7 @@ namespace PowerScope.Model
                 _channelSettings[channelIndex] = settings;
 
                 // Update filter reference and reset if filter type changed
-                var newFilter = settings?.Filter;
+                IDigitalFilter newFilter = settings?.Filter;
                 if (_channelFilters[channelIndex] != newFilter)
                 {
                     _channelFilters[channelIndex] = newFilter;
@@ -319,7 +323,9 @@ namespace PowerScope.Model
             {
                 lock (_channelConfigLock)
                 {
-                    return ReceivedData?[0]?.Capacity ?? 0;
+                    if (ReceivedData == null || ReceivedData[0] == null)
+                        return 0;
+                    return ReceivedData[0].Capacity;
                 }
             }
             set
@@ -332,7 +338,7 @@ namespace PowerScope.Model
                     // Clear existing data
                     if (ReceivedData != null)
                     {
-                        foreach (var buffer in ReceivedData)
+                        foreach (RingBuffer<double> buffer in ReceivedData)
                         {
                             buffer?.Clear();
                         }
@@ -365,9 +371,16 @@ namespace PowerScope.Model
 
         #region Data Processing
 
-        private double ApplyChannelProcessing(int channel, double rawSample)
+        /// <summary>
+        /// Applies gain/offset and filtering for one channel across a whole batch of samples.
+        /// Settings/filter are fetched once per batch rather than once per sample: a config
+        /// change landing mid-batch is visible on the next batch instead of immediately, which
+        /// is an acceptable tradeoff for a live data stream and avoids per-sample lock overhead.
+        /// The gain/offset pass has no cross-sample dependency and auto-vectorizes; the filter
+        /// pass is inherently sequential (IIR state) so it stays as a separate loop.
+        /// </summary>
+        private void ApplyChannelProcessing(int channel, double[] rawSamples, double[] destination, int sampleCount)
         {
-            // Get channel settings safely
             ChannelSettings settings;
             IDigitalFilter filter;
 
@@ -378,18 +391,32 @@ namespace PowerScope.Model
             }
 
             if (settings == null)
-                return rawSample;
-
-            // Apply gain and offset
-            double processed = settings.Gain * (rawSample + settings.Offset);
-
-            // Apply filter if configured
-            if (filter != null)
             {
-                processed = filter.Filter(processed);
+                Array.Copy(rawSamples, destination, sampleCount);
+            }
+            else
+            {
+                double gain = settings.Gain;
+                double offset = settings.Offset;
+                for (int i = 0; i < sampleCount; i++)
+                {
+                    double processed = gain * (rawSamples[i] + offset);
+                    if (!double.IsFinite(processed))
+                        processed = 0.0;
+                    destination[i] = processed;
+                }
             }
 
-            return processed;
+            if (filter != null)
+            {
+                for (int i = 0; i < sampleCount; i++)
+                {
+                    double filtered = filter.Filter(destination[i]);
+                    if (!double.IsFinite(filtered))
+                        filtered = 0.0;
+                    destination[i] = filtered;
+                }
+            }
         }
 
         #endregion
@@ -738,48 +765,40 @@ namespace PowerScope.Model
             // Copy new data to working buffer, after any prepended residue
             Array.Copy(readBuffer, 0, workingBuffer, workingBufferOffset, bytesRead);
 
-            try
+            if (_useFastBinaryPath)
             {
-                if (_useFastBinaryPath)
-                {
-                    // Zero-allocation path: ParseInto fills _parseOutput and refills _residueBuffer in place.
-                    int sampleCount = Parser.ParseInto(
-                        workingBuffer.AsSpan(0, totalDataLength),
-                        _parseOutput,
-                        _residueBuffer,
-                        out _residueLength);
+                // Zero-allocation path: ParseInto fills _parseOutput and refills _residueBuffer in place.
+                int sampleCount = Parser.ParseInto(
+                    workingBuffer.AsSpan(0, totalDataLength),
+                    _parseOutput,
+                    _residueBuffer,
+                    out _residueLength);
 
-                    // Safety: a runaway residue (more than half the buffer) indicates a format mismatch.
-                    if (_residueLength > workingBuffer.Length / 2)
-                        _residueLength = 0;
-
-                    if (sampleCount > 0)
-                        AddProcessedToRingBuffers(sampleCount);
-                }
-                else
-                {
-                    // Legacy allocating path for ASCII (not throughput-critical). ParseData returns a
-                    // freshly allocated double[][] and residue byte[]; copy the residue into our reusable
-                    // buffer so the prepend logic above stays uniform across both paths.
-                    ParsedData parsedData = Parser.ParseData(workingBuffer.AsSpan(0, totalDataLength));
-
+                // Safety: a runaway residue (more than half the buffer) indicates a format mismatch.
+                if (_residueLength > workingBuffer.Length / 2)
                     _residueLength = 0;
-                    if (parsedData.Residue != null &&
-                        parsedData.Residue.Length > 0 &&
-                        parsedData.Residue.Length <= workingBuffer.Length / 2)
-                    {
-                        _residueLength = parsedData.Residue.Length;
-                        Array.Copy(parsedData.Residue, 0, _residueBuffer, 0, _residueLength);
-                    }
 
-                    if (parsedData.Data != null)
-                        AddDataToRingBuffers(parsedData.Data);
-                }
+                if (sampleCount > 0)
+                    AddProcessedToRingBuffers(sampleCount);
             }
-            catch (Exception)
+            else
             {
-                // Parser failed - reset residue to recover
+                // Legacy allocating path for ASCII (not throughput-critical). ParseData returns a
+                // freshly allocated double[][] and residue byte[]; copy the residue into our reusable
+                // buffer so the prepend logic above stays uniform across both paths.
+                ParsedData parsedData = Parser.ParseData(workingBuffer.AsSpan(0, totalDataLength));
+
                 _residueLength = 0;
+                if (parsedData.Residue != null &&
+                    parsedData.Residue.Length > 0 &&
+                    parsedData.Residue.Length <= workingBuffer.Length / 2)
+                {
+                    _residueLength = parsedData.Residue.Length;
+                    Array.Copy(parsedData.Residue, 0, _residueBuffer, 0, _residueLength);
+                }
+
+                if (parsedData.Data != null)
+                    AddDataToRingBuffers(parsedData.Data);
             }
         }
 
@@ -803,13 +822,7 @@ namespace PowerScope.Model
             for (int channel = 0; channel < ChannelCount; channel++)
             {
                 double[] rawSamples = _parseOutput[channel];
-                for (int sample = 0; sample < sampleCount; sample++)
-                {
-                    double processed = ApplyChannelProcessing(channel, rawSamples[sample]);
-                    if (!double.IsFinite(processed))
-                        processed = 0.0; // Replace NaN/Infinity with zero
-                    _processedSamples[sample] = processed;
-                }
+                ApplyChannelProcessing(channel, rawSamples, _processedSamples, sampleCount);
 
                 if (_upDownSampling.IsEnabled)
                 {
@@ -857,13 +870,7 @@ namespace PowerScope.Model
                     continue;
 
                 double[] channelProcessedSamples = new double[parsedData[channel].Length];
-                for (int sample = 0; sample < parsedData[channel].Length; sample++)
-                {
-                    double processedSample = ApplyChannelProcessing(channel, parsedData[channel][sample]);
-                    if (!double.IsFinite(processedSample))
-                        processedSample = 0.0;
-                    channelProcessedSamples[sample] = processedSample;
-                }
+                ApplyChannelProcessing(channel, parsedData[channel], channelProcessedSamples, parsedData[channel].Length);
 
                 double[] channelFinalData = channelProcessedSamples;
                 if (_upDownSampling.IsEnabled)
