@@ -165,32 +165,32 @@ namespace PowerScope.Model
                     string numberTypeStr = ConvertBinaryFormatToNumberType(binaryFormatStr);
 
                     streamElement.Add(
-                          new XElement("StreamSource", "SerialPort"),
-                     new XElement("NumberOfChannels", serialStream.ChannelCount),
+                        new XElement("StreamSource", "SerialPort"),
+                        new XElement("NumberOfChannels", serialStream.ChannelCount),
                         new XElement("Port", serialStream.SourceSetting.PortName),
-                           new XElement("Baud", serialStream.SourceSetting.BaudRate),
-                     new XElement("DataBits", serialStream.SourceSetting.DataBits),
-                new XElement("StopBits", serialStream.SourceSetting.StopBits),
-                 new XElement("Parity", serialStream.SourceSetting.Parity.ToString()),
-                    new XElement("DataFormat", dataFormatStr),
-                     new XElement("NumberType", numberTypeStr),
-                      new XElement("Delimiter", delimiterStr),
-                  new XElement("FrameStart", frameStartStr),
-                  new XElement("UpDownSampling", upDownSamplingFactor)
-                 );
+                        new XElement("Baud", serialStream.SourceSetting.BaudRate),
+                        new XElement("DataBits", serialStream.SourceSetting.DataBits),
+                        new XElement("StopBits", serialStream.SourceSetting.StopBits),
+                        new XElement("Parity", serialStream.SourceSetting.Parity.ToString()),
+                        new XElement("DataFormat", dataFormatStr),
+                        new XElement("NumberType", numberTypeStr),
+                        new XElement("Delimiter", delimiterStr),
+                        new XElement("FrameStart", frameStartStr),
+                        new XElement("UpDownSampling", upDownSamplingFactor)
+                        );
                 }
 
                 XElement channelsElement = new XElement("Channels");
                 foreach (Channel channel in channels)
                 {
                     XElement channelElement = new XElement("Channel",
-                       new XElement("LocalIndex", channel.LocalChannelIndex),
-                      new XElement("Label", channel.Settings.Label),
+                        new XElement("LocalIndex", channel.LocalChannelIndex),
+                        new XElement("Label", channel.Settings.Label),
                         new XElement("Color", channel.Settings.Color.ToString()),
-                  new XElement("IsEnabled", channel.Settings.IsEnabled),
-                          new XElement("Gain", channel.Settings.Gain.ToString(System.Globalization.CultureInfo.InvariantCulture)),
-                      new XElement("Offset", channel.Settings.Offset.ToString(System.Globalization.CultureInfo.InvariantCulture))
-                      );
+                        new XElement("IsEnabled", channel.Settings.IsEnabled),
+                        new XElement("Gain", channel.Settings.Gain.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+                        new XElement("Offset", channel.Settings.Offset.ToString(System.Globalization.CultureInfo.InvariantCulture))
+                        );
 
                     if (channel.Settings.Filter != null)
                     {
@@ -203,9 +203,9 @@ namespace PowerScope.Model
                         foreach (KeyValuePair<string, double> parameter in parameters)
                         {
                             parametersElement.Add(new XElement("Parameter",
-                               new XAttribute("Name", parameter.Key),
+                                new XAttribute("Name", parameter.Key),
                                 new XAttribute("Value", parameter.Value.ToString(System.Globalization.CultureInfo.InvariantCulture))
-                              ));
+                                ));
                         }
                         filterElement.Add(parametersElement);
                         channelElement.Add(filterElement);
@@ -217,7 +217,7 @@ namespace PowerScope.Model
                         foreach (Measurement measurement in channel.Measurements)
                         {
                             XElement measurementElement = new XElement("Measurement",
-                          new XElement("Type", measurement.Type.ToString())
+                                new XElement("Type", measurement.Type.ToString())
                                 );
                             measurementsElement.Add(measurementElement);
                         }

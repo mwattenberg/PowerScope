@@ -420,11 +420,18 @@ namespace PowerScope
         /// </summary>
         private StreamSettings ResolveMissingSerialPort(StreamSettings settings)
         {
-            MessageBox.Show(
+            MessageBoxResult choice = MessageBox.Show(
                 $"The serial port '{settings.Port}' used by a saved stream was not found on this system.\n\nSelect a different port in the next dialog, or Cancel to skip restoring that stream.",
-                "Serial Port Not Found", MessageBoxButton.OK, MessageBoxImage.Warning);
+                "Serial Port Not Found", MessageBoxButton.OKCancel, MessageBoxImage.Warning);
+            if (choice == MessageBoxResult.Cancel)
+                return null;
 
-            SerialConfigWindow window = new SerialConfigWindow(settings) { Owner = this };
+            // This runs from RestoreSessionFromXML(), which the constructor calls before WPF
+            // shows this window. Setting Owner to a Window that has not yet been shown throws,
+            // so only own the dialog once this window is actually on screen.
+            SerialConfigWindow window = new SerialConfigWindow(settings);
+            if (IsVisible)
+                window.Owner = this;
             bool? dialogResult = window.ShowDialog();
             if (dialogResult == true)
                 return settings;

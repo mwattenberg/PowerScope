@@ -60,6 +60,7 @@ namespace PowerScope.Model
         /// </summary>
         public static Color GetColor(int index)
         {
+            //Color 3 of Tsitsulin is not nice, replace with accent color lime green
             if (index == 3)
             {
                 return System.Windows.Media.Colors.LimeGreen;
@@ -239,20 +240,21 @@ namespace PowerScope.Model
         private void OnChannelPropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
             Application.Current.Dispatcher.BeginInvoke(() =>
-{
-    switch (e.PropertyName)
-    {
-        case nameof(Channel.IsEnabled):
-        case "Settings.IsEnabled":
-            UpdateChannelDisplay();
-            break;
+            {
+                // Channel forwards each ChannelSettings change twice: once as "Settings.<Name>"
+                // and once as the bare property name (e.g. "IsEnabled"). Only handle the bare
+                // name here, otherwise UpdateChannelDisplay/ApplyChannelColors run twice per change.
+                switch (e.PropertyName)
+                {
+                    case nameof(Channel.IsEnabled):
+                        UpdateChannelDisplay();
+                        break;
 
-        case nameof(Channel.Color):
-        case "Settings.Color":
-            ApplyChannelColors();
-            break;
-    }
-});
+                    case nameof(Channel.Color):
+                        ApplyChannelColors();
+                        break;
+                }
+            });
         }
 
         private void RebuildSignalsForNewXRange()

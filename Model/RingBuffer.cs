@@ -43,7 +43,9 @@
             lock (_lock)
             {
                 _buffer[_head] = item;
-                _head = (_head + 1) % _capacity;
+                _head++;
+                if (_head == _capacity)
+                    _head = 0;
 
                 if (_count < _capacity)
                 {
@@ -52,7 +54,9 @@
                 else
                 {
                     // Buffer is full, move tail forward (overwrite oldest)
-                    _tail = (_tail + 1) % _capacity;
+                    _tail++;
+                    if (_tail == _capacity)
+                        _tail = 0;
                 }
             }
         }
@@ -92,7 +96,9 @@
                 for (int i = 0; i < count; i++)
                 {
                     _buffer[_head] = source[i];
-                    _head = (_head + 1) % _capacity;
+                    _head++;
+                    if (_head == _capacity)
+                        _head = 0;
 
                     if (_count < _capacity)
                     {
@@ -100,7 +106,9 @@
                     }
                     else
                     {
-                        _tail = (_tail + 1) % _capacity;
+                        _tail++;
+                        if (_tail == _capacity)
+                            _tail = 0;
                     }
                 }
             }
@@ -123,7 +131,9 @@
                     return 0;
 
                 // Calculate starting position for the latest data
-                int startIndex = (_head - actualCount + _capacity) % _capacity;
+                int startIndex = _head - actualCount;
+                if (startIndex < 0)
+                    startIndex += _capacity;
                 
                 // Handle the case where data wraps around the circular buffer
                 if (startIndex + actualCount <= _capacity)
