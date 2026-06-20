@@ -77,8 +77,9 @@
         <Style x:Key="SmallLabelStyle" TargetType="TextBlock">
             <Setter Property="FontFamily" Value="{DynamicResource {x:Static SystemFonts.MessageFontFamily}}"/>
             <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="Bold"/>
             <Setter Property="HorizontalAlignment" Value="Center"/>
-            <Setter Property="Foreground" Value="{DynamicResource PlotSettings_LabelForegroundBrush}"/>
+            <Setter Property="Foreground" Value="White"/>
         </Style>
     </Window.Resources>
     
@@ -136,7 +137,7 @@
 
                         <Button Grid.Row="0" Grid.Column="0" x:Name="Button_None" Style="{StaticResource FilterButtonStyle}" Click="FilterButton_Click" Tag="None" ToolTip="No filter applied">
                             <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
-                                <TextBlock Text="∅" FontSize="40" HorizontalAlignment="Center" VerticalAlignment="Center" Width="48" Height="48" Margin="10,0,0,0" Foreground="{DynamicResource PlotSettings_LabelForegroundBrush}"/>
+                                <TextBlock Text="∅" FontSize="40" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" Width="48" Height="48" Margin="10,0,0,0" Foreground="White"/>
                                 <TextBlock Text="None" Style="{StaticResource SmallLabelStyle}"/>
                             </StackPanel>
                         </Button>

@@ -81,35 +81,27 @@ namespace PowerScope.View.UserForms
         {
             // Reset all button styles
             ResetButtonStyles();
-            
-            // Highlight the selected button by its name
-            Button selectedButton = FindName($"Button_{filterType}") as Button;
 
-            if (selectedButton != null)
-            {
-                object accentColor = Application.Current.Resources["AccentColor"];
-                if (accentColor != null)
-                {
-                    selectedButton.BorderBrush = new SolidColorBrush((Color)accentColor);
-                    selectedButton.BorderThickness = new Thickness(3);
-                }
-            }
+            // Highlight the active filter via the button's own background, leaving the frame as-is.
+            if (FindName($"Button_{filterType}") is Button selectedButton)
+                selectedButton.Background = Brushes.LimeGreen;
         }
 
         private void ResetButtonStyles()
         {
-            var buttonNames = new[] 
-            { 
-                "Button_None", "Button_LowPass", "Button_HighPass", "Button_MovingAverage", 
-                "Button_Median", "Button_Notch", "Button_Absolute", "Button_Squared" 
+            var buttonNames = new[]
+            {
+                "Button_None", "Button_LowPass", "Button_HighPass", "Button_MovingAverage",
+                "Button_Median", "Button_Notch", "Button_Absolute", "Button_Squared"
             };
-            
+
             foreach (var buttonName in buttonNames)
             {
                 Button button = FindName(buttonName) as Button;
                 if (button != null)
                 {
                     button.ClearValue(Button.BorderBrushProperty);
+                    button.ClearValue(Button.BackgroundProperty);
                     button.BorderThickness = new Thickness(2);
                 }
             }
@@ -321,16 +313,6 @@ namespace PowerScope.View.UserForms
                 if (parameters.ContainsKey("WindowSize")) return (int)parameters["WindowSize"];
             }
             return 5;
-        }
-
-        private int GetCurrentDownsamplingRate()
-        {
-            if (_channelSettings?.Filter != null)
-            {
-                var parameters = _channelSettings.Filter.GetFilterParameters();
-                if (parameters.ContainsKey("Rate")) return (int)parameters["Rate"];
-            }
-            return 3;
         }
 
         private double GetCurrentNotchFreq()

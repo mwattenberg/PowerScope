@@ -16,9 +16,6 @@
         FontSize="{DynamicResource {x:Static SystemFonts.MessageFontSize}}">
     <Window.Resources>
         <!-- Dark theme styles using global resources and system fonts -->
-        <Style TargetType="Label" BasedOn="{StaticResource LabelStyle}">
-            <!-- Inherits system font settings from LabelStyle in App.xaml -->
-        </Style>
         <Style TargetType="Button" BasedOn="{StaticResource ButtonStyle}">
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Padding" Value="5,5"/>
@@ -82,8 +79,9 @@
         <Style x:Key="SmallLabelStyle" TargetType="TextBlock">
             <Setter Property="FontFamily" Value="{DynamicResource {x:Static SystemFonts.MessageFontFamily}}"/>
             <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="Bold"/>
             <Setter Property="HorizontalAlignment" Value="Center"/>
-            <Setter Property="Foreground" Value="{DynamicResource PlotSettings_LabelForegroundBrush}"/>
+            <Setter Property="Foreground" Value="White"/>
         </Style>
     </Window.Resources>
     
@@ -99,7 +97,6 @@
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
-                <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
             
             <!-- Custom title bar -->
@@ -122,7 +119,7 @@
             </Grid>
 
             <!-- Content Area - Grid of measurement buttons -->
-            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="20,10,20,20" Grid.RowSpan="2">
+            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="20,10,20,20">
                 <UniformGrid Columns="3" HorizontalAlignment="Center">
                     
                     <!-- Minimum Button -->
@@ -223,9 +220,6 @@
 
                 </UniformGrid>
             </ScrollViewer>
-
-            <!-- Bottom buttons -->
-            <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="20,10,20,20"/>
         </Grid>
     </Border>
 </Window>
