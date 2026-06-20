@@ -121,19 +121,26 @@ namespace PowerScope.View.UserControls
         }
 
         /// <summary>
+        /// Finds the StreamInfoPanel associated with a specific stream, or null if none exists.
+        /// </summary>
+        private StreamInfoPanel FindPanelForStream(IDataStream dataStream)
+        {
+            foreach (UIElement child in Panel_Streams.Children)
+            {
+                if (child is StreamInfoPanel panel && panel.AssociatedDataStream == dataStream)
+                    return panel;
+            }
+            return null;
+        }
+
+        /// <summary>
         /// Removes the StreamInfoPanel for a specific stream
         /// </summary>
         private void RemoveStreamInfoPanelForStream(IDataStream dataStream)
         {
-            for (int i = Panel_Streams.Children.Count - 1; i >= 0; i--)
-            {
-                if (Panel_Streams.Children[i] is StreamInfoPanel panel && 
-                    panel.AssociatedDataStream == dataStream)
-                {
-                    Panel_Streams.Children.RemoveAt(i);
-                    break;
-                }
-            }
+            StreamInfoPanel panel = FindPanelForStream(dataStream);
+            if (panel != null)
+                Panel_Streams.Children.Remove(panel);
         }
 
         private void Button_AddStream_Click(object sender, RoutedEventArgs e)
@@ -327,9 +334,57 @@ namespace PowerScope.View.UserControls
         {
             StreamInfoPanel panel = new StreamInfoPanel(datastream, settings);
             panel.OnRemoveClickedEvent += (s, args) => RemoveStreamByDataStream(datastream);
+            panel.OnReconfigureClickedEvent += (s, args) => ReconfigureStream(datastream);
             Panel_Streams.Children.Add(panel);
         }
-                
+
+        /// <summary>
+        /// Reconfigures a running stream: reopens the stream config dialog pre-filled with its
+        /// current settings, then on acceptance tears down the old stream and rebuilds it with
+        /// the edited settings (port/baud, channel count, data format, resampler factor, etc.),
+        /// reapplying each channel's label/color/gain/offset/filter/measurements by index - the
+        /// same snapshot/restore convention Serializer already uses when loading a saved session.
+        /// Cancelling the dialog leaves the original stream running untouched.
+        /// </summary>
+        public void ReconfigureStream(IDataStream dataStream)
+        {
+            StreamInfoPanel panel = FindPanelForStream(dataStream);
+            StreamSettings settings = panel?.AssociatedStreamSettings;
+            if (settings == null)
+                return;
+
+            // Snapshot per-channel settings + measurement types; reapplied by index after rebuild
+            var channelSnapshots = GetChannelsForStream(dataStream)
+                .Select(c => (Settings: c.Settings, Measurements: c.Measurements.Select(m => m.Type).ToList()))
+                .ToList();
+
+            SerialConfigWindow window = new SerialConfigWindow(settings);
+            window.TextBlock_Title.Text = "Reconfigure Stream";
+            window.Owner = Window.GetWindow(this);
+            if (window.ShowDialog() != true)
+                return;
+
+            settings.UpdateFromWindow(window);
+            IDataStream newStream = settings.CreateDataStream();
+            newStream.Connect();
+            newStream.StartStreaming();
+
+            // Stops/disconnects/disposes the old stream and cascades dependent virtual-channel cleanup
+            RemoveChannelsForStream(dataStream);
+            RemoveStreamInfoPanelForStream(dataStream);
+
+            Color[] colors = channelSnapshots.Select(s => s.Settings.Color).ToArray();
+            AddChannelsForStream(newStream, colors);
+
+            List<Channel> newChannels = GetChannelsForStream(newStream).ToList();
+            int count = Math.Min(channelSnapshots.Count, newChannels.Count);
+            for (int i = 0; i < count; i++)
+                Serializer.ApplyChannelSettings(newChannels[i], channelSnapshots[i].Settings, channelSnapshots[i].Measurements);
+
+            AddStreamInfoPanel(settings, newStream);
+        }
+
+
         /// <summary>
         /// Removes a stream by its data stream reference
         /// Much simpler than the old approach - no complex searching needed
@@ -344,15 +399,7 @@ namespace PowerScope.View.UserControls
             RemoveChannelsForStream(dataStream);
 
             // Find and remove the StreamInfoPanel
-            for (int i = Panel_Streams.Children.Count - 1; i >= 0; i--)
-            {
-                if (Panel_Streams.Children[i] is StreamInfoPanel panel && 
-                    panel.AssociatedDataStream == dataStream)
-                {
-                    Panel_Streams.Children.RemoveAt(i);
-                    break;
-                }
-            }
+            RemoveStreamInfoPanelForStream(dataStream);
 
             // ObservableCollection.CollectionChanged handles all notifications automatically
         }

@@ -2,7 +2,6 @@
 using System.Timers;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
 using System.Windows.Media;
 using PowerScope.Model;
 using System.IO;
@@ -16,6 +15,9 @@ namespace PowerScope.View.UserControls
 
         public delegate void OnRemoveClicked(object sender, EventArgs e);
         public event OnRemoveClicked OnRemoveClickedEvent;
+
+        public delegate void OnReconfigureClicked(object sender, EventArgs e);
+        public event OnReconfigureClicked OnReconfigureClickedEvent;
 
         public IDataStream AssociatedDataStream { get; set; }
         public StreamSettings AssociatedStreamSettings => _associatedStreamSettings;
@@ -41,9 +43,10 @@ namespace PowerScope.View.UserControls
 
             if (dataStream is USBDataStream)
             {
-                // USB: model owns all metric calculations and fires OnPropertyChanged.
-                // Bind directly — no polling timer needed.
-                SetupUsbBindings();
+                // USB: model owns all metric calculations and fires OnPropertyChanged from its
+                // background read thread (ReadUsbData) - handled via dispatched updates in
+                // DataStream_PropertyChanged below, not a WPF binding (which would not marshal
+                // onto the UI thread and would update inconsistently). No polling timer needed.
             }
             else
             {
@@ -112,42 +115,6 @@ namespace PowerScope.View.UserControls
             usageLabel.Text = AssociatedDataStream.StreamType == "USB" ? "Throughput:" : "Usage:";
         }
 
-        /// <summary>
-        /// For USB streams: wires the three metric TextBlocks directly to the model's
-        /// <see cref="USBDataStream.SampleRate"/>, <see cref="USBDataStream.ThroughputKBps"/>,
-        /// and <see cref="USBDataStream.StatusMessage"/> properties via WPF one-way bindings.
-        /// The model fires <see cref="INotifyPropertyChanged"/> whenever values change, so no
-        /// polling timer is needed on the view side.
-        /// </summary>
-        private void SetupUsbBindings()
-        {
-            // Samples/s  — e.g. "27,500"
-            SamplesPerSecondTextBlock.SetBinding(
-                TextBlock.TextProperty,
-                new Binding(nameof(USBDataStream.SampleRate))
-                {
-                    StringFormat = "N0",
-                    Mode = BindingMode.OneWay
-                });
-
-            // Throughput  — e.g. "440 KB/s"
-            PortUsageTextBlock.SetBinding(
-                TextBlock.TextProperty,
-                new Binding(nameof(USBDataStream.ThroughputKBps))
-                {
-                    StringFormat = "{0:F0} KB/s",
-                    Mode = BindingMode.OneWay
-                });
-
-            // Status  — "Running", "Stopped", "Err: …", etc.
-            StatusTextBlock.SetBinding(
-                TextBlock.TextProperty,
-                new Binding(nameof(USBDataStream.StatusMessage))
-                {
-                    Mode = BindingMode.OneWay
-                });
-        }
-
         private void DataStream_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
         {
             // Refresh the connect/disconnect button whenever the connection state changes
@@ -156,9 +123,32 @@ namespace PowerScope.View.UserControls
             {
                 Application.Current?.Dispatcher?.BeginInvoke(UpdateButtonAppearance);
             }
-            // Note: SampleRate / ThroughputKBps / StatusMessage for USB are handled by
-            // WPF one-way bindings set up in SetupUsbBindings() — no manual TextBlock
-            // updates are needed or wanted here (they would break the binding).
+
+            // USB streams raise these from their background read thread (ReadUsbData), so the
+            // TextBlock updates must be dispatched explicitly - a WPF Binding to a plain CLR
+            // object does not marshal PropertyChanged onto the UI thread, which is why the
+            // previous binding-based approach updated inconsistently.
+            if (sender is USBDataStream usbStream)
+            {
+                if (e.PropertyName == nameof(USBDataStream.SampleRate))
+                {
+                    double sampleRate = usbStream.SampleRate;
+                    Application.Current?.Dispatcher?.BeginInvoke(() =>
+                        SamplesPerSecondTextBlock.Text = sampleRate.ToString("N0"));
+                }
+                else if (e.PropertyName == nameof(USBDataStream.ThroughputKBps))
+                {
+                    double throughput = usbStream.ThroughputKBps;
+                    Application.Current?.Dispatcher?.BeginInvoke(() =>
+                        PortUsageTextBlock.Text = $"{throughput:F0} KB/s");
+                }
+                else if (e.PropertyName == nameof(USBDataStream.StatusMessage))
+                {
+                    string status = usbStream.StatusMessage;
+                    Application.Current?.Dispatcher?.BeginInvoke(() =>
+                        StatusTextBlock.Text = status);
+                }
+            }
         }
 
         private void UpdateButtonAppearance()
@@ -252,6 +242,11 @@ namespace PowerScope.View.UserControls
 
             if (OnRemoveClickedEvent != null)
                 OnRemoveClickedEvent.Invoke(this, EventArgs.Empty);
+        }
+
+        private void Button_Reconfigure_Click(object sender, RoutedEventArgs e)
+        {
+            OnReconfigureClickedEvent?.Invoke(this, EventArgs.Empty);
         }
     }
 }

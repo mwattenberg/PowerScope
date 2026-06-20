@@ -87,10 +87,10 @@ namespace PowerScope.Model
 
                 XElement streamElement = new XElement("Stream");
 
-                int upDownSamplingFactor = 0;
-                if (stream is IUpDownSampling upDownSamplingStream)
+                int resamplingFactor = 0;
+                if (stream is IResamplable resamplableStream)
                 {
-                    upDownSamplingFactor = upDownSamplingStream.UpDownSamplingFactor;
+                    resamplingFactor = resamplableStream.ResamplingFactor;
                 }
 
                 if (stream is DemoDataStream demoStream)
@@ -100,7 +100,7 @@ namespace PowerScope.Model
                     new XElement("NumberOfChannels", demoStream.ChannelCount),
                     new XElement("DemoSampleRate", demoStream.DemoSettings.SampleRate),
                       new XElement("DemoSignalType", demoStream.DemoSettings.SignalType.ToString()),
-                               new XElement("UpDownSampling", upDownSamplingFactor)
+                               new XElement("Resampling", resamplingFactor)
                       );
                 }
                 else if (stream is AudioDataStream audioStream)
@@ -114,7 +114,7 @@ namespace PowerScope.Model
                      new XElement("NumberOfChannels", audioStream.ChannelCount),
                 new XElement("AudioDevice", deviceName),
                           new XElement("AudioSampleRate", audioStream.SampleRate),
-                           new XElement("UpDownSampling", upDownSamplingFactor)
+                           new XElement("Resampling", resamplingFactor)
                   );
                 }
                 else if (stream is USBDataStream usbStream)
@@ -132,7 +132,7 @@ namespace PowerScope.Model
                         new XElement("DataFormat", dataFormatStr),
                         new XElement("NumberType", numberTypeStr),
                         new XElement("FrameStart", frameStartStr),
-                        new XElement("UpDownSampling", upDownSamplingFactor),
+                        new XElement("Resampling", resamplingFactor),
                         new XElement("UsbInterface", usbStream.Interface.ToString()),
                         new XElement("Baud", usbStream.UartBaudRate),
                         new XElement("UsbBufThreshold", usbStream.UartBufferThreshold),
@@ -176,7 +176,7 @@ namespace PowerScope.Model
                         new XElement("NumberType", numberTypeStr),
                         new XElement("Delimiter", delimiterStr),
                         new XElement("FrameStart", frameStartStr),
-                        new XElement("UpDownSampling", upDownSamplingFactor)
+                        new XElement("Resampling", resamplingFactor)
                         );
                 }
 
@@ -426,10 +426,10 @@ namespace PowerScope.Model
                     break;
             }
 
-            XElement upDownSamplingElement = streamElement.Element("UpDownSampling");
-            if (upDownSamplingElement != null && int.TryParse(upDownSamplingElement.Value, out int upDownSamplingFactor))
+            XElement resamplingElement = streamElement.Element("Resampling");
+            if (resamplingElement != null && int.TryParse(resamplingElement.Value, out int resamplingFactor))
             {
-                streamSettings.UpDownSampling = upDownSamplingFactor;
+                streamSettings.Resampling = resamplingFactor;
             }
 
             return streamSettings;
@@ -544,8 +544,8 @@ namespace PowerScope.Model
         {
             IDataStream dataStream = dataStreamBar.CreateDataStreamFromUserInput(streamSettings);
 
-            if (dataStream is IUpDownSampling upDownSamplingStream)
-                upDownSamplingStream.UpDownSamplingFactor = streamSettings.UpDownSampling;
+            if (dataStream is IResamplable resamplableStream)
+                resamplableStream.ResamplingFactor = streamSettings.Resampling;
 
             dataStream.Connect();
             dataStream.StartStreaming();
@@ -700,9 +700,10 @@ namespace PowerScope.Model
         }
 
         /// <summary>
-        /// Applies settings and measurements to a channel
+        /// Applies settings and measurements to a channel. Internal so DataStreamBar can reuse
+        /// the same index-matched reapply logic for runtime stream reconfiguration.
         /// </summary>
-        private static void ApplyChannelSettings(Channel channel, ChannelSettings settings, List<MeasurementType> measurements)
+        internal static void ApplyChannelSettings(Channel channel, ChannelSettings settings, List<MeasurementType> measurements)
         {
             channel.Settings.Label = settings.Label;
             channel.Settings.Color = settings.Color;

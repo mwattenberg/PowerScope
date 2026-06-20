@@ -86,7 +86,7 @@ namespace PowerScope.Model
     /// <summary>
     /// Interface for data streams that support up/down sampling
     /// </summary>
-    public interface IUpDownSampling : INotifyPropertyChanged
+    public interface IResamplable : INotifyPropertyChanged
     {
         /// <summary>
         /// Gets or sets the up/down sampling factor
@@ -95,7 +95,7 @@ namespace PowerScope.Model
         /// 0 = no sampling change (bypass)
         /// Range: -9 to +9 (factors of 10^n)
         /// </summary>
-        int UpDownSamplingFactor { get; set; }
+        int ResamplingFactor { get; set; }
 
         /// <summary>
         /// Gets the actual sample rate multiplier based on the up/down sampling factor
@@ -105,11 +105,11 @@ namespace PowerScope.Model
         /// <summary>
         /// Gets whether up/down sampling is currently enabled (factor != 0)
         /// </summary>
-        bool IsUpDownSamplingEnabled { get; }
+        bool IsResamplingEnabled { get; }
 
         /// <summary>
         /// Gets a human-readable description of the current sampling configuration
         /// </summary>
-        string UpDownSamplingDescription { get; }
+        string ResamplingDescription { get; }
     }
 }

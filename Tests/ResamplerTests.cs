@@ -1,14 +1,14 @@
-using PowerScope.Model;
+﻿using PowerScope.Model;
 using Xunit;
 
 namespace PowerScope.Tests
 {
     /// <summary>
-    /// Cross-checks UpDownSampling's vectorized FIR path against a faithful copy of the original
+    /// Cross-checks Resampler's vectorized FIR path against a faithful copy of the original
     /// pre-vectorization scalar algorithm, fed multiple consecutive variably-sized blocks so any
     /// tail-continuity regression across block boundaries would show up as a mismatch.
     /// </summary>
-    public class UpDownSamplingTests
+    public class ResamplerTests
     {
         [Theory]
         [InlineData(1)]
@@ -19,7 +19,7 @@ namespace PowerScope.Tests
         {
             double[] kernel = GenerateReferenceKernel(factor, out int kernelLen);
 
-            UpDownSampling sampling = new UpDownSampling(factor);
+            Resampler sampling = new Resampler(factor);
             sampling.InitializeChannels(1);
 
             double[] referenceUpTail = new double[kernelLen - 1];
@@ -69,7 +69,7 @@ namespace PowerScope.Tests
 
         private static double[] GenerateReferenceKernel(int samplingFactor, out int kernelLen)
         {
-            const int N = 32; // matches UpDownSampling.SincKernelHalfLength
+            const int N = 32; // matches Resampler.SincKernelHalfLength
             int M = Math.Abs(samplingFactor) + 1;
             double cutoff = 0.5 / M;
             cutoff *= 0.9;

@@ -38,10 +38,11 @@
         <Grid Grid.Row="0" Margin="2,2,2,2">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>    <!-- Connect button -->
+                <ColumnDefinition Width="Auto"/>    <!-- Reconfigure (edit) button -->
                 <ColumnDefinition Width="*"/>       <!-- Spacer -->
                 <ColumnDefinition Width="Auto"/>    <!-- Close button -->
             </Grid.ColumnDefinitions>
-            
+
             <!-- Connect/Disconnect button with play/pause icons (left-aligned) -->
             <Button Grid.Column="0" x:Name="Button_Connect" Content="▶️" Width="22" Height="22" Margin="2,0,2,0"
                     VerticalAlignment="Center" HorizontalAlignment="Left"
@@ -49,12 +50,20 @@
                     Background="Transparent" Foreground="LimeGreen"
                     BorderThickness="0" FontSize="12" FontWeight="Bold"
                     ToolTip="Connect" />
-            
+
+            <!-- Reconfigure button: reopen the stream config dialog, carrying current settings over -->
+            <Button Grid.Column="1" x:Name="Button_Reconfigure" Content="✎" Width="22" Height="22" Margin="2,0,2,0"
+                    VerticalAlignment="Center" HorizontalAlignment="Left"
+                    Click="Button_Reconfigure_Click"
+                    Background="Transparent" Foreground="LightGray"
+                    BorderThickness="0" FontSize="12" FontWeight="Bold"
+                    ToolTip="Reconfigure stream settings" />
+
             <!-- Spacer -->
-            <Border Grid.Column="1"/>
-            
+            <Border Grid.Column="2"/>
+
             <!-- Close button (right-aligned) -->
-            <Button Grid.Column="2" x:Name="Button_Close" Content="✕" Width="22" Height="22" 
+            <Button Grid.Column="3" x:Name="Button_Close" Content="✕" Width="22" Height="22"
                     VerticalAlignment="Center" HorizontalAlignment="Right"
                     Click="Button_Close_Click"
                     Background="Transparent" Foreground="LightGray"

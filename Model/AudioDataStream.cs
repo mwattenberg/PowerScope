@@ -1,10 +1,10 @@
-using System.ComponentModel;
+﻿using System.ComponentModel;
 using NAudio.CoreAudioApi;
 using NAudio.Wave;
 
 namespace PowerScope.Model
 {
-    public class AudioDataStream : IDataStream, IChannelConfigurable, IBufferResizable, IUpDownSampling, IDisposable
+    public class AudioDataStream : IDataStream, IChannelConfigurable, IBufferResizable, IResamplable, IDisposable
     {
         private bool _disposed = false;
         private bool _isConnected = false;
@@ -28,8 +28,8 @@ namespace PowerScope.Model
         // blocks, so these are sized to the largest block seen so far and reused on subsequent
         // callbacks instead of allocating per callback. Written only on the audio callback thread
         // (guarded by _dataLock).
-        //   _audioChannelData[channel][0..samples)  — raw samples after format conversion
-        //   _audioProcessed[0..samples)              — gain/offset/filter scratch, reused per channel
+        //   _audioChannelData[channel][0..samples)  â€” raw samples after format conversion
+        //   _audioProcessed[0..samples)              â€” gain/offset/filter scratch, reused per channel
         private double[][] _audioChannelData;
         private double[] _audioProcessed;
         private int _audioBufferCapacity;
@@ -40,7 +40,7 @@ namespace PowerScope.Model
         private readonly object _channelConfigLock = new object();
 
         // Up/Down sampling
-        private readonly UpDownSampling _upDownSampling;
+        private readonly Resampler _resampler;
 
         // Audio processing parameters
         private const int DefaultSampleRate = 44100;
@@ -71,9 +71,9 @@ namespace PowerScope.Model
                 double baseSampleRate = _sampleRate;
 
                 // Apply up/down sampling multiplier if enabled
-                if (_upDownSampling.IsEnabled)
+                if (_resampler.IsEnabled)
                 {
-                    return baseSampleRate * _upDownSampling.SampleRateMultiplier;
+                    return baseSampleRate * _resampler.SampleRateMultiplier;
                 }
 
                 return baseSampleRate;
@@ -164,27 +164,27 @@ namespace PowerScope.Model
             _sampleRate = sampleRate;
 
             // Initialize up/down sampling
-            _upDownSampling = new UpDownSampling(0); // Start with no sampling change
-            _upDownSampling.PropertyChanged += OnUpDownSamplingPropertyChanged;
+            _resampler = new Resampler(0); // Start with no sampling change
+            _resampler.PropertyChanged += OnResamplerPropertyChanged;
 
             StatusMessage = "Disconnected";
             TotalSamples = 0;
             TotalBits = 0;
         }
 
-        private void OnUpDownSamplingPropertyChanged(object sender, PropertyChangedEventArgs e)
+        private void OnResamplerPropertyChanged(object sender, PropertyChangedEventArgs e)
         {
             // Forward up/down sampling property change notifications
-            if (e.PropertyName == nameof(UpDownSampling.SamplingFactor))
+            if (e.PropertyName == nameof(Resampler.SamplingFactor))
             {
-                OnPropertyChanged(nameof(UpDownSamplingFactor));
+                OnPropertyChanged(nameof(ResamplingFactor));
                 OnPropertyChanged(nameof(SampleRateMultiplier));
-                OnPropertyChanged(nameof(IsUpDownSamplingEnabled));
-                OnPropertyChanged(nameof(UpDownSamplingDescription));
+                OnPropertyChanged(nameof(IsResamplingEnabled));
+                OnPropertyChanged(nameof(ResamplingDescription));
                 OnPropertyChanged(nameof(SampleRate));
 
                 // Reinitialize for new sampling factor
-                _upDownSampling.InitializeChannels(ChannelCount);
+                _resampler.InitializeChannels(ChannelCount);
             }
         }
 
@@ -289,8 +289,8 @@ namespace PowerScope.Model
             ResetChannelFilters();
 
             // Initialize up/down sampling for current channel configuration
-            _upDownSampling.InitializeChannels(ChannelCount);
-            _upDownSampling.Reset();
+            _resampler.InitializeChannels(ChannelCount);
+            _resampler.Reset();
 
             _audioCapture.StartRecording();
             IsStreaming = true;
@@ -331,7 +331,7 @@ namespace PowerScope.Model
             ResetChannelFilters();
 
             // Reset up/down sampling when clearing data
-            _upDownSampling.Reset();
+            _resampler.Reset();
         }
 
         #endregion
@@ -407,13 +407,13 @@ namespace PowerScope.Model
                         _audioProcessed[s] = ApplyChannelProcessing(ch, channelData[ch][s]);
                     }
 
-                    if (_upDownSampling.IsEnabled)
+                    if (_resampler.IsEnabled)
                     {
                         // Optional resampling allocates a right-sized block; copy the live range first.
                         double[] block = new double[samplesRecorded];
                         Array.Copy(_audioProcessed, 0, block, 0, samplesRecorded);
 
-                        double[] resampled = _upDownSampling.ProcessChannelData(ch, block);
+                        double[] resampled = _resampler.ProcessChannelData(ch, block);
                         ReceivedData[ch].AddRange(resampled, resampled.Length);
                         if (ch == 0)
                             producedSamples = resampled.Length;
@@ -615,7 +615,7 @@ namespace PowerScope.Model
             }
 
             // Unsubscribe from up/down sampling events
-            _upDownSampling.PropertyChanged -= OnUpDownSamplingPropertyChanged;
+            _resampler.PropertyChanged -= OnResamplerPropertyChanged;
 
             _disposed = true;
             GC.SuppressFinalize(this);
@@ -668,27 +668,27 @@ namespace PowerScope.Model
 
         #endregion
 
-        #region IUpDownSampling Implementation
+        #region IResamplable Implementation
 
-        public int UpDownSamplingFactor
+        public int ResamplingFactor
         {
-            get { return _upDownSampling.SamplingFactor; }
-            set { _upDownSampling.SamplingFactor = value; }
+            get { return _resampler.SamplingFactor; }
+            set { _resampler.SamplingFactor = value; }
         }
 
         public double SampleRateMultiplier
         {
-            get { return _upDownSampling.SampleRateMultiplier; }
+            get { return _resampler.SampleRateMultiplier; }
         }
 
-        public bool IsUpDownSamplingEnabled
+        public bool IsResamplingEnabled
         {
-            get { return _upDownSampling.IsEnabled; }
+            get { return _resampler.IsEnabled; }
         }
 
-        public string UpDownSamplingDescription
+        public string ResamplingDescription
         {
-            get { return _upDownSampling.GetDescription(); }
+            get { return _resampler.GetDescription(); }
         }
 
         #endregion

@@ -722,9 +722,9 @@ namespace PowerScope.View.UserForms
             // Set up callback to apply settings to data streams when they are created
             ViewModel.DataStreamConfigurationCallback = (dataStream) =>
             {
-                if (dataStream is IUpDownSampling upDownSamplingStream)
+                if (dataStream is IResamplable resamplableStream)
                 {
-                    upDownSamplingStream.UpDownSamplingFactor = ViewModel.UpDownSampling;
+                    resamplableStream.ResamplingFactor = ViewModel.Resampling;
                 }
             };
             

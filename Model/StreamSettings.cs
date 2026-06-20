@@ -75,7 +75,7 @@ namespace PowerScope.Model
         private string _frameStart; // for CustomFrame
         private int _demoSampleRate; // for Demo mode
         private string _demoSignalType; // for Demo mode
-        private int _upDownSampling; // for UP/down sampling factor
+        private int _resampling; // resampler factor
         
         // File-related properties
         private string _filePath;
@@ -113,7 +113,7 @@ namespace PowerScope.Model
             DemoSignalType = "Sine Wave"; // Keep for demo mode
             
             // Sampling defaults
-            UpDownSampling = 0; // Default to no sampling change
+            Resampling = 0; // Default to no sampling change
             
             // File defaults
             FileSampleRate = 1000.0;
@@ -324,17 +324,17 @@ namespace PowerScope.Model
             }
         }
 
-        public int UpDownSampling
+        public int Resampling
         {
-            get { return _upDownSampling; }
+            get { return _resampling; }
             set
             {
                 // Clamp value between -9 and 9
                 var clampedValue = Math.Max(-9, Math.Min(9, value));
-                if (_upDownSampling != clampedValue)
+                if (_resampling != clampedValue)
                 {
-                    _upDownSampling = clampedValue;
-                    OnPropertyChanged(nameof(UpDownSampling));
+                    _resampling = clampedValue;
+                    OnPropertyChanged(nameof(Resampling));
                 }
             }
         }
@@ -552,18 +552,18 @@ namespace PowerScope.Model
             // - Demo properties (NumberOfChannels, DemoSampleRate, DemoSignalType)
             // - Serial properties (Port, Baud, DataBits, StopBits, Parity)
             // - Audio properties (AudioDevice, AudioDeviceIndex, AudioSampleRate)
-            // - Other properties (Delimiter, FrameStart, EnableChecksum, UpDownSampling)
+            // - Other properties (Delimiter, FrameStart, EnableChecksum, Resampling)
         }
 
         /// <summary>
-        /// Apply up/down sampling settings to a data stream if it supports the feature
+        /// Apply resampler settings to a data stream if it supports the feature
         /// </summary>
         /// <param name="dataStream">Data stream to configure</param>
-        public void ApplyUpDownSamplingToDataStream(IDataStream dataStream)
+        public void ApplyResamplingToDataStream(IDataStream dataStream)
         {
-            if (dataStream is IUpDownSampling upDownSamplingStream)
+            if (dataStream is IResamplable resamplableStream)
             {
-                upDownSamplingStream.UpDownSamplingFactor = this.UpDownSampling;
+                resamplableStream.ResamplingFactor = this.Resampling;
             }
 
             // Call the configured callback if available
@@ -722,7 +722,7 @@ namespace PowerScope.Model
                     break;
             }
 
-            this.ApplyUpDownSamplingToDataStream(dataStream);
+            this.ApplyResamplingToDataStream(dataStream);
             return dataStream;
         }
 

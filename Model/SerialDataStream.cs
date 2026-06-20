@@ -45,7 +45,7 @@ namespace PowerScope.Model
         }
     }
 
-    public class SerialDataStream : IDataStream, IChannelConfigurable, IBufferResizable, IUpDownSampling
+    public class SerialDataStream : IDataStream, IChannelConfigurable, IBufferResizable, IResamplable
     {
         private readonly SerialPort _port;
         private readonly byte[] _readBuffer;
@@ -83,7 +83,7 @@ namespace PowerScope.Model
         private double _sampleRateFilterAlpha = DefaultFilterAlpha;
 
         // Up/Down sampling
-        private readonly UpDownSampling _upDownSampling;
+        private readonly Resampler _resampler;
 
         public SourceSetting SourceSetting { get; init; }
         public long TotalSamples { get; private set; }
@@ -186,8 +186,8 @@ namespace PowerScope.Model
             ValidatePortExists(source.PortName);
 
             // Initialize up/down sampling
-            _upDownSampling = new UpDownSampling(1);
-            _upDownSampling.PropertyChanged += OnUpDownSamplingPropertyChanged;
+            _resampler = new Resampler(1);
+            _resampler.PropertyChanged += OnResamplerPropertyChanged;
 
             _port = new SerialPort(source.PortName)
             {
@@ -251,19 +251,19 @@ namespace PowerScope.Model
             StatusMessage = "Disconnected";
         }
 
-        private void OnUpDownSamplingPropertyChanged(object sender, PropertyChangedEventArgs e)
+        private void OnResamplerPropertyChanged(object sender, PropertyChangedEventArgs e)
         {
             // Forward up/down sampling property change notifications
-            if (e.PropertyName == nameof(UpDownSampling.SamplingFactor))
+            if (e.PropertyName == nameof(Resampler.SamplingFactor))
             {
-                OnPropertyChanged(nameof(UpDownSamplingFactor));
+                OnPropertyChanged(nameof(ResamplingFactor));
                 OnPropertyChanged(nameof(SampleRateMultiplier));
-                OnPropertyChanged(nameof(IsUpDownSamplingEnabled));
-                OnPropertyChanged(nameof(UpDownSamplingDescription));
+                OnPropertyChanged(nameof(IsResamplingEnabled));
+                OnPropertyChanged(nameof(ResamplingDescription));
                 OnPropertyChanged(nameof(SampleRate));
 
                 // Reinitialize for new sampling factor
-                _upDownSampling.InitializeChannels(ChannelCount);
+                _resampler.InitializeChannels(ChannelCount);
             }
         }
 
@@ -538,8 +538,8 @@ namespace PowerScope.Model
             ResetChannelFilters();
 
             // Initialize up/down sampling for current channel configuration
-            _upDownSampling.InitializeChannels(ChannelCount);
-            _upDownSampling.Reset();
+            _resampler.InitializeChannels(ChannelCount);
+            _resampler.Reset();
 
             if (_readSerialPortThread != null && _readSerialPortThread.IsAlive)
             {
@@ -607,7 +607,7 @@ namespace PowerScope.Model
 
             // Reset filters and up/down sampling when clearing data
             ResetChannelFilters();
-            _upDownSampling.Reset();
+            _resampler.Reset();
         }
 
         private void ReadSerialData()
@@ -803,7 +803,7 @@ namespace PowerScope.Model
         /// overwrites the buffer, and (2) IDigitalFilter.Filter() is sample-by-sample — the filter owns
         /// its own history, so we never need the whole input window resident at once (no block convolution).
         ///
-        /// Up/down sampling, when enabled, still allocates inside UpDownSampling. That is an optional,
+        /// Up/down sampling, when enabled, still allocates inside Resampler. That is an optional,
         /// non-default feature, so it is intentionally left on the allocating path.
         /// </summary>
         /// <param name="sampleCount">Number of valid samples per channel in _parseOutput.</param>
@@ -816,13 +816,13 @@ namespace PowerScope.Model
                 double[] rawSamples = _parseOutput[channel];
                 ApplyChannelProcessing(channel, rawSamples, _processedSamples, sampleCount);
 
-                if (_upDownSampling.IsEnabled)
+                if (_resampler.IsEnabled)
                 {
                     // Optional resampling allocates a right-sized block; copy the live range first.
                     double[] block = new double[sampleCount];
                     Array.Copy(_processedSamples, 0, block, 0, sampleCount);
 
-                    double[] resampled = _upDownSampling.ProcessChannelData(channel, block);
+                    double[] resampled = _resampler.ProcessChannelData(channel, block);
                     for (int i = 0; i < resampled.Length; i++)
                     {
                         if (!double.IsFinite(resampled[i]))
@@ -865,9 +865,9 @@ namespace PowerScope.Model
                 ApplyChannelProcessing(channel, parsedData[channel], channelProcessedSamples, parsedData[channel].Length);
 
                 double[] channelFinalData = channelProcessedSamples;
-                if (_upDownSampling.IsEnabled)
+                if (_resampler.IsEnabled)
                 {
-                    channelFinalData = _upDownSampling.ProcessChannelData(channel, channelProcessedSamples);
+                    channelFinalData = _resampler.ProcessChannelData(channel, channelProcessedSamples);
                     for (int i = 0; i < channelFinalData.Length; i++)
                     {
                         if (!double.IsFinite(channelFinalData[i]))
@@ -959,7 +959,7 @@ namespace PowerScope.Model
             }
 
             // Unsubscribe from up/down sampling events
-            _upDownSampling.PropertyChanged -= OnUpDownSamplingPropertyChanged;
+            _resampler.PropertyChanged -= OnResamplerPropertyChanged;
 
             _residueLength = 0;
             _disposed = true;
@@ -971,27 +971,27 @@ namespace PowerScope.Model
             clearData();
         }
 
-        #region IUpDownSampling Implementation
+        #region IResamplable Implementation
 
-        public int UpDownSamplingFactor
+        public int ResamplingFactor
         {
-            get { return _upDownSampling.SamplingFactor; }
-            set { _upDownSampling.SamplingFactor = value; }
+            get { return _resampler.SamplingFactor; }
+            set { _resampler.SamplingFactor = value; }
         }
 
         public double SampleRateMultiplier
         {
-            get { return _upDownSampling.SampleRateMultiplier; }
+            get { return _resampler.SampleRateMultiplier; }
         }
 
-        public bool IsUpDownSamplingEnabled
+        public bool IsResamplingEnabled
         {
-            get { return _upDownSampling.IsEnabled; }
+            get { return _resampler.IsEnabled; }
         }
 
-        public string UpDownSamplingDescription
+        public string ResamplingDescription
         {
-            get { return _upDownSampling.GetDescription(); }
+            get { return _resampler.GetDescription(); }
         }
 
         #endregion
