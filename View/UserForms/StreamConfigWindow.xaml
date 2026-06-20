@@ -275,10 +275,10 @@
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <TextBlock Grid.Column="0" Text="Input Stream Configuration" 
-                           Foreground="{DynamicResource PlotSettings_LabelForegroundBrush}" 
+                <TextBlock Grid.Column="0" x:Name="TextBlock_Title" Text="Input Stream Configuration"
+                           Foreground="{DynamicResource PlotSettings_LabelForegroundBrush}"
                            FontWeight="SemiBold"
-                           VerticalAlignment="Center" 
+                           VerticalAlignment="Center"
                            Margin="15,8"/>
                 <!-- Close button -->
                 <Button Grid.Column="1" 
@@ -620,14 +620,19 @@
                 </TabControl>
             </DockPanel>
             
-            <!-- Up/Down Sampling Controls -->
+            <!-- Resampler Controls -->
             <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Left" Margin="20,10,20,0">
-                <Label Content="Up / down sampling:" VerticalAlignment="Center" Width="130" 
-                       ToolTip="Sampling factor: negative values for downsampling, 0 for no change, positive for upsampling"/>
-                <ComboBox x:Name="ComboBox_UpDownSampling" Width="80" Height="25" 
-                          SelectedValue="{Binding UpDownSampling, Mode=TwoWay}" 
+                <Label Content="Resampler:" VerticalAlignment="Center" Width="130"
+                       ToolTip="Resampling factor: negative values for downsampling, 0 for no change, positive for upsampling"/>
+                <ComboBox x:Name="ComboBox_Resampler" Width="80" Height="25"
+                          SelectedValue="{Binding Resampling, Mode=TwoWay}"
                           SelectedValuePath="Tag"
-                          ToolTip="Select sampling factor">
+                          ToolTip="Select resampling factor">
+                    <ComboBoxItem Content="1/10" Tag="-9"/>
+                    <ComboBoxItem Content="1/9" Tag="-8"/>
+                    <ComboBoxItem Content="1/8" Tag="-7"/>
+                    <ComboBoxItem Content="1/7" Tag="-6"/>
+                    <ComboBoxItem Content="1/6" Tag="-5"/>
                     <ComboBoxItem Content="1/5" Tag="-4"/>
                     <ComboBoxItem Content="1/4" Tag="-3"/>
                     <ComboBoxItem Content="1/3" Tag="-2"/>
@@ -637,6 +642,11 @@
                     <ComboBoxItem Content="3x" Tag="2"/>
                     <ComboBoxItem Content="4x" Tag="3"/>
                     <ComboBoxItem Content="5x" Tag="4"/>
+                    <ComboBoxItem Content="6x" Tag="5"/>
+                    <ComboBoxItem Content="7x" Tag="6"/>
+                    <ComboBoxItem Content="8x" Tag="7"/>
+                    <ComboBoxItem Content="9x" Tag="8"/>
+                    <ComboBoxItem Content="10x" Tag="9"/>
                 </ComboBox>
             </StackPanel>
             

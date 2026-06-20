@@ -3,7 +3,7 @@ using System.Numerics;
 
 namespace PowerScope.Model
 {
-    public class UpDownSampling : INotifyPropertyChanged
+    public class Resampler : INotifyPropertyChanged
     {
         // Public constants/config
         private const int SincKernelHalfLength = 32; // Half-length; kernel size = 2*N + 1 (odd)
@@ -44,7 +44,7 @@ namespace PowerScope.Model
             }
         }
 
-        public UpDownSampling(int factor)
+        public Resampler(int factor)
         {
             _samplingFactor = Math.Max(-9, Math.Min(9, factor)); // clamp <source_id data="2" title="StreamSettings.cs" />
             GenerateSincKernel();
@@ -57,7 +57,7 @@ namespace PowerScope.Model
         public bool IsUpsampling => _samplingFactor > 0;
         public bool IsDownsampling => _samplingFactor < 0;
 
-        // Matches your existing mapping (+1 → 2x, +2 → 3x; -1 → 1/2, -2 → 1/3, etc.) <source_id data="1" title="UpDownSampling.cs" />
+        // Matches your existing mapping (+1 → 2x, +2 → 3x; -1 → 1/2, -2 → 1/3, etc.) <source_id data="1" title="Resampler.cs" />
         public double SampleRateMultiplier
         {
             get

@@ -1,8 +1,8 @@
-using System.ComponentModel;
+﻿using System.ComponentModel;
 
 namespace PowerScope.Model
 {
-    public class DemoDataStream : IDataStream, IChannelConfigurable, IBufferResizable, IUpDownSampling
+    public class DemoDataStream : IDataStream, IChannelConfigurable, IBufferResizable, IResamplable
     {
         private bool _disposed = false;
         private bool _isConnected = false;
@@ -29,7 +29,7 @@ namespace PowerScope.Model
         private readonly object _channelConfigLock = new object();
 
         // Up/Down sampling
-        private readonly UpDownSampling _upDownSampling;
+        private readonly Resampler _resampler;
 
         public int ChannelCount { get; }
 
@@ -41,35 +41,35 @@ namespace PowerScope.Model
             get 
             { 
                 double baseSampleRate = DemoSettings.SampleRate;
-                if (_upDownSampling.IsEnabled)
+                if (_resampler.IsEnabled)
                 {
-                    return baseSampleRate * _upDownSampling.SampleRateMultiplier;
+                    return baseSampleRate * _resampler.SampleRateMultiplier;
                 }
                 return baseSampleRate;
             } 
         }
 
-        #region IUpDownSampling Implementation
+        #region IResamplable Implementation
 
-        public int UpDownSamplingFactor
+        public int ResamplingFactor
         {
-            get { return _upDownSampling.SamplingFactor; }
-            set { _upDownSampling.SamplingFactor = value; }
+            get { return _resampler.SamplingFactor; }
+            set { _resampler.SamplingFactor = value; }
         }
 
         public double SampleRateMultiplier
         {
-            get { return _upDownSampling.SampleRateMultiplier; }
+            get { return _resampler.SampleRateMultiplier; }
         }
 
-        public bool IsUpDownSamplingEnabled
+        public bool IsResamplingEnabled
         {
-            get { return _upDownSampling.IsEnabled; }
+            get { return _resampler.IsEnabled; }
         }
 
-        public string UpDownSamplingDescription
+        public string ResamplingDescription
         {
-            get { return _upDownSampling.GetDescription(); }
+            get { return _resampler.GetDescription(); }
         }
 
         #endregion
@@ -137,8 +137,8 @@ namespace PowerScope.Model
             ChannelCount = demoSettings.NumberOfChannels;
             
             // Initialize up/down sampling
-            _upDownSampling = new UpDownSampling(1);
-            _upDownSampling.PropertyChanged += OnUpDownSamplingPropertyChanged;
+            _resampler = new Resampler(1);
+            _resampler.PropertyChanged += OnResamplerPropertyChanged;
             
             // Initialize ring buffers for each channel
             int ringBufferSize = Math.Max(500000, demoSettings.SampleRate * 10); // 10 seconds of data
@@ -151,19 +151,19 @@ namespace PowerScope.Model
             StatusMessage = "Disconnected";
         }
 
-        private void OnUpDownSamplingPropertyChanged(object sender, PropertyChangedEventArgs e)
+        private void OnResamplerPropertyChanged(object sender, PropertyChangedEventArgs e)
         {
             // Forward up/down sampling property change notifications
-            if (e.PropertyName == nameof(UpDownSampling.SamplingFactor))
+            if (e.PropertyName == nameof(Resampler.SamplingFactor))
             {
-                OnPropertyChanged(nameof(UpDownSamplingFactor));
+                OnPropertyChanged(nameof(ResamplingFactor));
                 OnPropertyChanged(nameof(SampleRateMultiplier));
-                OnPropertyChanged(nameof(IsUpDownSamplingEnabled));
-                OnPropertyChanged(nameof(UpDownSamplingDescription));
+                OnPropertyChanged(nameof(IsResamplingEnabled));
+                OnPropertyChanged(nameof(ResamplingDescription));
                 OnPropertyChanged(nameof(SampleRate));
                 
                 // Reinitialize for new sampling factor
-                _upDownSampling.InitializeChannels(ChannelCount);
+                _resampler.InitializeChannels(ChannelCount);
             }
         }
 
@@ -329,8 +329,8 @@ namespace PowerScope.Model
             ResetChannelFilters();
             
             // Initialize up/down sampling for current channel configuration
-            _upDownSampling.InitializeChannels(ChannelCount);
-            _upDownSampling.Reset();
+            _resampler.InitializeChannels(ChannelCount);
+            _resampler.Reset();
             
             // Calculate timer interval to generate data at the specified sample rate
             // Generate data in chunks of ~100 samples at a time for smooth streaming
@@ -390,12 +390,12 @@ namespace PowerScope.Model
                 // allocates a right-sized block (non-default feature, left on the allocating path).
                 for (int channel = 0; channel < ChannelCount; channel++)
                 {
-                    if (_upDownSampling.IsEnabled)
+                    if (_resampler.IsEnabled)
                     {
                         double[] resampled;
                         try
                         {
-                            resampled = _upDownSampling.ProcessChannelData(channel, buffer[channel]);
+                            resampled = _resampler.ProcessChannelData(channel, buffer[channel]);
                             for (int i = 0; i < resampled.Length; i++)
                             {
                                 if (!double.IsFinite(resampled[i]))
@@ -481,7 +481,7 @@ namespace PowerScope.Model
             double instantaneousFreq = adjustedStartFreq + (adjustedEndFreq - adjustedStartFreq) * (cycleTime / chirpDuration);
             
             // Calculate the phase for the chirp signal
-            // For a linear chirp: ?(t) = 2? * [f0 * t + (f1 - f0) * t� / (2 * T)]
+            // For a linear chirp: ?(t) = 2? * [f0 * t + (f1 - f0) * tï¿½ / (2 * T)]
             double phase = 2 * Math.PI * (adjustedStartFreq * cycleTime + 
                           (adjustedEndFreq - adjustedStartFreq) * cycleTime * cycleTime / (2 * chirpDuration));
             
@@ -505,7 +505,7 @@ namespace PowerScope.Model
             double mainTone = amplitude * Math.Sin(2 * Math.PI * mainFrequency * time);
             
             // Calculate side tone frequencies based on channel
-            // Channel 0: �250Hz offset (750Hz and 1250Hz)
+            // Channel 0: ï¿½250Hz offset (750Hz and 1250Hz)
             // Higher channels: Progressively smaller offsets approaching 1kHz
             double baseOffset = 250.0; // Base offset of 250Hz for channel 0
             double offsetReduction = Math.Min(channel * 40.0, 250.0); // Reduce offset by 40Hz per channel, max 200Hz reduction
@@ -579,7 +579,7 @@ namespace PowerScope.Model
             
             // Reset filters and up/down sampling when clearing data
             ResetChannelFilters();
-            _upDownSampling?.Reset();
+            _resampler?.Reset();
         }
 
         public void Dispose()
@@ -604,9 +604,9 @@ namespace PowerScope.Model
             }
             
             // Unsubscribe from up/down sampling events
-            if (_upDownSampling != null)
+            if (_resampler != null)
             {
-                _upDownSampling.PropertyChanged -= OnUpDownSamplingPropertyChanged;
+                _resampler.PropertyChanged -= OnResamplerPropertyChanged;
             }
             
             _disposed = true;

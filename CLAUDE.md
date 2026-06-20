@@ -79,7 +79,7 @@ The built `.hex` file is at `build/APP_KIT_FX2G3_104LGA/Release/mtb-example-fx2g
 Beyond `IDataStream`, streams can implement optional interfaces:
 - `IChannelConfigurable` — per-channel gain/offset/filter applied during streaming
 - `IBufferResizable` — ring buffer size adjustable at runtime
-- `IUpDownSampling` — decimation or interpolation by powers of 10
+- `IResamplable` — decimation or interpolation by powers of 10 (`Model/Resampler.cs`)
 
 ### VirtualDataStream
 
