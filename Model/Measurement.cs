@@ -1,5 +1,4 @@
 ﻿using System.ComponentModel;
-using System.Windows;
 
 namespace PowerScope.Model
 {
@@ -52,98 +51,12 @@ namespace PowerScope.Model
         private double _mean = 0.0;
         private long _samplesCount = 0;
 
-        // FFT-specific data for spectrum display
-        private double[] _spectrumFrequencies;
-        private double[] _spectrumMagnitudes;
         private View.UserForms.FFT _fftWindow;
 
-        // Cached FFT plot signal for efficient updates (PlotManager pattern)
-        private ScottPlot.Plottables.SignalXY _spectrumSignal;
-        private int _lastSpectrumLength = -1; // Track when we need to rebuild the signal
-
-        // FFT configuration properties
-        private int _FFT_Size = 4096;
-        private int _FFT_interpolation = 1; // Zero-padding factor
-        private string _FFT_windowFunction = "Blackman-Harris";
-        private int _FFT_averaging = 1;
-
-        // Pre-calculated window function coefficients for performance optimization
-        private double[] _FFT_windowCoefficients;
-        private bool _FFT_windowCoefficientsValid = false;
-
-        // Detail tracking for expandable UI
-        private readonly List<(double frequency, double magnitude)> _fftPeaks = new List<(double, double)>();
-        private const int MaxPeaksToTrack = 10;
-
-        // FFT Peak sorting state - stored in Model for persistence across data updates
-        private View.UserForms.SortColumn _fftSortColumn = View.UserForms.SortColumn.Amplitude;
-        private View.UserForms.SortDirection _fftSortDirection = View.UserForms.SortDirection.Descending;
-
         /// <summary>
-        /// Gets the current FFT peaks data for display in the frequency analysis grid
-        /// Returns the top frequencies with their magnitudes as bindable FFTPeakData objects
+        /// FFT-specific computation and bindable settings. Non-null only when Type == FFT.
         /// </summary>
-        public System.Collections.ObjectModel.ObservableCollection<FFTPeakData> FFTPeaks { get; } = new System.Collections.ObjectModel.ObservableCollection<FFTPeakData>();
-
-        /// <summary>
-        /// Sort the FFT peaks collection based on the specified column and direction
-        /// Called from the FFT window when user clicks column headers
-        /// Now stores the sort preference for consistent application on data updates
-        /// </summary>
-        public void SortFFTPeaks(View.UserForms.SortColumn column, View.UserForms.SortDirection direction)
-        {
-            // Store the sort preference for future updates
-            _fftSortColumn = column;
-            _fftSortDirection = direction;
-            
-            // Apply the sorting immediately
-            ApplyFFTPeakSorting();
-        }
-
-        /// <summary>
-        /// Apply the current sorting preference to FFT peaks
-        /// Called both when user changes sort and when new data arrives
-        /// </summary>
-        private void ApplyFFTPeakSorting()
-        {
-            if (_fftPeaks.Count == 0) return;
-
-            // Sort the internal peaks list based on stored preferences
-            switch (_fftSortColumn)
-            {
-                case View.UserForms.SortColumn.Frequency:
-                    _fftPeaks.Sort((a, b) => _fftSortDirection == View.UserForms.SortDirection.Ascending 
-                        ? a.frequency.CompareTo(b.frequency) 
-                        : b.frequency.CompareTo(a.frequency));
-                    break;
-
-                case View.UserForms.SortColumn.Amplitude:
-                case View.UserForms.SortColumn.AmplitudeDb: // Both sort by magnitude since dB is just a transform
-                    _fftPeaks.Sort((a, b) => _fftSortDirection == View.UserForms.SortDirection.Ascending 
-                        ? a.magnitude.CompareTo(b.magnitude) 
-                        : b.magnitude.CompareTo(a.magnitude));
-                    break;
-            }
-
-            // Update the observable collection on UI thread
-            Application.Current?.Dispatcher.BeginInvoke(new Action(() =>
-            {
-                FFTPeaks.Clear();
-                foreach (var peak in _fftPeaks.Take(10))
-                {
-                    FFTPeaks.Add(new FFTPeakData(peak.frequency, peak.magnitude));
-                }
-            }));
-        }
-
-        /// <summary>
-        /// Get the current FFT peak sorting preferences
-        /// Used by FFT window to initialize sort indicators
-        /// </summary>
-        public (View.UserForms.SortColumn column, View.UserForms.SortDirection direction) GetFFTPeakSortState()
-        {
-            return (_fftSortColumn, _fftSortDirection);
-        }
+        public FFTAnalysis FFT { get; }
 
         // Events
         public event EventHandler RemoveRequested;
@@ -185,17 +98,11 @@ namespace PowerScope.Model
                 _measurementWindowLength = 5000;
 
             _dataBuffer = new double[_measurementWindowLength];
-            
+
             _calculationFunction = GetCalculationFunction(measurementType);
-            
-            // Pre-calculate window coefficients for FFT measurements
+
             if (measurementType == MeasurementType.FFT)
-            {
-                // For FFT measurements we need an instance-bound calculation function
-                // Traditional C-style: assign function pointer directly
-                _calculationFunction = CalculateFFT;
-                FFT_PreCalculateWindowCoefficients();
-            }
+                FFT = new FFTAnalysis(dataStream, channelSettings);
         }
 
         /// <summary>
@@ -322,7 +229,7 @@ namespace PowerScope.Model
             Max = double.MinValue;
             Mean = 0.0;
             SamplesCount = 0;
-            _fftPeaks.Clear();
+            FFT?.ClearPeaks();
         }
 
 
@@ -341,100 +248,6 @@ namespace PowerScope.Model
             }
         }
 
-        #region FFT
-
-        /// <summary>
-        /// FFT size (number of samples for FFT calculation)
-        /// Must be a power of 2, range 128-16384
-        /// </summary>
-        public int FFT_Size
-        {
-            get
-            {
-                return _FFT_Size;
-            }
-            set
-            {
-                _FFT_Size = value;
-                OnPropertyChanged(nameof(FFT_Size));
-                    
-                // Invalidate window coefficients since FFT size changed
-                _FFT_windowCoefficientsValid = false;
-                FFT_PreCalculateWindowCoefficients();
-                    
-                // Invalidate cached spectrum signal since data length will change
-                _lastSpectrumLength = -1;
-                    
-                int newSpectrumLength = _FFT_Size * _FFT_interpolation / 2;
-                _spectrumFrequencies = new double[newSpectrumLength];
-                _spectrumMagnitudes = new double[newSpectrumLength];
-            }
-        }
-
-        /// <summary>
-        /// Interpolation factor (zero-padding factor)
-        /// Valid values: 1, 2, 4, 8
-        /// </summary>
-        public int FFT_Interpolation
-        {
-            get
-            {
-                return _FFT_interpolation;
-            }
-            set
-            {
-                _FFT_interpolation = value;
-                OnPropertyChanged(nameof(FFT_Interpolation));
-                    
-                // Invalidate cached spectrum signal since data length will change
-                _lastSpectrumLength = -1;
-                    
-                int newSpectrumLength = _FFT_Size * _FFT_interpolation / 2;
-                _spectrumFrequencies = new double[newSpectrumLength];
-                _spectrumMagnitudes = new double[newSpectrumLength];
-            }
-        }
-
-        /// <summary>
-        /// Window function for FFT
-        /// Valid values: "Blackman-Harris", "Hann", "Flat Top", "None"
-        /// </summary>
-        public string FFT_WindowFunction
-        {
-            get
-            {
-                return _FFT_windowFunction;
-            }
-            set
-            {
-                string validatedValue = value;
-
-                _FFT_windowFunction = validatedValue;
-                OnPropertyChanged(nameof(FFT_WindowFunction));
-                    
-                // Invalidate window coefficients since window function changed
-                _FFT_windowCoefficientsValid = false;
-                FFT_PreCalculateWindowCoefficients();
-            }
-        }
-
-        /// <summary>
-        /// Averaging factor for FFT spectrum smoothing
-        /// Valid values: 1, 2, 4, 8, 16
-        /// </summary>
-        public int FFT_Averaging
-        {
-            get
-            {
-                return _FFT_averaging;
-            }
-            set
-            {
-                _FFT_averaging = value;
-                OnPropertyChanged(nameof(FFT_Averaging));
-            }
-        }
-
         /// <summary>
         /// Show the FFT spectrum window for this measurement (FFT measurements only)
         /// </summary>
@@ -444,205 +257,15 @@ namespace PowerScope.Model
             {
                 _fftWindow = new View.UserForms.FFT();
                 _fftWindow.DataContext = this; // Set the Measurement as DataContext
-
-                _fftWindow.Title = "FFT Spectrum - " + _channelSettings.Label;
-                _fftWindow.Closed += (s, e) => 
-                {
-                    _fftWindow = null;
-                    _spectrumSignal = null; // Clear cached signal when window closes
-                    _lastSpectrumLength = -1;
-                };
-
-                _spectrumFrequencies = new double[FFT_Size * FFT_Interpolation / 2];
-                _spectrumMagnitudes = new double[FFT_Size * FFT_Interpolation / 2];
+                _fftWindow.Closed += (s, e) => { _fftWindow = null; };
                 _fftWindow.Show();
-
-                // Initialize the spectrum plot with constant elements (PlotManager pattern)
-                FFT_InitializeSpectrumPlot();
             }
             else
             {
                 _fftWindow.Activate();
-            }
-
-            // Update the spectrum plot with current data
-            FFT_UpdateSpectrumPlot();
-        }
-
-        /// <summary>
-        /// Initialize the spectrum plot with constant elements (called once when window opens)
-        /// Following PlotManager pattern for efficiency
-        /// </summary>
-        private void FFT_InitializeSpectrumPlot()
-        {
-            if (_fftWindow == null) return;
-
-            // Clear the plot completely for fresh start
-            _fftWindow.WpfPlotFFT.Plot.Clear();
-                
-            // Set constant elements that never change
-            _fftWindow.WpfPlotFFT.Plot.Axes.Bottom.Label.Text = "Frequency (Hz)";
-            _fftWindow.WpfPlotFFT.Plot.Axes.Left.Label.Text = "Magnitude (dB)";
-            _fftWindow.WpfPlotFFT.Plot.Title("FFT Spectrum - " + _channelSettings.Label + " (Fs = " + _dataStream.SampleRate.ToString("F1") + " Hz)");
-
-            // Initialize X-axis to show frequency range from 0 to Nyquist frequency (SampleRate/2)
-            double nyquistFrequency = _dataStream.SampleRate / 2.0;
-            _fftWindow.WpfPlotFFT.Plot.Axes.SetLimitsX(0, nyquistFrequency);
-            _fftWindow.WpfPlotFFT.Plot.Axes.SetLimitsY(-60, 100);
-
-            // Reset signal tracking
-            _spectrumSignal = null;
-            _lastSpectrumLength = -1;
-        }
-
-        /// <summary>
-        /// Update the spectrum plot with current data (efficient updates following PlotManager pattern)
-        /// Only recreates signal when data length changes (FFT size or interpolation change)
-        /// </summary>
-        private void FFT_UpdateSpectrumPlot()
-        {
-            int currentSpectrumLength = _spectrumFrequencies.Length;
-                
-            // Check if we need to rebuild the signal (data length changed)
-            bool needsRebuild = _spectrumSignal == null || _lastSpectrumLength != currentSpectrumLength;
-                
-            if (needsRebuild)
-            {                    
-                // Remove old signal if it exists
-                if (_spectrumSignal != null)
-                    _fftWindow.WpfPlotFFT.Plot.Remove(_spectrumSignal);
-
-                // Create new signal with current data
-                ScottPlot.Plottables.SignalXY newSignal = _fftWindow.WpfPlotFFT.Plot.Add.SignalXY(_spectrumFrequencies, _spectrumMagnitudes);
-                _spectrumSignal = newSignal;
-
-                // Apply constant signal properties (set once)
-                ScottPlot.Color scColor = new ScottPlot.Color(_channelSettings.Color.R, _channelSettings.Color.G, _channelSettings.Color.B);
-                _spectrumSignal.Color = scColor;
-                _spectrumSignal.LineWidth = 2.0f;
-                _spectrumSignal.LineStyle.AntiAlias = true;
-                _spectrumSignal.MarkerShape = ScottPlot.MarkerShape.None;
-                    
-                _lastSpectrumLength = currentSpectrumLength;
-            }
-      
-            // Refresh the plot to show updated data
-            _fftWindow.WpfPlotFFT.Refresh();
-        }
-
-        private void FFT_ApplyWindowFunction(ReadOnlySpan<double> input, Span<double> output, int length)
-        {
-            // Ensure window coefficients are valid
-            if (!_FFT_windowCoefficientsValid || _FFT_windowCoefficients == null || _FFT_windowCoefficients.Length != _FFT_Size)
-            {
-                FFT_PreCalculateWindowCoefficients();
-            }
-
-            // Apply pre-calculated window coefficients (element-wise multiplication)
-            int applyLength = Math.Min(length, _FFT_windowCoefficients.Length);
-            for (int i = 0; i < applyLength; i++)
-            {
-                output[i] = input[i] * _FFT_windowCoefficients[i];
+                _fftWindow.RefreshSpectrumPlot();
             }
         }
-
-        /// <summary>
-        /// Pre-calculate window function coefficients for optimal performance
-        /// Called when FFT size or window function changes
-        /// </summary>
-        private void FFT_PreCalculateWindowCoefficients()
-        {
-            // Allocate or reallocate window coefficients array
-            if (_FFT_windowCoefficients == null || _FFT_windowCoefficients.Length != _FFT_Size)
-            {
-                _FFT_windowCoefficients = new double[_FFT_Size];
-            }
-
-            // Calculate coefficients based on window function type
-            switch (_FFT_windowFunction)
-            {
-                case "Hann":
-                    FFT_PreCalculateHannWindow();
-                    break;
-                case "Flat Top":
-                    FFT_PreCalculateFlatTopWindow();
-                    break;
-                case "None":
-                    FFT_PreCalculateRectangularWindow();
-                    break;
-                case "Blackman-Harris":
-                default:
-                    FFT_PreCalculateBlackmanHarrisWindow();
-                    break;
-            }
-
-            _FFT_windowCoefficientsValid = true;
-        }
-
-        /// <summary>
-        /// Pre-calculate Blackman-Harris window coefficients
-        /// </summary>
-        private void FFT_PreCalculateBlackmanHarrisWindow()
-        {
-            const double a0 = 0.35875;
-            const double a1 = 0.48829;
-            const double a2 = 0.14128;
-            const double a3 = 0.01168;
-
-            for (int i = 0; i < _FFT_Size; i++)
-            {
-                double n = i / (double)(_FFT_Size - 1);
-                _FFT_windowCoefficients[i] = a0 - a1 * Math.Cos(2.0 * Math.PI * n) +
-                                        a2 * Math.Cos(4.0 * Math.PI * n) -
-                                        a3 * Math.Cos(6.0 * Math.PI * n);
-            }
-        }
-
-        /// <summary>
-        /// Pre-calculate Hann window coefficients
-        /// </summary>
-        private void FFT_PreCalculateHannWindow()
-        {
-            for (int i = 0; i < _FFT_Size; i++)
-            {
-                _FFT_windowCoefficients[i] = 0.5 * (1.0 - Math.Cos(2.0 * Math.PI * i / (_FFT_Size - 1)));
-            }
-        }
-
-        /// <summary>
-        /// Pre-calculate Flat Top window coefficients
-        /// </summary>
-        private void FFT_PreCalculateFlatTopWindow()
-        {
-            const double a0 = 0.21557895;
-            const double a1 = 0.41663158;
-            const double a2 = 0.277263158;
-            const double a3 = 0.083578947;
-            const double a4 = 0.006947368;
-
-            for (int i = 0; i < _FFT_Size; i++)
-            {
-                double n = i / (double)(_FFT_Size - 1);
-                _FFT_windowCoefficients[i] = a0 - a1 * Math.Cos(2.0 * Math.PI * n) +
-                                        a2 * Math.Cos(4.0 * Math.PI * n) -
-                                        a3 * Math.Cos(6.0 * Math.PI * n) +
-                                        a4 * Math.Cos(8.0 * Math.PI * n);
-            }
-        }
-
-        /// <summary>
-        /// Pre-calculate rectangular window coefficients (all ones - no windowing)
-        /// </summary>
-        private void FFT_PreCalculateRectangularWindow()
-        {
-            for (int i = 0; i < _FFT_Size; i++)
-            {
-                _FFT_windowCoefficients[i] = 1.0;
-            }
-        }
-
-
-        #endregion
 
         /// <summary>
         /// Update measurement - called by SystemManager
@@ -655,35 +278,22 @@ namespace PowerScope.Model
             // For other measurements, use 5000 samples as requested (hardcoded for now)
             int samplesToCopy;
             if (_measurementType == MeasurementType.FFT)
-                samplesToCopy = _FFT_Size;
+                samplesToCopy = FFT.Size;
             else
                 samplesToCopy = MeasurementWindowLength;
-                
+
             int samplesCopied = _dataStream.CopyLatestTo(_channelIndex, _dataBuffer, samplesToCopy);
-            
+
             // Skip calculation if no data was copied
             if (samplesCopied <= 0)
                 return;
 
             ReadOnlySpan<double> validData = _dataBuffer.AsSpan(0, samplesCopied);
-                    
+
             if (_measurementType == MeasurementType.FFT)
-            {
-                double newResult = FFT_Update(validData);
-                Result = newResult;
-                        
-                // Update FFT plot if window is open
-                if (_fftWindow != null && _fftWindow.IsVisible)
-                {
-                    Application.Current.Dispatcher.BeginInvoke((Action)FFT_UpdateSpectrumPlot);
-                }
-            }
+                Result = FFT.Update(validData);
             else
-            {
-                // Calculate using the assigned function pointer for non-FFT measurements
-                double newResult = _calculationFunction(validData);
-                Result = newResult;
-            }
+                Result = _calculationFunction(validData);
 
             // Update measurement history for detail tracking
             if (CalculateStatistics)
@@ -830,182 +440,6 @@ namespace PowerScope.Model
                 return max - min;
         }
 
-        /// <summary>
-        /// FFT calculation function (matching traditional C-style function pointer pattern)
-        /// Note: This is an instance method that gets bound to the specific Measurement instance
-        /// </summary>
-        private double CalculateFFT(ReadOnlySpan<double> data)
-        {
-            return FFT_Update(data);
-        }
-
-        private double FFT_Update(ReadOnlySpan<double> data)
-        {
-            int effectiveFftSize = _FFT_Size * _FFT_interpolation;
-
-            Aelian.FFT.SignalData fftData = Aelian.FFT.SignalData.CreateFromRealSize(effectiveFftSize);
-            System.Span<double> realPart = fftData.AsReal();
-
-            int copyLength = Math.Min(data.Length, _FFT_Size);
-
-            FFT_ApplyWindowFunction(data, realPart, copyLength);
-
-            // Zero-pad the rest for interpolation
-            for (int i = copyLength; i < effectiveFftSize; i++)
-            {
-                realPart[i] = 0.0;
-            }
-
-            Aelian.FFT.FastFourierTransform.RealFFT(realPart, true);
-
-            // Calculate magnitude spectrum and find peak frequency
-
-            System.Span<System.Numerics.Complex> complexData = fftData.AsComplex();
-            double maxMagnitude = 0.0;
-            int peakBin = 0;
-
-            // Prepare arrays for spectrum data (only positive frequencies)
-            int spectrumLength = effectiveFftSize / 2;
-
-            bool needSpectrum = false;
-            if (_fftWindow != null && _fftWindow.IsVisible)
-                    needSpectrum = true;
-
-            // Get actual sample rate from the data stream
-            double sampleRate = _dataStream.SampleRate;
-            double frequencyResolution = sampleRate / effectiveFftSize;
-
-            // Calculate proper scaling factors for magnitude correction
-            double fftScaling = 2.0 / _FFT_Size; // Factor of 2 for single-sided spectrum, divide by N for FFT scaling
-            
-            // Calculate window-specific amplitude correction factor
-            double windowAmplitudeCorrection = GetWindowAmplitudeCorrection(_FFT_windowFunction);
-
-            // Clear peaks list for new calculation
-            _fftPeaks.Clear();
-
-            // First pass: Calculate all magnitudes and store them temporarily
-            double[] magnitudes = new double[spectrumLength];
-            
-            // Calculate magnitudes and optionally build spectrum arrays
-            for (int i = 0; i < spectrumLength; i++)
-            {
-                double magnitude = Math.Sqrt(complexData[i].Real * complexData[i].Real + 
-                                            complexData[i].Imaginary * complexData[i].Imaginary);
-
-                // Apply proper scaling: FFT scaling and window amplitude correction
-                magnitude = magnitude * fftScaling * windowAmplitudeCorrection;
-                
-                // Special case for DC component (i=0) - no factor of 2 needed for single-sided spectrum
-                if (i == 0)
-                {
-                    magnitude = magnitude / 2.0;
-                }
-
-                magnitudes[i] = magnitude;
-                double frequency = i * frequencyResolution;
-
-                if (magnitude > maxMagnitude)
-                {
-                    maxMagnitude = magnitude;
-                    peakBin = i;
-                }
-
-                if (needSpectrum)
-                {
-                    _spectrumFrequencies[i] = frequency;
-
-                    // Apply averaging smoothing (exponential moving average simulation)
-                    if (_FFT_averaging > 1 && i < _spectrumMagnitudes.Length)
-                    {
-                        double alpha = 2.0 / (_FFT_averaging + 1.0); // EMA smoothing factor
-                        double currentMagdB = 20.0 * Math.Log10(Math.Max(magnitude, 1e-10));
-                        _spectrumMagnitudes[i] = alpha * currentMagdB + (1.0 - alpha) * _spectrumMagnitudes[i];
-                    }
-                    else
-                    {
-                        // Convert to dB (with small offset to avoid log(0))
-                        _spectrumMagnitudes[i] = 20.0 * Math.Log10(Math.Max(magnitude, 1e-10));
-                    }
-                }
-            }
-
-            // Second pass: Find peaks with windowing (±5 bins)
-            const int peakWindow = 5;
-            const double peakThreshold = 0.001; // Threshold to avoid noise
-            
-            for (int i = 1; i < spectrumLength - 1; i++) // Skip DC (i=0) and last bin
-            {
-                double currentMagnitude = magnitudes[i];
-                
-                // Skip if below threshold
-                if (currentMagnitude <= peakThreshold)
-                    continue;
-                
-                // Check if this is a local maximum within the ±5 bin window
-                bool isLocalMaximum = true;
-                int windowStart = Math.Max(1, i - peakWindow); // Don't include DC component
-                int windowEnd = Math.Min(spectrumLength - 1, i + peakWindow);
-                
-                for (int j = windowStart; j <= windowEnd; j++)
-                {
-                    if (j != i && magnitudes[j] > currentMagnitude)
-                    {
-                        isLocalMaximum = false;
-                        break;
-                    }
-                }
-                
-                // If this is a local maximum, add it to peaks
-                if (isLocalMaximum)
-                {
-                    double frequency = i * frequencyResolution;
-                    _fftPeaks.Add((frequency, currentMagnitude));
-                }
-            }
-
-            // Keep only the top peaks and limit the list size
-            if (_fftPeaks.Count > MaxPeaksToTrack)
-            {
-                _fftPeaks.Sort((a, b) => b.magnitude.CompareTo(a.magnitude));
-                _fftPeaks.RemoveRange(MaxPeaksToTrack, _fftPeaks.Count - MaxPeaksToTrack);
-            }
-
-            // Update the observable collection for data binding (UI thread safe)
-            // Apply the current user-selected sorting preference
-            Application.Current?.Dispatcher.BeginInvoke(new Action(() =>
-            {
-                ApplyFFTPeakSorting();
-            }));
-                
-            double peakFrequency = peakBin * frequencyResolution;
-            return peakFrequency;
-        }
-
-        /// <summary>
-        /// Get the amplitude correction factor for the specified window function
-        /// These factors compensate for the amplitude loss caused by windowing
-        /// </summary>
-        /// <param name="windowFunction">Name of the window function</param>
-        /// <returns>Amplitude correction factor</returns>
-        private double GetWindowAmplitudeCorrection(string windowFunction)
-        {
-            switch (windowFunction)
-            {
-                case "Hann":
-                    return 2.0; // Hann window has coherent gain of 0.5, so correction is 2.0
-                
-                case "Blackman-Harris":
-                    return 2.79; // Blackman-Harris window has coherent gain of ~0.358, so correction is ~2.79
-                
-                case "Flat Top":
-                    return 4.64; // Flat Top window has coherent gain of ~0.215, so correction is ~4.64
-                
-                case "None":
-                default:
-                    return 1.0; // Rectangular window (no windowing) needs no correction
-            }
-        }
 
         /// <summary>
         /// Apply the selected window function to the input data using pre-calculated coefficients
@@ -1028,12 +462,8 @@ namespace PowerScope.Model
             if (!_disposed)
             {
                 _disposed = true;
-                
-                // Clean up cached spectrum signal
-                _spectrumSignal = null;
-                _lastSpectrumLength = -1;
-                
-                // Dispose of FFT window if it exists
+
+                // Close the spectrum window if it exists
                 if (_fftWindow != null)
                 {
                     _fftWindow.Close();

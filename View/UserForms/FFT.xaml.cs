@@ -1,6 +1,7 @@
 ﻿using System.Windows;
 using System.Windows.Input;
 using System.Windows.Threading;
+using PowerScope.Model;
 
 namespace PowerScope.View.UserForms
 {
@@ -36,6 +37,12 @@ namespace PowerScope.View.UserForms
         private SortColumn _currentSortColumn = SortColumn.Amplitude;
         private SortDirection _currentSortDirection = SortDirection.Descending;
 
+        // Cached FFT plot signal for efficient updates (PlotManager pattern)
+        private ScottPlot.Plottables.SignalXY _spectrumSignal;
+        private int _lastSpectrumLength = -1; // Track when we need to rebuild the signal
+
+        private FFTAnalysis FFTAnalysis => (DataContext as Measurement)?.FFT;
+
         public FFT()
         {
             InitializeComponent();
@@ -50,17 +57,25 @@ namespace PowerScope.View.UserForms
         {
             InitializeFFTPlot();
             StartAutoScaleTimer();
-            
-            // Initialize sort state from the measurement model to sync with persisted preferences
-            if (DataContext is PowerScope.Model.Measurement measurement)
+
+            if (DataContext is Measurement measurement)
             {
-                var (column, direction) = measurement.GetFFTPeakSortState();
+                Title = "FFT Spectrum - " + measurement.ChannelSettings.Label;
+
+                // Initialize sort state from the model to sync with persisted preferences
+                var (column, direction) = measurement.FFT.GetSortState();
                 _currentSortColumn = column;
                 _currentSortDirection = direction;
+
+                // Spectrum arrays are only computed while a window is open and listening
+                measurement.FFT.ComputeSpectrum = true;
+                measurement.FFT.SpectrumUpdated += FFTAnalysis_SpectrumUpdated;
             }
-            
+
             // Initialize sort indicators to show current sort state
             UpdateSortIndicators();
+
+            RefreshSpectrumPlot();
         }
 
         /// <summary>
@@ -75,13 +90,75 @@ namespace PowerScope.View.UserForms
             WpfPlotFFT.Plot.Grid.MajorLineColor = ScottPlot.Color.FromHex("#404040");
             WpfPlotFFT.Plot.Axes.Bottom.Label.Text = "Frequency (Hz)";
             WpfPlotFFT.Plot.Axes.Left.Label.Text = "Magnitude (dB)";
-            WpfPlotFFT.Plot.Title("FFT Spectrum");
-            
+
+            FFTAnalysis fft = FFTAnalysis;
+            if (fft != null)
+            {
+                WpfPlotFFT.Plot.Title("FFT Spectrum - " + fft.ChannelLabel + " (Fs = " + fft.SampleRate.ToString("F1") + " Hz)");
+
+                double nyquistFrequency = fft.SampleRate / 2.0;
+                WpfPlotFFT.Plot.Axes.SetLimitsX(0, nyquistFrequency);
+                WpfPlotFFT.Plot.Axes.SetLimitsY(-60, 100);
+            }
+            else
+            {
+                WpfPlotFFT.Plot.Title("FFT Spectrum");
+            }
+
             // Disable auto scaling to prevent automatic axis adjustments
             WpfPlotFFT.Plot.Axes.ContinuouslyAutoscale = false;
-            
+
             // Setup user input for zoom/pan
             SetupPlotUserInput();
+
+            // Reset signal tracking
+            _spectrumSignal = null;
+            _lastSpectrumLength = -1;
+
+            WpfPlotFFT.Refresh();
+        }
+
+        /// <summary>
+        /// Handle a new spectrum being computed on the model side (raised on whatever thread
+        /// the measurement update runs on - currently always the UI thread, but dispatch
+        /// defensively in case that ever changes).
+        /// </summary>
+        private void FFTAnalysis_SpectrumUpdated(object sender, EventArgs e)
+        {
+            Dispatcher.BeginInvoke(new Action(RefreshSpectrumPlot));
+        }
+
+        /// <summary>
+        /// Update the spectrum plot with current data (efficient updates following PlotManager
+        /// pattern) - only recreates the signal when data length changes (FFT size/interpolation).
+        /// </summary>
+        public void RefreshSpectrumPlot()
+        {
+            FFTAnalysis fft = FFTAnalysis;
+            if (fft == null)
+                return;
+
+            double[] frequencies = fft.SpectrumFrequencies;
+            double[] magnitudes = fft.SpectrumMagnitudes;
+            int currentSpectrumLength = frequencies.Length;
+
+            bool needsRebuild = _spectrumSignal == null || _lastSpectrumLength != currentSpectrumLength;
+
+            if (needsRebuild)
+            {
+                if (_spectrumSignal != null)
+                    WpfPlotFFT.Plot.Remove(_spectrumSignal);
+
+                _spectrumSignal = WpfPlotFFT.Plot.Add.SignalXY(frequencies, magnitudes);
+
+                ScottPlot.Color scColor = new ScottPlot.Color(fft.ChannelColor.R, fft.ChannelColor.G, fft.ChannelColor.B);
+                _spectrumSignal.Color = scColor;
+                _spectrumSignal.LineWidth = 2.0f;
+                _spectrumSignal.LineStyle.AntiAlias = true;
+                _spectrumSignal.MarkerShape = ScottPlot.MarkerShape.None;
+
+                _lastSpectrumLength = currentSpectrumLength;
+            }
 
             WpfPlotFFT.Refresh();
         }
@@ -150,6 +227,11 @@ namespace PowerScope.View.UserForms
         /// </summary>
         private void CloseButton_Click(object sender, RoutedEventArgs e)
         {
+            Close();
+        }
+
+        protected override void OnClosed(EventArgs e)
+        {
             // Clean up timer if still running
             if (_autoScaleTimer != null)
             {
@@ -157,7 +239,17 @@ namespace PowerScope.View.UserForms
                 _autoScaleTimer.Tick -= AutoScaleTimer_Tick;
                 _autoScaleTimer = null;
             }
-            Close();
+
+            if (DataContext is Measurement measurement)
+            {
+                measurement.FFT.SpectrumUpdated -= FFTAnalysis_SpectrumUpdated;
+                measurement.FFT.ComputeSpectrum = false;
+            }
+
+            _spectrumSignal = null;
+            _lastSpectrumLength = -1;
+
+            base.OnClosed(e);
         }
 
         /// <summary>
@@ -225,10 +317,7 @@ namespace PowerScope.View.UserForms
         /// </summary>
         private void ApplySorting()
         {
-            if (DataContext is PowerScope.Model.Measurement measurement)
-            {
-                measurement.SortFFTPeaks(_currentSortColumn, _currentSortDirection);
-            }
+            FFTAnalysis?.SortPeaks(_currentSortColumn, _currentSortDirection);
         }
 
         /// <summary>
