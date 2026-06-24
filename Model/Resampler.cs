@@ -66,17 +66,39 @@ namespace PowerScope.Model
         public bool IsUpsampling => _samplingFactor > 0;
         public bool IsDownsampling => _samplingFactor < 0;
 
-        // Matches your existing mapping (+1 → 2x, +2 → 3x; -1 → 1/2, -2 → 1/3, etc.) <source_id data="1" title="Resampler.cs" />
-        public double SampleRateMultiplier
+        public double SampleRateMultiplier => FactorToMultiplier(_samplingFactor);
+
+        /// <summary>
+        /// Canonical mapping from a resampling factor to the sample-rate multiplier it represents.
+        /// Encoding (single source of truth for the whole app):
+        ///   0  → ×1   (bypass, no resampling)
+        ///   +n → ×(n+1)        (upsample: +1 → ×2, +2 → ×3, …)
+        ///   −n → ÷(n+1) = 1/(n+1)  (downsample: −1 → ½, −2 → ⅓, …)
+        /// </summary>
+        public static double FactorToMultiplier(int factor)
         {
-            get
-            {
-                if (_samplingFactor == 0) return 1.0;
-                if (_samplingFactor > 0) return _samplingFactor + 1.0;
-                return 1.0 / (Math.Abs(_samplingFactor) + 1.0);
-            }
+            if (factor == 0) return 1.0;
+            if (factor > 0) return factor + 1.0;
+            return 1.0 / (Math.Abs(factor) + 1.0);
         }
 
+        /// <summary>
+        /// Short human-readable label for a resampling factor, e.g. "1x" (bypass), "2x" (upsample ×2),
+        /// "1/2" (downsample ÷2). Same encoding as <see cref="FactorToMultiplier"/>; used by both the
+        /// stream-config slider readout and <see cref="GetDescription"/> so the two cannot drift.
+        /// </summary>
+        public static string FactorToLabel(int factor)
+        {
+            if (factor == 0) return "1x";
+            if (factor > 0) return $"{factor + 1}x";
+            return $"1/{Math.Abs(factor) + 1}";
+        }
+
+        /// <summary>
+        /// Resampling factor, range −9..+9. This is an offset from bypass, NOT a multiplier:
+        /// <c>0</c> = no resampling, <c>+n</c> = upsample ×(n+1), <c>−n</c> = downsample ÷(n+1).
+        /// (So the "off" value is 0, even though the UI renders it as "1x".)
+        /// </summary>
         public int SamplingFactor
         {
             get => _samplingFactor;
@@ -122,13 +144,12 @@ namespace PowerScope.Model
             if (IsUpsampling)
             {
                 int L = _samplingFactor; // zeros between samples
-                int M = L + 1;
-                return $"Upsampling x{M} (insert {L} zeros + sinc filter)";
+                return $"Upsampling {FactorToLabel(_samplingFactor)} (insert {L} zeros + sinc filter)";
             }
             else
             {
                 int M = Math.Abs(_samplingFactor) + 1;
-                return $"Downsampling x{M} (sinc anti-alias + keep every {M}th)";
+                return $"Downsampling to {FactorToLabel(_samplingFactor)} rate (sinc anti-alias + keep every {M}th)";
             }
         }
 

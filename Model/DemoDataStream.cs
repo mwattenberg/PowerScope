@@ -136,8 +136,8 @@ namespace PowerScope.Model
             DemoSettings = demoSettings;
             ChannelCount = demoSettings.NumberOfChannels;
             
-            // Initialize up/down sampling
-            _resampler = new Resampler(1);
+            // Initialize up/down sampling (0 = bypass; overwritten by StreamSettings on creation)
+            _resampler = new Resampler(0);
             _resampler.PropertyChanged += OnResamplerPropertyChanged;
             
             // Initialize ring buffers for each channel

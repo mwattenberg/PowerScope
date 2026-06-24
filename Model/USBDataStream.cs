@@ -305,8 +305,8 @@ namespace PowerScope.Model
             Parser = dataParser;
             _deviceGuid = new Guid(source.DeviceGuid);
 
-            // Initialize up/down sampling
-            _resampler = new Resampler(1);
+            // Initialize up/down sampling (0 = bypass; overwritten by StreamSettings on creation)
+            _resampler = new Resampler(0);
             _resampler.PropertyChanged += OnResamplerPropertyChanged;
 
             int ringBufferSize = Math.Max(500000, 1000000); // Large buffer for USB throughput

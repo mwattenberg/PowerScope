@@ -324,6 +324,12 @@ namespace PowerScope.Model
             }
         }
 
+        /// <summary>
+        /// Resampling factor, range −9..+9. Offset from bypass, NOT a multiplier:
+        /// <c>0</c> = no resampling, <c>+n</c> = upsample ×(n+1), <c>−n</c> = downsample ÷(n+1).
+        /// Applied to the stream's <see cref="Resampler.SamplingFactor"/> on creation.
+        /// (See <see cref="Resampler.FactorToLabel"/> / <see cref="Resampler.FactorToMultiplier"/>.)
+        /// </summary>
         public int Resampling
         {
             get { return _resampling; }

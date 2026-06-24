@@ -186,7 +186,7 @@ namespace PowerScope.Model
             ValidatePortExists(source.PortName);
 
             // Initialize up/down sampling
-            _resampler = new Resampler(1);
+            _resampler = new Resampler(0); // 0 = bypass; overwritten by StreamSettings on creation
             _resampler.PropertyChanged += OnResamplerPropertyChanged;
 
             _port = new SerialPort(source.PortName)
