@@ -46,7 +46,7 @@
                     <RowDefinition Height="*"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
-                <ScottPlot:WpfPlotGL x:Name="WpfPlot1" Grid.Row="0" Margin="0" VerticalAlignment="Stretch"/>
+                <ScottPlot:WpfPlot x:Name="WpfPlot1" Grid.Row="0" Margin="0" VerticalAlignment="Stretch"/>
             </Grid>
             <!-- MeasurementBar (right) -->
             <UserControls:MeasurementBar Grid.Column="2" x:Name="MeasurementBar" VerticalAlignment="Stretch"/>

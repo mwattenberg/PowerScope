@@ -67,7 +67,7 @@ The built `.hex` file is at `build/APP_KIT_FX2G3_104LGA/Release/mtb-example-fx2g
 
 3. **RingBuffer\<T\>** (`Model/RingBuffer.cs`) — thread-safe circular buffer per channel. Fixed capacity; oldest samples silently discarded when full.
 
-4. **PlotManager** (`Model/PlotManager.cs` + `.Cursors.cs` + `.Triggers.cs`) — the rendering hub. A `DispatcherTimer` (default 30 Hz) calls `UpdatePlot()`, which calls `CopyLatestN()` on each visible channel and hands data to ScottPlot's `WpfPlotGL` (GPU-accelerated). Also owns trigger logic and cursor math.
+4. **PlotManager** (`Model/PlotManager.cs` + `.Cursors.cs` + `.Triggers.cs`) — the rendering hub. A `DispatcherTimer` (default 30 Hz) calls `UpdatePlot()`, which calls `CopyLatestN()` on each visible channel and hands data to ScottPlot's `WpfPlot` (software/SkiaSharp CPU renderer). Also owns trigger logic and cursor math. See "Known Issues" below for why this is not the GPU (`WpfPlotGL`) control.
 
 ### Channel Model
 
@@ -113,7 +113,26 @@ PowerScope embeds an MCP server (`Model/Mcp/`, see `docs/MCP.md`) so AI agents c
 
 | Package | Role |
 |---|---|
-| ScottPlot.WPF 5.0.55 | GPU-accelerated 2D waveform rendering |
+| ScottPlot.WPF 5.1.59 | 2D waveform rendering (software `WpfPlot`; see Known Issues) |
 | RJCP.SerialPortStream 3.0.3 | High-speed COM port (>1 MBaud reliable) |
 | NAudio 2.2.1 | Audio input capture |
 | Aelian.FFT 1.0.4 | FFT calculations |
+
+## Known Issues / Future Work
+
+### GPU rendering (`WpfPlotGL`) is disabled — native memory leak
+
+The plot uses the **software** `WpfPlot` (SkiaSharp CPU) control, not the GPU `WpfPlotGL` control, even though GPU would render faster.
+
+**Why:** `WpfPlotGL` leaks **native** memory on every `Refresh()` (working set climbs ~2.5 GB/min at 30 Hz; the managed GC heap stays flat). The leak was masked before the acquisition-path allocation optimization, because the constant managed-GC churn reclaimed the native render surfaces; once the hot path became allocation-free, GC effectively stopped and native memory grew unbounded — the app got sluggish but never threw OOM. Switching to software `WpfPlot` (identical `PlotManager` usage) makes the leak disappear entirely.
+
+**Why we can't just fix it on the current package:** ScottPlot.WPF 5.1.59 has an internally inconsistent GL dependency closure — it requires `OpenTK >= 4.9.4` / `OpenTK.GLWpfControl >= 4.3.3`, but the `SkiaSharp.Views.WPF 3.119.0` `SKGLElement` it uses is a .NET Framework package built against `OpenTK 3.3.1`. Those OpenTK majors are mutually exclusive: with 4.x loaded, `SKGLElement.OnPaint` throws `FileNotFoundException` for `OpenTK 3.3.1` at first render; pinning to 3.x is rejected (`NU1605` downgrade). This is an upstream packaging bug.
+
+**To revisit GPU rendering later:**
+1. File an upstream ScottPlot issue (repro: the `NU1605` / `OpenTK 3.3.1 FileNotFound` GL dependency conflict on net10).
+2. When a ScottPlot 5.x ships with a consistent GL closure, switch `WpfPlot` → `WpfPlotGL` in `MainWindow.xaml`, `View/UserForms/FFT.xaml`, and the `_plot` field/property/ctor in `Model/PlotManager.cs`, then **re-verify the native leak is actually fixed** (gcdump: managed flat + working set flat under a high-rate demo) — a runnable GL build does NOT by itself prove the leak is gone.
+
+### Latent (unrelated) cleanups noticed during the above
+
+- Resampler default factor is `1` (= 2× upsampling *enabled*) in `USBDataStream`, `SerialDataStream`, `DemoDataStream`; only `AudioDataStream` uses `0` (bypass). Currently masked because `StreamSettings.CreateDataStream` resets it to `0`, but any construction path that skips that reset silently enables the allocating resampler.
+- `StreamInfoPanel` subscribes to the stream's `PropertyChanged` but never unsubscribes (the `Unloaded` handler's unsubscribe is commented out), leaking a panel + stream (~8 MB/channel ring buffer + read thread) per stream remove/reconfigure.

@@ -172,8 +172,8 @@ _stream.CopyLatestTo(_indexWithinDatastream, destination, n);
 
 Which efficiently copies the **latest N samples** from the ring buffer to ScottPlot's display arrays **without locking** (lock-free read).
 
-### 9. GPU-Accelerated Rendering
-ScottPlot renders the data arrays using GPU acceleration (`WpfPlotGL`) at the configured FPS, independent of data acquisition rate.
+### 9. Rendering
+ScottPlot renders the data arrays using the software `WpfPlot` (SkiaSharp CPU) control at the configured FPS, independent of data acquisition rate. The GPU `WpfPlotGL` control is intentionally not used — it leaks native render memory (see project Known Issues / CLAUDE.md).
 
 ---
 

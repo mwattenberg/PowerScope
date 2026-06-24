@@ -23,7 +23,7 @@ namespace PowerScope.Model
     public partial class PlotManager : INotifyPropertyChanged, IDisposable
     {
         // Core fields
-        private readonly WpfPlotGL _plot;
+        private readonly WpfPlot _plot;
         private readonly DispatcherTimer _updateTimer;
         private bool _disposed;
         private readonly Signal[] _signals;
@@ -48,7 +48,7 @@ namespace PowerScope.Model
 
         public PlotSettings Settings { get; private set; }
 
-        public WpfPlotGL Plot
+        public WpfPlot Plot
         {
             get { return _plot; }
         }
@@ -76,7 +76,7 @@ namespace PowerScope.Model
         /// </summary>
         public bool IsRunning { get; private set; }
 
-        public PlotManager(WpfPlotGL wpfPlot, int maxChannels = 16)
+        public PlotManager(WpfPlot wpfPlot, int maxChannels = 16)
         {
             _plot = wpfPlot;
             Settings = new PlotSettings();
