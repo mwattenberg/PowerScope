@@ -55,6 +55,19 @@ namespace PowerScope.View.UserForms
             
             // Automatically select the appropriate tab based on the configured StreamSource
             SelectTabBasedOnStreamSource();
+
+            UpdateResamplerLabel();
+        }
+
+        private void Slider_Resampler_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            UpdateResamplerLabel();
+        }
+
+        private void UpdateResamplerLabel()
+        {
+            int factor = (int)Math.Round(Slider_Resampler.Value);
+            TextBlock_ResamplerValue.Text = Model.Resampler.FactorToLabel(factor);
         }
 
         public SerialConfigWindow() : this(new StreamSettings()) { }
