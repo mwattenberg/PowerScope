@@ -29,6 +29,15 @@ namespace PowerScope.Model
             // Decimation phase across blocks (0..M-1)
             public int DecimPhase;
 
+            // Reusable per-channel scratch, grown on demand and never freed in steady state:
+            //   Work     — zero-stuffed (up) / tail-prefixed (raw) input for the FIR
+            //   Filtered — FIR output (y)
+            //   Out      — the right-sized result handed back to the caller
+            // Reused across blocks so steady-state resampling allocates nothing.
+            public double[] Work = Array.Empty<double>();
+            public double[] Filtered = Array.Empty<double>();
+            public double[] Out = Array.Empty<double>();
+
             public ChannelState(int kernelTailLen)
             {
                 DownTail = new double[kernelTailLen];
@@ -135,22 +144,56 @@ namespace PowerScope.Model
             return ProcessChannelData(0, inputData);
         }
 
-        // Main API used by SerialDataStream <source_id data="3" title="SerialDataStream.cs" />
+        // Allocating convenience overload (returns a right-sized array). Kept for the unit tests and
+        // any non-hot-path caller; the acquisition hot path uses the zero-allocation overload below.
         public double[] ProcessChannelData(int channelIndex, double[] inputData)
+        {
+            if (inputData == null || inputData.Length == 0 || !IsEnabled)
+                return inputData;
+
+            int n = ProcessChannelData(channelIndex, inputData, inputData.Length, out double[] reused);
+            double[] result = new double[n];
+            Array.Copy(reused, 0, result, 0, n);
+            return result;
+        }
+
+        /// <summary>
+        /// Zero-allocation channelized resampling for the acquisition hot path.
+        ///
+        /// Reads <paramref name="inputCount"/> samples from <paramref name="input"/> and writes the
+        /// resampled result into a buffer owned by this Resampler, handed back via <paramref name="output"/>.
+        /// That buffer is reused on the next call for the same channel, so the caller must consume
+        /// <c>output[0..return)</c> (e.g. push to the ring buffer) before calling again for that channel.
+        /// The internal scratch/output buffers only grow when a larger block arrives, so steady-state
+        /// resampling allocates nothing.
+        /// </summary>
+        /// <returns>Number of valid samples written to <paramref name="output"/>.</returns>
+        public int ProcessChannelData(int channelIndex, double[] input, int inputCount, out double[] output)
         {
             if (_channels == null || channelIndex < 0 || channelIndex >= _channels.Length)
                 InitializeChannels(Math.Max(channelIndex + 1, 1));
 
-            if (inputData == null || inputData.Length == 0 || !IsEnabled)
-                return inputData;
+            if (input == null || inputCount <= 0 || !IsEnabled)
+            {
+                output = input;
+                return inputCount <= 0 ? 0 : inputCount;
+            }
 
             EnsureKernel();
-            var state = _channels[channelIndex];
+            ChannelState state = _channels[channelIndex];
 
             if (IsUpsampling)
-                return ProcessUpsampling(inputData, state);
+                return ProcessUpsampling(input, inputCount, state, out output);
             else
-                return ProcessDownsampling(inputData, state);
+                return ProcessDownsampling(input, inputCount, state, out output);
+        }
+
+        // Grows (never shrinks) a reusable scratch buffer to at least <paramref name="needed"/> elements.
+        private static double[] EnsureCapacity(double[] buffer, int needed)
+        {
+            if (buffer == null || buffer.Length < needed)
+                return new double[needed];
+            return buffer;
         }
 
         private void EnsureKernel()
@@ -210,56 +253,65 @@ namespace PowerScope.Model
 
         // Upsampling: insert L zeros then filter with FIR.
         // L = _samplingFactor (zeros between samples), M = L + 1 (final multiplier)
-        private double[] ProcessUpsampling(double[] input, ChannelState state)
+        private int ProcessUpsampling(double[] input, int inputCount, ChannelState state, out double[] output)
         {
             int L = _samplingFactor;
             int M = L + 1;
 
             // Build upsampled buffer for this block, prefixed by previous upsampled tail for FIR continuity.
-            int upBlockLen = input.Length * M;
+            int upBlockLen = inputCount * M;
             int totalUpLen = state.UpTail.Length + upBlockLen;
-            var up = new double[totalUpLen];
+
+            // Reusable zero-stuffed buffer (grow-only). Must be cleared first: upsampling relies on the
+            // gaps between inserted samples being zero, and the buffer carries stale data from prior blocks.
+            state.Work = EnsureCapacity(state.Work, totalUpLen);
+            double[] up = state.Work;
+            Array.Clear(up, 0, totalUpLen);
 
             // Copy previous tail
             Array.Copy(state.UpTail, 0, up, 0, state.UpTail.Length);
 
             // Zero-stuff: place each input sample every M steps
             int writeBase = state.UpTail.Length;
-            for (int n = 0; n < input.Length; n++)
+            for (int n = 0; n < inputCount; n++)
             {
                 up[writeBase + n * M] = input[n] * M;
             }
 
             // FIR filtering over the upsampled stream
-            var y = new double[totalUpLen];
-            ConvolveFIRSteadyState(up, y, _sincKernelReversed);
+            state.Filtered = EnsureCapacity(state.Filtered, totalUpLen);
+            double[] y = state.Filtered;
+            ConvolveFIRSteadyState(up, y, _sincKernelReversed, totalUpLen);
 
             // Update tail for next block: last (kernelLen-1) of upsampled sequence
             int tailCopy = Math.Min(state.UpTail.Length, totalUpLen);
             Array.Copy(up, totalUpLen - tailCopy, state.UpTail, 0, tailCopy);
 
             // Return the filtered samples corresponding to the new upsampled portion
-            var outBlock = new double[upBlockLen];
-            Array.Copy(y, state.UpTail.Length, outBlock, 0, upBlockLen);
-            return outBlock;
+            state.Out = EnsureCapacity(state.Out, upBlockLen);
+            Array.Copy(y, state.UpTail.Length, state.Out, 0, upBlockLen);
+            output = state.Out;
+            return upBlockLen;
         }
 
         // Downsampling: filter first with FIR, then keep every M-th sample
         // M = |_samplingFactor| + 1
-        private double[] ProcessDownsampling(double[] input, ChannelState state)
+        private int ProcessDownsampling(double[] input, int inputCount, ChannelState state, out double[] output)
         {
             int M = Math.Abs(_samplingFactor) + 1;
 
-            // Raw buffer for this block with previous raw tail for FIR continuity
-            int totalRawLen = state.DownTail.Length + input.Length;
-            var raw = new double[totalRawLen];
+            // Raw buffer for this block with previous raw tail for FIR continuity (grow-only reuse).
+            int totalRawLen = state.DownTail.Length + inputCount;
+            state.Work = EnsureCapacity(state.Work, totalRawLen);
+            double[] raw = state.Work;
 
             Array.Copy(state.DownTail, 0, raw, 0, state.DownTail.Length);
-            Array.Copy(input, 0, raw, state.DownTail.Length, input.Length);
+            Array.Copy(input, 0, raw, state.DownTail.Length, inputCount);
 
             // Filter raw
-            var y = new double[totalRawLen];
-            ConvolveFIRSteadyState(raw, y, _sincKernelReversed);
+            state.Filtered = EnsureCapacity(state.Filtered, totalRawLen);
+            double[] y = state.Filtered;
+            ConvolveFIRSteadyState(raw, y, _sincKernelReversed, totalRawLen);
 
             // Update raw tail for next block
             int tailCopy = Math.Min(state.DownTail.Length, totalRawLen);
@@ -278,7 +330,8 @@ namespace PowerScope.Model
                 phase = (phase + 1) % M;
             }
 
-            var outBlock = new double[kept];
+            state.Out = EnsureCapacity(state.Out, kept);
+            double[] outBlock = state.Out;
             int outIdx = 0;
             phase = state.DecimPhase;
 
@@ -292,7 +345,8 @@ namespace PowerScope.Model
             }
 
             state.DecimPhase = phase;
-            return outBlock;
+            output = state.Out;
+            return kept;
         }
 
         /// <summary>
@@ -306,9 +360,8 @@ namespace PowerScope.Model
         /// caller-supplied tail), so the inner loop never needs a bounds check and is a fixed-width
         /// dot product - straightforward to vectorize.
         /// </summary>
-        private static void ConvolveFIRSteadyState(double[] x, double[] y, double[] hReversed)
+        private static void ConvolveFIRSteadyState(double[] x, double[] y, double[] hReversed, int len)
         {
-            int len = x.Length;
             int kLen = hReversed.Length;
             int startIndex = kLen - 1;
             int vectorSize = Vector<double>.Count;

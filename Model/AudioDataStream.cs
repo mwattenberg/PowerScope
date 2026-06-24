@@ -409,14 +409,12 @@ namespace PowerScope.Model
 
                     if (_resampler.IsEnabled)
                     {
-                        // Optional resampling allocates a right-sized block; copy the live range first.
-                        double[] block = new double[samplesRecorded];
-                        Array.Copy(_audioProcessed, 0, block, 0, samplesRecorded);
-
-                        double[] resampled = _resampler.ProcessChannelData(ch, block);
-                        ReceivedData[ch].AddRange(resampled, resampled.Length);
+                        // Zero-allocation: reads _audioProcessed[0..samplesRecorded) and hands back a
+                        // reused per-channel buffer consumed before the next channel's call.
+                        int resampledCount = _resampler.ProcessChannelData(ch, _audioProcessed, samplesRecorded, out double[] resampled);
+                        ReceivedData[ch].AddRange(resampled, resampledCount);
                         if (ch == 0)
-                            producedSamples = resampled.Length;
+                            producedSamples = resampledCount;
                     }
                     else
                     {

@@ -843,8 +843,8 @@ namespace PowerScope.Model
         /// overwrites the buffer, and (2) IDigitalFilter.Filter() is sample-by-sample — the filter owns
         /// its own history, so we never need the whole input window resident at once (no block convolution).
         ///
-        /// Up/down sampling, when enabled, still allocates inside Resampler. That is an optional,
-        /// non-default feature, so it is intentionally left on the allocating path.
+        /// Up/down sampling, when enabled, runs through Resampler's zero-allocation overload
+        /// (reused per-channel buffers), so this path stays allocation-free either way.
         /// </summary>
         /// <param name="sampleCount">Number of valid samples per channel in _parseOutput.</param>
         private void AddProcessedToRingBuffers(int sampleCount)
@@ -858,20 +858,18 @@ namespace PowerScope.Model
 
                 if (_resampler.IsEnabled)
                 {
-                    // Optional resampling allocates a right-sized block; copy the live range first.
-                    double[] block = new double[sampleCount];
-                    Array.Copy(_processedSamples, 0, block, 0, sampleCount);
-
-                    double[] resampled = _resampler.ProcessChannelData(channel, block);
-                    for (int i = 0; i < resampled.Length; i++)
+                    // Zero-allocation resampling: reads _processedSamples[0..sampleCount) and hands back
+                    // a reused per-channel buffer we consume immediately (before the next channel's call).
+                    int resampledCount = _resampler.ProcessChannelData(channel, _processedSamples, sampleCount, out double[] resampled);
+                    for (int i = 0; i < resampledCount; i++)
                     {
                         if (!double.IsFinite(resampled[i]))
                             resampled[i] = 0.0;
                     }
 
-                    ReceivedData[channel].AddRange(resampled, resampled.Length);
+                    ReceivedData[channel].AddRange(resampled, resampledCount);
                     if (channel == 0)
-                        producedSamples = resampled.Length;
+                        producedSamples = resampledCount;
                 }
                 else
                 {
@@ -903,20 +901,26 @@ namespace PowerScope.Model
                 double[] channelProcessedSamples = new double[parsedData[channel].Length];
                 ApplyChannelProcessing(channel, parsedData[channel], channelProcessedSamples, parsedData[channel].Length);
 
-                double[] channelFinalData = channelProcessedSamples;
+                double[] channelFinalData;
+                int finalCount;
                 if (_resampler.IsEnabled)
                 {
-                    channelFinalData = _resampler.ProcessChannelData(channel, channelProcessedSamples);
-                    for (int i = 0; i < channelFinalData.Length; i++)
+                    finalCount = _resampler.ProcessChannelData(channel, channelProcessedSamples, channelProcessedSamples.Length, out channelFinalData);
+                    for (int i = 0; i < finalCount; i++)
                     {
                         if (!double.IsFinite(channelFinalData[i]))
                             channelFinalData[i] = 0.0;
                     }
                 }
+                else
+                {
+                    channelFinalData = channelProcessedSamples;
+                    finalCount = channelProcessedSamples.Length;
+                }
 
-                ReceivedData[channel].AddRange(channelFinalData, channelFinalData.Length);
+                ReceivedData[channel].AddRange(channelFinalData, finalCount);
                 if (channel == 0)
-                    producedSamples = channelFinalData.Length;
+                    producedSamples = finalCount;
             }
 
             if (producedSamples > 0)

@@ -386,17 +386,20 @@ namespace PowerScope.Model
                 // Update time accumulator based on original sample rate
                 _timeAccumulator += (double)samplesPerChunk / DemoSettings.SampleRate;
 
-                // Push to ring buffers. The common path reuses the buffer; optional up/down sampling
-                // allocates a right-sized block (non-default feature, left on the allocating path).
+                // Push to ring buffers. Both the common path and optional up/down sampling reuse
+                // buffers (Resampler's zero-allocation overload), so this stays allocation-free.
                 for (int channel = 0; channel < ChannelCount; channel++)
                 {
                     if (_resampler.IsEnabled)
                     {
                         double[] resampled;
+                        int resampledCount;
                         try
                         {
-                            resampled = _resampler.ProcessChannelData(channel, buffer[channel]);
-                            for (int i = 0; i < resampled.Length; i++)
+                            // Zero-allocation: reads buffer[channel][0..samplesPerChunk) and returns a
+                            // reused per-channel buffer consumed before the next channel's call.
+                            resampledCount = _resampler.ProcessChannelData(channel, buffer[channel], samplesPerChunk, out resampled);
+                            for (int i = 0; i < resampledCount; i++)
                             {
                                 if (!double.IsFinite(resampled[i]))
                                     resampled[i] = 0.0; // Replace NaN/Infinity with zero
@@ -405,11 +408,12 @@ namespace PowerScope.Model
                         catch (Exception)
                         {
                             resampled = buffer[channel]; // Fall back to processed samples
+                            resampledCount = samplesPerChunk;
                         }
 
-                        ReceivedData[channel].AddRange(resampled, resampled.Length);
+                        ReceivedData[channel].AddRange(resampled, resampledCount);
                         if (channel == 0)
-                            producedSamples = resampled.Length;
+                            producedSamples = resampledCount;
                     }
                     else
                     {

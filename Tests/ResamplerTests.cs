@@ -67,6 +67,37 @@ namespace PowerScope.Tests
             }
         }
 
+        /// <summary>
+        /// The zero-allocation overload must allocate nothing in steady state (fixed block size):
+        /// the per-channel scratch/output buffers are grown once during warmup, then reused. Guards
+        /// against a regression that reintroduces per-block array allocations (the GC-pressure bug).
+        /// </summary>
+        [Theory]
+        [InlineData(1)]
+        [InlineData(2)]
+        [InlineData(-1)]
+        [InlineData(-2)]
+        public void ProcessChannelData_AllocatesNothing_InSteadyState(int factor)
+        {
+            Resampler sampling = new Resampler(factor);
+            sampling.InitializeChannels(1);
+
+            double[] block = new double[256];
+            for (int i = 0; i < block.Length; i++)
+                block[i] = Math.Sin(i * 0.1);
+
+            // Warmup: the first calls grow the internal Work/Filtered/Out buffers.
+            for (int w = 0; w < 5; w++)
+                sampling.ProcessChannelData(0, block, block.Length, out _);
+
+            long before = GC.GetAllocatedBytesForCurrentThread();
+            for (int r = 0; r < 1000; r++)
+                sampling.ProcessChannelData(0, block, block.Length, out _);
+            long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+
+            Assert.Equal(0, allocated);
+        }
+
         private static double[] GenerateReferenceKernel(int samplingFactor, out int kernelLen)
         {
             const int N = 32; // matches Resampler.SincKernelHalfLength
