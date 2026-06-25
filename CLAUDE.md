@@ -113,24 +113,22 @@ PowerScope embeds an MCP server (`Model/Mcp/`, see `docs/MCP.md`) so AI agents c
 
 | Package | Role |
 |---|---|
-| ScottPlot.WPF 5.1.59 | 2D waveform rendering (software `WpfPlot`; see Known Issues) |
+| ScottPlot.WPF 5.1.59 | GPU-accelerated 2D waveform rendering (`WpfPlotGL`) |
 | RJCP.SerialPortStream 3.0.3 | High-speed COM port (>1 MBaud reliable) |
 | NAudio 2.2.1 | Audio input capture |
 | Aelian.FFT 1.0.4 | FFT calculations |
 
 ## Known Issues / Future Work
 
-### GPU rendering (`WpfPlotGL`) is disabled — native memory leak
+## Known Issues / Future Work
 
-The plot uses the **software** `WpfPlot` (SkiaSharp CPU) control, not the GPU `WpfPlotGL` control, even though GPU would render faster.
+### GPU rendering (`WpfPlotGL`) — native memory leak workaround
 
-**Why:** `WpfPlotGL` leaks **native** memory on every `Refresh()` (working set climbs ~2.5 GB/min at 30 Hz; the managed GC heap stays flat). The leak was masked before the acquisition-path allocation optimization, because the constant managed-GC churn reclaimed the native render surfaces; once the hot path became allocation-free, GC effectively stopped and native memory grew unbounded — the app got sluggish but never threw OOM. Switching to software `WpfPlot` (identical `PlotManager` usage) makes the leak disappear entirely.
+`WpfPlotGL` leaks **native** memory on every `Refresh()` (~2.5 GB/min at 30 Hz; managed heap stays flat). The leak is SkiaSharp creating a new `GRBackendRenderTarget` + `SKSurface` per frame whose native GPU memory is only reclaimed by GC finalizers. With an allocation-free hot path, GC barely runs and finalizers never fire.
 
-**Why we can't just fix it on the current package:** ScottPlot.WPF 5.1.59 has an internally inconsistent GL dependency closure — it requires `OpenTK >= 4.9.4` / `OpenTK.GLWpfControl >= 4.3.3`, but the `SkiaSharp.Views.WPF 3.119.0` `SKGLElement` it uses is a .NET Framework package built against `OpenTK 3.3.1`. Those OpenTK majors are mutually exclusive: with 4.x loaded, `SKGLElement.OnPaint` throws `FileNotFoundException` for `OpenTK 3.3.1` at first render; pinning to 3.x is rejected (`NU1605` downgrade). This is an upstream packaging bug.
+**Current mitigation:** `PlotManager.UpdatePlot` triggers a non-blocking gen0 `GC.Collect` every 150 frames (~5 s at 30 Hz). This keeps the finalizer queue drained and working set flat without visible pauses. Monitor with Task Manager: working set should remain stable under a high-rate Demo stream.
 
-**To revisit GPU rendering later:**
-1. File an upstream ScottPlot issue (repro: the `NU1605` / `OpenTK 3.3.1 FileNotFound` GL dependency conflict on net10).
-2. When a ScottPlot 5.x ships with a consistent GL closure, switch `WpfPlot` → `WpfPlotGL` in `MainWindow.xaml`, `View/UserForms/FFT.xaml`, and the `_plot` field/property/ctor in `Model/PlotManager.cs`, then **re-verify the native leak is actually fixed** (gcdump: managed flat + working set flat under a high-rate demo) — a runnable GL build does NOT by itself prove the leak is gone.
+**Original dependency-conflict blocker (resolved):** When the project targeted `windows10.0.17763`, NuGet fell back to `SkiaSharp.Views.WPF`'s `.NETFramework4.6.2` asset (the only one whose OS version was compatible) which references `OpenTK 3.3.1`. ScottPlot requires `OpenTK 4.9.4`. The two are binary-incompatible → `FileNotFoundException` at first GL render. Fixed by bumping the TFM to `net10.0-windows10.0.19041` so NuGet picks the `net8.0-windows10.0.19041` asset (OpenTK 4.3.0 → resolves to 4.9.4, same major, semver-compatible).
 
 ### Latent (unrelated) cleanups noticed during the above
 

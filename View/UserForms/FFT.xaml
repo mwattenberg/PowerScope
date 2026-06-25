@@ -259,7 +259,7 @@
                 </Grid.ColumnDefinitions>
                 
                 <!-- FFT Plot Area (Left column - dynamic width) -->
-                <ScottPlot:WpfPlot x:Name="WpfPlotFFT" Grid.Column="0" Margin="15"/>
+                <ScottPlot:WpfPlotGL x:Name="WpfPlotFFT" Grid.Column="0" Margin="15"/>
                 
                 <!-- Control Panel (Right column - fixed 220px width) -->
                 <Grid Grid.Column="1" Margin="5">

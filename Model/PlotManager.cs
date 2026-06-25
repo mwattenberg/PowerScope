@@ -23,13 +23,18 @@ namespace PowerScope.Model
     public partial class PlotManager : INotifyPropertyChanged, IDisposable
     {
         // Core fields
-        private readonly WpfPlot _plot;
+        private readonly WpfPlotGL _plot;
         private readonly DispatcherTimer _updateTimer;
         private bool _disposed;
         private readonly Signal[] _signals;
         private readonly double[][] _data;
         private readonly int _maxChannels;
         private ObservableCollection<Channel> _channels;
+        // Frame counter for periodic gen0 GC to reclaim native SkiaSharp GL render surfaces.
+        // WpfPlotGL creates a new GRBackendRenderTarget + SKSurface each frame; the native memory
+        // is only freed when GC runs finalizers.  With an allocation-free hot path GC rarely fires,
+        // so we nudge it every ~5 s (150 frames @ 30 Hz) with a cheap non-blocking gen0 collect.
+        private int _gcCollectFrameCounter;
 
         // Recording functionality. Exposed directly so callers (e.g. RunControl via MainWindow)
         // start/stop recording and check IsRecording on the recorder itself, instead of PlotManager
@@ -48,7 +53,7 @@ namespace PowerScope.Model
 
         public PlotSettings Settings { get; private set; }
 
-        public WpfPlot Plot
+        public WpfPlotGL Plot
         {
             get { return _plot; }
         }
@@ -76,7 +81,7 @@ namespace PowerScope.Model
         /// </summary>
         public bool IsRunning { get; private set; }
 
-        public PlotManager(WpfPlot wpfPlot, int maxChannels = 16)
+        public PlotManager(WpfPlotGL wpfPlot, int maxChannels = 16)
         {
             _plot = wpfPlot;
             Settings = new PlotSettings();
@@ -495,6 +500,16 @@ namespace PowerScope.Model
             else
             {
                 _plot.Plot.RenderManager.EnableRendering = true;
+            }
+
+            // Periodically collect gen0 to flush the finalizer queue so the SkiaSharp GL
+            // render surfaces created by WpfPlotGL.Refresh() are reclaimed promptly.
+            // Without this, native GPU memory grows ~2.5 GB/min when GC is otherwise idle.
+            _gcCollectFrameCounter++;
+            if (_gcCollectFrameCounter >= 150)
+            {
+                _gcCollectFrameCounter = 0;
+                GC.Collect(0, GCCollectionMode.Optimized, false, false);
             }
         }
 
