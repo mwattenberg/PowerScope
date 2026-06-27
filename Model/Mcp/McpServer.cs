@@ -1,8 +1,7 @@
-using System.Diagnostics;
-using System.Net;
-using System.Net.Sockets;
 using System.ComponentModel;
 using System.Text.Json.Nodes;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -11,80 +10,47 @@ using ModelContextProtocol.Server;
 namespace PowerScope.Model.Mcp
 {
     /// <summary>
-    /// MCP server using the official ModelContextProtocol C# SDK over TCP.
-    /// Listens on localhost:54321 and handles one client connection at a time.
-    /// Connect via the PowerScopeMCP companion executable, which bridges
-    /// an MCP client's stdio ↔ this TCP port.
+    /// MCP server using the official ModelContextProtocol C# SDK over Streamable HTTP.
+    /// Listens on http://127.0.0.1:54321/ — any MCP client that supports the HTTP
+    /// transport connects directly, no companion stdio bridge process required.
     /// </summary>
     public sealed class McpServer : IDisposable
     {
         public const int DefaultPort = 54321;
 
-        private readonly McpToolService _tools;
-        private readonly TcpListener _listener;
-        private readonly CancellationTokenSource _cts = new();
+        private readonly WebApplication _app;
         private bool _disposed;
 
         public McpServer(McpToolService tools, int port = DefaultPort)
         {
-            _tools = tools;
-            _listener = new TcpListener(IPAddress.Loopback, port);
+            WebApplicationBuilder builder = WebApplication.CreateBuilder();
+
+            builder.Logging
+                   .SetMinimumLevel(LogLevel.Warning)
+                   .AddConsole(o => o.LogToStandardErrorThreshold = LogLevel.Trace);
+
+            builder.WebHost.UseUrls($"http://127.0.0.1:{port}");
+
+            builder.Services
+                   .AddSingleton(tools)
+                   .AddMcpServer()
+                   .WithHttpTransport()
+                   .WithToolsFromAssembly();
+
+            _app = builder.Build();
+            _app.MapMcp();
         }
 
         public void Start()
         {
-            _listener.Start();
-            _ = AcceptLoopAsync(_cts.Token);
-        }
-
-        private async Task AcceptLoopAsync(CancellationToken ct)
-        {
-            while (!ct.IsCancellationRequested)
-            {
-                try
-                {
-                    TcpClient client = await _listener.AcceptTcpClientAsync(ct);
-                    _ = HandleClientAsync(client, ct);
-                }
-                catch (OperationCanceledException) { break; }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"MCP TCP accept error: {ex.Message}");
-                }
-            }
-        }
-
-        private async Task HandleClientAsync(TcpClient client, CancellationToken ct)
-        {
-            using (client)
-            {
-                NetworkStream stream = client.GetStream();
-
-                var settings = new HostApplicationBuilderSettings { Args = [] };
-                var builder = Host.CreateEmptyApplicationBuilder(settings);
-
-                builder.Logging
-                       .SetMinimumLevel(LogLevel.Warning)
-                       .AddConsole(o => o.LogToStandardErrorThreshold = LogLevel.Trace);
-
-                builder.Services
-                       .AddSingleton(_tools)
-                       .AddMcpServer()
-                       .WithStreamServerTransport(stream, stream)
-                       .WithToolsFromAssembly();
-
-                using IHost host = builder.Build();
-                await host.RunAsync(ct);
-            }
+            _app.Start();
         }
 
         public void Dispose()
         {
             if (_disposed) return;
             _disposed = true;
-            _cts.Cancel();
-            _listener.Stop();
-            _cts.Dispose();
+            _app.DisposeAsync().AsTask().GetAwaiter().GetResult();
         }
     }
 

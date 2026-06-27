@@ -10,33 +10,52 @@ so the MCU can be connected any way PowerScope supports: UART through a virtual 
 a USB bridge chip (e.g. FX2G3), or even an audio input. The agent sees the same channels and tools
 regardless of the physical link.
 
-## Connecting from Claude Desktop
+## Enabling the server
 
-Add the following to `claude_desktop_config.json`
-(`%APPDATA%\Claude\claude_desktop_config.json` on Windows):
+PowerScope must already be running. Open **Plot Settings** and check **MCP Server** — the status
+label next to it reports `Running` (listening on `http://127.0.0.1:54321/`) or `Port occupied` if
+another instance already holds the port. The setting is persisted in the session XML, so it stays
+on across restarts once enabled. There is no command-line switch for this.
+
+## Connecting a client
+
+The server speaks plain MCP **Streamable HTTP** — any MCP client that supports an HTTP server
+entry connects directly; no companion process, no stdio bridge.
+
+**Claude Desktop / Claude Code** (`claude_desktop_config.json` or `.mcp.json`):
 
 ```json
 {
   "mcpServers": {
     "powerscope": {
-      "command": "C:\\path\\to\\PowerScope.exe",
-      "args": ["--stdio"]
+      "type": "http",
+      "url": "http://127.0.0.1:54321"
     }
   }
 }
 ```
 
-Replace `C:\\path\\to\\PowerScope.exe` with the actual installation path.
-Claude Desktop will launch PowerScope (which opens its normal window) and communicate with the
-MCP server over the process's stdin/stdout.
+**VS Code** (`.vscode/mcp.json` or user `mcp.json`):
+
+```json
+{
+  "servers": {
+    "powerscope": {
+      "type": "http",
+      "url": "http://127.0.0.1:54321"
+    }
+  }
+}
+```
+
+If you previously used the `PowerScopeMCP` stdio↔TCP bridge executable, it's no longer needed —
+remove the `command`/`args` entry and replace it with the `type: "http"` block above.
 
 ## Command line arguments
 
 | Argument | Effect |
 |---|---|
-| `--config <path>` | Load the given session XML at startup instead of `Settings.xml`. Configure streams once in the GUI, save the session, then launch reproducibly: `PowerScope.exe --stdio --config buck_test.xml` |
-| `--stdio` | Start the MCP server on stdin/stdout (required for Claude Desktop). Without this flag no MCP server runs. |
-| `--no-mcp` | Disable the MCP server (overrides `--stdio` if both are specified). |
+| `--config <path>` | Load the given session XML at startup instead of `Settings.xml`. Configure streams once in the GUI, save the session, then launch reproducibly: `PowerScope.exe --config buck_test.xml` |
 
 ## Tools
 
@@ -61,7 +80,7 @@ MCP server over the process's stdin/stdout.
 
 ## Architecture
 
-- `Model/Mcp/McpServer.cs` — wraps the official [ModelContextProtocol C# SDK](https://csharp.sdk.modelcontextprotocol.io) (NuGet: `ModelContextProtocol 1.4.0`). Runs a stdio transport host; discovers tools via `[McpServerToolType]`/`[McpServerTool]` attributes on the `PowerScopeTools` bridge class.
+- `Model/Mcp/McpServer.cs` — wraps the official [ModelContextProtocol C# SDK](https://csharp.sdk.modelcontextprotocol.io) (NuGet: `ModelContextProtocol`/`ModelContextProtocol.AspNetCore` 1.4.0). Hosts an embedded Kestrel server (`WithHttpTransport()` + `MapMcp()`) on `127.0.0.1:54321`; discovers tools via `[McpServerToolType]`/`[McpServerTool]` attributes on the `PowerScopeTools` bridge class.
 - `Model/Mcp/McpToolService.cs` — tool implementations, transport-independent.
 - `Model/Mcp/IMcpHost.cs` — boundary to the application. `MainWindow.McpWindowHost` implements it by marshalling onto the WPF dispatcher; tests implement it with bare `DemoDataStream`s.
 
