@@ -477,6 +477,20 @@ namespace PowerScope.Model
             streamSettings.UsbSelectedDevicePath = string.IsNullOrEmpty(devicePathElement?.Value)
                 ? null
                 : devicePathElement.Value;
+
+            XElement dataFormatElement = streamElement.Element("DataFormat");
+            if (dataFormatElement != null && Enum.TryParse<DataFormatType>(dataFormatElement.Value, out DataFormatType dataFormat))
+                streamSettings.DataFormat = dataFormat;
+            else
+                streamSettings.DataFormat = DataFormatType.ASCII;
+
+            XElement numberTypeElement = streamElement.Element("NumberType");
+            if (numberTypeElement != null && Enum.TryParse<NumberTypeEnum>(numberTypeElement.Value, out NumberTypeEnum numberType))
+                streamSettings.NumberType = numberType;
+
+            XElement frameStartElement = streamElement.Element("FrameStart");
+            if (frameStartElement != null)
+                streamSettings.FrameStart = frameStartElement.Value;
         }
 
         /// <summary>
