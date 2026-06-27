@@ -27,7 +27,7 @@ dotnet run
 dotnet test Tests\PowerScope.Tests.csproj
 ```
 
-Command line arguments: `--config <path>` (load a session XML instead of Settings.xml at startup). The TCP MCP server is enabled/disabled from the Plot Settings window (persisted in the session XML), not via a command line switch.
+Command line arguments: `--config <path>` (load a session XML instead of Settings.xml at startup). The MCP server (Streamable HTTP, `127.0.0.1:54321`) is enabled/disabled from the Plot Settings window (persisted in the session XML), not via a command line switch.
 
 ## Companion Repositories
 
@@ -107,7 +107,7 @@ Modal dialogs in `View/UserForms/`:
 
 ### MCP Server
 
-PowerScope embeds an MCP server (`Model/Mcp/`, see `docs/MCP.md`) so AI agents can read live waveform data. Uses the official `ModelContextProtocol` C# SDK (NuGet 1.4.0) with stdio transport — launched with `--stdio` for Claude Desktop. Tools: `get_status`, `read_samples`, `get_measurements`, `clear_data`, `add_demo_stream`, `load_config`, `remove_all_streams`. The `IMcpHost` interface decouples the tool layer from the UI — `MainWindow.McpWindowHost` marshals onto the dispatcher; tests (`Tests/`) back it with `DemoDataStream`s directly.
+PowerScope embeds an MCP server (`Model/Mcp/`, see `docs/MCP.md`) so AI agents can read live waveform data. Uses the official `ModelContextProtocol`/`ModelContextProtocol.AspNetCore` C# SDK (NuGet 1.4.0) over Streamable HTTP — an embedded Kestrel server on `127.0.0.1:54321`, toggled from the Plot Settings window. Any MCP client with an HTTP transport (`"type": "http"`) connects directly; no companion process needed. Tools: `get_status`, `read_samples`, `get_measurements`, `clear_data`, `add_demo_stream`, `load_config`, `remove_stream`, `remove_all_streams`, `capture_plot`. The `IMcpHost` interface decouples the tool layer from the UI — `MainWindow.McpWindowHost` marshals onto the dispatcher; tests (`Tests/`) back it with `DemoDataStream`s directly.
 
 ## Key Dependencies
 

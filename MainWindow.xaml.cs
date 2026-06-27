@@ -109,10 +109,10 @@ namespace PowerScope
                 _mcpServer.Start();
                 _plotManager.Settings.McpServerStatus = "Running";
             }
-            catch (System.Net.Sockets.SocketException)
+            catch (IOException)
             {
-                // Most commonly AddressAlreadyInUse: another process (e.g. a second
-                // PowerScope instance) already holds the MCP port.
+                // Kestrel throws AddressInUseException (an IOException) when another
+                // process (e.g. a second PowerScope instance) already holds the MCP port.
                 _mcpServer?.Dispose();
                 _mcpServer = null;
                 _plotManager.Settings.McpServerStatus = "Port occupied";
