@@ -211,14 +211,18 @@ namespace PowerScope
                 switch (extension)
                 {
                     case ".svg":
-                        WpfPlot1.Plot.SaveSvg(saveFileDialog.FileName, 1920, 1080);
+                        _plotManager.ApplyLegend();
+                        try { WpfPlot1.Plot.SaveSvg(saveFileDialog.FileName, 1920, 1080); }
+                        finally { _plotManager.RemoveLegend(); }
                         break;
                     case ".csv":
                         ExportPlotDataToCsv(saveFileDialog.FileName);
                         break;
                     case ".png":
                     default:
-                        WpfPlot1.Plot.SavePng(saveFileDialog.FileName, 1920, 1080);
+                        _plotManager.ApplyLegend();
+                        try { WpfPlot1.Plot.SavePng(saveFileDialog.FileName, 1920, 1080); }
+                        finally { _plotManager.RemoveLegend(); }
                         break;
                 }
             }
@@ -642,10 +646,18 @@ namespace PowerScope
                             $"powerscope_plot_{DateTime.Now:yyyyMMdd_HHmmss}.png");
 
                     string ext = System.IO.Path.GetExtension(filePath).ToLowerInvariant();
-                    if (ext == ".svg")
-                        _window.WpfPlot1.Plot.SaveSvg(filePath, width, height);
-                    else
-                        _window.WpfPlot1.Plot.SavePng(filePath, width, height);
+                    _window._plotManager.ApplyLegend();
+                    try
+                    {
+                        if (ext == ".svg")
+                            _window.WpfPlot1.Plot.SaveSvg(filePath, width, height);
+                        else
+                            _window.WpfPlot1.Plot.SavePng(filePath, width, height);
+                    }
+                    finally
+                    {
+                        _window._plotManager.RemoveLegend();
+                    }
 
                     return filePath;
                 });

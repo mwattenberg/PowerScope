@@ -644,6 +644,42 @@ namespace PowerScope.Model
 
         #endregion
 
+        #region Legend
+
+        /// <summary>
+        /// Sets legend text on every active signal and shows the legend overlay.
+        /// Pair with <see cref="RemoveLegend"/> after the export completes.
+        /// </summary>
+        public void ApplyLegend()
+        {
+            if (_channels == null)
+                return;
+
+            for (int i = 0; i < NumberOfChannels && i < _maxChannels; i++)
+            {
+                if (_signals[i] != null && _channels[i].IsEnabled)
+                    _signals[i].LegendText = _channels[i].Settings.Label;
+            }
+
+            _plot.Plot.ShowLegend();
+        }
+
+        /// <summary>
+        /// Clears all signal legend text and hides the legend overlay.
+        /// </summary>
+        public void RemoveLegend()
+        {
+            for (int i = 0; i < _maxChannels; i++)
+            {
+                if (_signals[i] != null)
+                    _signals[i].LegendText = string.Empty;
+            }
+
+            _plot.Plot.HideLegend();
+        }
+
+        #endregion
+
         #region Cleanup
 
         public void Dispose()
