@@ -43,6 +43,13 @@ namespace PowerScope.Model.Mcp
             switch (name)
             {
                 case "get_status": return GetStatus();
+                case "get_channel_info": return GetChannelInfo(arguments);
+                case "set_channel": return SetChannel(arguments);
+                case "set_trigger": return SetTrigger(arguments);
+                case "get_x_range": return GetXRange();
+                case "set_x_range": return SetXRange(arguments);
+                case "get_y_range": return GetYRange();
+                case "set_y_range": return SetYRange(arguments);
                 case "read_samples": return ReadSamples(arguments);
                 case "get_measurements": return GetMeasurements(arguments);
                 case "clear_data": return ClearData();
@@ -100,11 +107,268 @@ namespace PowerScope.Model.Mcp
                 });
             }
 
+            TriggerSnapshot trigger = _host.GetTriggerInfo();
+            JsonObject triggerObj = new JsonObject
+            {
+                ["mode"] = trigger.Mode,
+                ["edge"] = trigger.Edge,
+                ["level"] = trigger.Level,
+                ["position"] = trigger.Position,
+                ["source_channel_label"] = trigger.SourceChannelLabel,
+                ["source_channel_index"] = trigger.SourceChannelIndex.HasValue
+                    ? (JsonNode)trigger.SourceChannelIndex.Value
+                    : null
+            };
+
             return new JsonObject
             {
                 ["streams"] = streamArray,
-                ["total_channels"] = channels.Count
+                ["total_channels"] = channels.Count,
+                ["trigger"] = triggerObj
             };
+        }
+
+        private JsonObject GetChannelInfo(JsonObject args)
+        {
+            (Channel channel, int index) = ResolveChannel(args);
+
+            string colorHex = $"#{channel.Settings.Color.R:X2}{channel.Settings.Color.G:X2}{channel.Settings.Color.B:X2}";
+            string filterName = channel.Settings.Filter?.GetType().Name ?? "None";
+
+            return new JsonObject
+            {
+                ["index"] = index,
+                ["label"] = channel.Settings.Label,
+                ["enabled"] = channel.Settings.IsEnabled,
+                ["gain"] = channel.Settings.Gain,
+                ["offset"] = channel.Settings.Offset,
+                ["color"] = colorHex,
+                ["filter"] = filterName,
+                ["stream_type"] = channel.StreamType
+            };
+        }
+
+        private JsonObject SetChannel(JsonObject args)
+        {
+            (Channel channel, int index) = ResolveChannel(args);
+
+            double? gain = null;
+            double? offset = null;
+
+            JsonNode gainNode = args?["gain"];
+            if (gainNode != null)
+            {
+                if (!TryGetNumber(gainNode, out double gainValue))
+                    throw new McpToolException("Argument 'gain' must be a number.");
+                if (gainValue == 0.0)
+                    throw new McpToolException("Gain must be non-zero.");
+                gain = gainValue;
+            }
+
+            JsonNode offsetNode = args?["offset"];
+            if (offsetNode != null)
+            {
+                if (!TryGetNumber(offsetNode, out double offsetValue))
+                    throw new McpToolException("Argument 'offset' must be a number.");
+                offset = offsetValue;
+            }
+
+            string label = null;
+            JsonNode labelNode = args?["label"];
+            if (labelNode != null)
+            {
+                label = labelNode.GetValue<string>();
+                if (string.IsNullOrWhiteSpace(label))
+                    throw new McpToolException("Argument 'label' must be a non-empty string.");
+            }
+
+            bool? enabled = null;
+            JsonNode enabledNode = args?["enabled"];
+            if (enabledNode != null)
+            {
+                if (enabledNode.GetValueKind() != JsonValueKind.True
+                    && enabledNode.GetValueKind() != JsonValueKind.False)
+                    throw new McpToolException("Argument 'enabled' must be a boolean.");
+                enabled = enabledNode.GetValue<bool>();
+            }
+
+            if (gain == null && offset == null && label == null && enabled == null)
+                throw new McpToolException("Provide at least one of: 'label', 'enabled', 'gain', 'offset'.");
+
+            _host.SetChannelProperties(channel, label, enabled, gain, offset);
+
+            return new JsonObject
+            {
+                ["channel"] = index,
+                ["label"] = channel.Settings.Label,
+                ["enabled"] = channel.Settings.IsEnabled,
+                ["gain"] = channel.Settings.Gain,
+                ["offset"] = channel.Settings.Offset
+            };
+        }
+
+        private JsonObject SetTrigger(JsonObject args)
+        {
+            bool? enableEdgeTrigger = null;
+            bool? singleShot = null;
+
+            JsonNode modeNode = args?["mode"];
+            if (modeNode != null)
+            {
+                string mode = modeNode.GetValue<string>().ToLowerInvariant().Replace("-", "_");
+                switch (mode)
+                {
+                    case "free_run": enableEdgeTrigger = false; break;
+                    case "normal":   enableEdgeTrigger = true; singleShot = false; break;
+                    case "single":   enableEdgeTrigger = true; singleShot = true; break;
+                    default:
+                        throw new McpToolException(
+                            $"Unknown trigger mode '{mode}'. Valid values: 'free_run', 'normal', 'single'.");
+                }
+            }
+
+            double? level = null;
+            JsonNode levelNode = args?["level"];
+            if (levelNode != null)
+            {
+                if (!TryGetNumber(levelNode, out double levelValue))
+                    throw new McpToolException("Argument 'level' must be a number.");
+                level = levelValue;
+            }
+
+            int? position = null;
+            JsonNode positionNode = args?["position"];
+            if (positionNode != null)
+            {
+                if (!TryGetNumber(positionNode, out double positionValue))
+                    throw new McpToolException("Argument 'position' must be a number.");
+                position = (int)positionValue;
+            }
+
+            TriggerEdgeType? edge = null;
+            JsonNode edgeNode = args?["edge"];
+            if (edgeNode != null)
+            {
+                string edgeStr = edgeNode.GetValue<string>().ToLowerInvariant();
+                if (edgeStr == "rising") edge = TriggerEdgeType.Rising;
+                else if (edgeStr == "falling") edge = TriggerEdgeType.Falling;
+                else throw new McpToolException(
+                    $"Unknown edge '{edgeStr}'. Valid values: 'rising', 'falling'.");
+            }
+
+            // Channel: present in args → change it; absent → leave unchanged.
+            // Value of "auto" or null → set to auto (first enabled channel).
+            bool channelSpecified = false;
+            Channel channel = null;
+            if (args != null && args.ContainsKey("channel"))
+            {
+                channelSpecified = true;
+                JsonNode channelArg = args["channel"];
+                bool isAutoRequest = channelArg == null
+                    || channelArg.GetValueKind() == JsonValueKind.Null
+                    || (channelArg.GetValueKind() == JsonValueKind.String
+                        && channelArg.GetValue<string>().Equals("auto", StringComparison.OrdinalIgnoreCase));
+
+                if (!isAutoRequest)
+                    (channel, _) = ResolveChannel(args);
+            }
+
+            if (!enableEdgeTrigger.HasValue && !singleShot.HasValue && !level.HasValue
+                && !position.HasValue && !edge.HasValue && !channelSpecified)
+                throw new McpToolException(
+                    "Provide at least one of: 'mode', 'level', 'position', 'edge', 'channel'.");
+
+            _host.SetTrigger(enableEdgeTrigger, singleShot, level, position, edge, channelSpecified, channel);
+
+            return GetStatus();
+        }
+
+        private JsonObject GetXRange()
+        {
+            AxisRangeSnapshot range = _host.GetXRange();
+            return new JsonObject
+            {
+                ["x_min"] = range.Min,
+                ["x_max"] = range.Max,
+                ["note"] = "Range is in sample indices. Reflects the current viewport, which may differ from the configured sample window if the user has zoomed or panned."
+            };
+        }
+
+        private JsonObject SetXRange(JsonObject args)
+        {
+            AxisRangeSnapshot current = _host.GetXRange();
+            double min = current.Min;
+            double max = current.Max;
+
+            JsonNode minNode = args?["x_min"];
+            if (minNode != null)
+            {
+                if (!TryGetNumber(minNode, out double v))
+                    throw new McpToolException("Argument 'x_min' must be a number.");
+                min = v;
+            }
+
+            JsonNode maxNode = args?["x_max"];
+            if (maxNode != null)
+            {
+                if (!TryGetNumber(maxNode, out double v))
+                    throw new McpToolException("Argument 'x_max' must be a number.");
+                max = v;
+            }
+
+            if (min >= max)
+                throw new McpToolException($"x_min ({min}) must be less than x_max ({max}).");
+
+            _host.SetXRange(min, max);
+            return GetXRange();
+        }
+
+        private JsonObject GetYRange()
+        {
+            AxisRangeSnapshot range = _host.GetYRange();
+            return new JsonObject
+            {
+                ["y_min"] = range.Min,
+                ["y_max"] = range.Max,
+                ["auto_scale"] = range.AutoScale,
+                ["note"] = "When auto_scale is true, y_min/y_max are overridden each frame and reflect the last auto-scaled values."
+            };
+        }
+
+        private JsonObject SetYRange(JsonObject args)
+        {
+            JsonNode autoScaleNode = args?["auto_scale"];
+            if (autoScaleNode != null && autoScaleNode.GetValueKind() == JsonValueKind.True)
+            {
+                _host.SetYRange(0, 0, autoScale: true);
+                return GetYRange();
+            }
+
+            AxisRangeSnapshot current = _host.GetYRange();
+            double min = current.Min;
+            double max = current.Max;
+
+            JsonNode minNode = args?["y_min"];
+            if (minNode != null)
+            {
+                if (!TryGetNumber(minNode, out double v))
+                    throw new McpToolException("Argument 'y_min' must be a number.");
+                min = v;
+            }
+
+            JsonNode maxNode = args?["y_max"];
+            if (maxNode != null)
+            {
+                if (!TryGetNumber(maxNode, out double v))
+                    throw new McpToolException("Argument 'y_max' must be a number.");
+                max = v;
+            }
+
+            if (min >= max)
+                throw new McpToolException($"y_min ({min}) must be less than y_max ({max}).");
+
+            _host.SetYRange(min, max, autoScale: false);
+            return GetYRange();
         }
 
         private JsonObject ReadSamples(JsonObject args)
@@ -299,11 +563,94 @@ namespace PowerScope.Model.Mcp
             try
             {
                 string saved = _host.ExportPlot(filePath, width, height);
+
+                // Gather plot context immediately after rendering
+                AxisRangeSnapshot xRange = _host.GetXRange();
+                AxisRangeSnapshot yRange = _host.GetYRange();
+                TriggerSnapshot trigger = _host.GetTriggerInfo();
+                IReadOnlyList<Channel> channels = _host.GetChannels();
+
+                // Visible sample index range, clamped to non-negative
+                int sliceStart = (int)Math.Max(0, Math.Floor(xRange.Min));
+                int sliceEnd = (int)Math.Ceiling(xRange.Max);
+                int fetchCount = Math.Min(Math.Max(sliceEnd, 1), MaxRawSamples);
+
+                // Per-channel stats for enabled channels over the visible slice
+                JsonArray channelArray = new JsonArray();
+                foreach (Channel channel in channels)
+                {
+                    if (!channel.Settings.IsEnabled) continue;
+
+                    double[] buffer = new double[fetchCount];
+                    int copied = channel.CopyLatestDataTo(buffer, fetchCount);
+
+                    int start = Math.Min(sliceStart, copied);
+                    int end = Math.Min(sliceEnd, copied);
+                    int count = end - start;
+
+                    if (count <= 0)
+                    {
+                        channelArray.Add(new JsonObject
+                        {
+                            ["label"] = channel.Settings.Label,
+                            ["min"] = (JsonNode)null,
+                            ["max"] = (JsonNode)null,
+                            ["mean"] = (JsonNode)null,
+                            ["clipped"] = false
+                        });
+                        continue;
+                    }
+
+                    double min = double.MaxValue, max = double.MinValue, sum = 0;
+                    bool clipped = false;
+                    for (int j = start; j < end; j++)
+                    {
+                        double v = buffer[j];
+                        if (v < min) min = v;
+                        if (v > max) max = v;
+                        sum += v;
+                        if (!yRange.AutoScale && (v < yRange.Min || v > yRange.Max))
+                            clipped = true;
+                    }
+
+                    channelArray.Add(new JsonObject
+                    {
+                        ["label"] = channel.Settings.Label,
+                        ["min"] = Math.Round(min, 4),
+                        ["max"] = Math.Round(max, 4),
+                        ["mean"] = Math.Round(sum / count, 4),
+                        ["clipped"] = clipped
+                    });
+                }
+
+                bool triggerInView = trigger.Enabled
+                    && trigger.Position >= xRange.Min
+                    && trigger.Position <= xRange.Max;
+
                 return new JsonObject
                 {
                     ["file_path"] = saved,
                     ["width"] = width,
-                    ["height"] = height
+                    ["height"] = height,
+                    ["x_range"] = new JsonObject
+                    {
+                        ["min"] = Math.Round(xRange.Min, 2),
+                        ["max"] = Math.Round(xRange.Max, 2),
+                        ["unit"] = "samples"
+                    },
+                    ["y_range"] = new JsonObject
+                    {
+                        ["min"] = Math.Round(yRange.Min, 4),
+                        ["max"] = Math.Round(yRange.Max, 4),
+                        ["auto_scale"] = yRange.AutoScale
+                    },
+                    ["trigger"] = new JsonObject
+                    {
+                        ["mode"] = trigger.Mode,
+                        ["position"] = trigger.Position,
+                        ["in_view"] = triggerInView
+                    },
+                    ["channels"] = channelArray
                 };
             }
             catch (NotSupportedException ex)

@@ -479,6 +479,106 @@ namespace PowerScope
                 return _window.Dispatcher.Invoke(() => _window.DataStreamBar.Channels.ToList());
             }
 
+            public TriggerSnapshot GetTriggerInfo()
+            {
+                return _window.Dispatcher.Invoke(() =>
+                {
+                    PlotSettings settings = _window._plotManager.Settings;
+                    Channel source = settings.TriggerSourceChannel;
+
+                    int? sourceIndex = null;
+                    string sourceLabel = null;
+                    if (source != null)
+                    {
+                        IReadOnlyList<Channel> channels = _window.DataStreamBar.Channels;
+                        for (int i = 0; i < channels.Count; i++)
+                        {
+                            if (channels[i] == source)
+                            {
+                                sourceIndex = i;
+                                sourceLabel = source.Settings.Label;
+                                break;
+                            }
+                        }
+                    }
+
+                    string mode = !settings.EnableEdgeTrigger ? "free_run"
+                                  : settings.SingleShotMode ? "single"
+                                  : "normal";
+
+                    return new TriggerSnapshot
+                    {
+                        Enabled = settings.EnableEdgeTrigger,
+                        Mode = mode,
+                        Edge = settings.TriggerEdge.ToString(),
+                        Level = settings.TriggerLevel,
+                        Position = settings.TriggerPosition,
+                        SourceChannelLabel = sourceLabel,
+                        SourceChannelIndex = sourceIndex
+                    };
+                });
+            }
+
+            public void SetTrigger(bool? enableEdgeTrigger, bool? singleShot, double? level,
+                                   int? position, TriggerEdgeType? edge, bool channelSpecified, Channel channel)
+            {
+                _window.Dispatcher.Invoke(() =>
+                {
+                    PlotSettings settings = _window._plotManager.Settings;
+                    if (enableEdgeTrigger.HasValue) settings.EnableEdgeTrigger = enableEdgeTrigger.Value;
+                    if (singleShot.HasValue) settings.SingleShotMode = singleShot.Value;
+                    if (level.HasValue) settings.TriggerLevel = level.Value;
+                    if (position.HasValue)
+                    {
+                        int xmax = settings.Xmax;
+                        int min = (int)(0.05 * xmax);
+                        int max = (int)(0.95 * xmax);
+                        settings.TriggerPosition = (int)Math.Clamp(position.Value, min, max);
+                    }
+                    if (edge.HasValue) settings.TriggerEdge = edge.Value;
+                    if (channelSpecified) settings.TriggerSourceChannel = channel;
+                });
+            }
+
+            public void SetChannelProperties(Channel channel, string label, bool? enabled, double? gain, double? offset)
+            {
+                _window.Dispatcher.Invoke(() =>
+                {
+                    if (label != null) channel.Settings.Label = label;
+                    if (enabled.HasValue) channel.Settings.IsEnabled = enabled.Value;
+                    if (gain.HasValue) channel.Settings.Gain = gain.Value;
+                    if (offset.HasValue) channel.Settings.Offset = offset.Value;
+                });
+            }
+
+            public AxisRangeSnapshot GetXRange()
+            {
+                return _window.Dispatcher.Invoke(() =>
+                {
+                    var (min, max) = _window._plotManager.GetXRange();
+                    return new AxisRangeSnapshot { Min = min, Max = max, AutoScale = false };
+                });
+            }
+
+            public void SetXRange(double min, double max)
+            {
+                _window.Dispatcher.Invoke(() => _window._plotManager.SetXRange(min, max));
+            }
+
+            public AxisRangeSnapshot GetYRange()
+            {
+                return _window.Dispatcher.Invoke(() =>
+                {
+                    var (min, max, autoScale) = _window._plotManager.GetYRange();
+                    return new AxisRangeSnapshot { Min = min, Max = max, AutoScale = autoScale };
+                });
+            }
+
+            public void SetYRange(double min, double max, bool autoScale)
+            {
+                _window.Dispatcher.Invoke(() => _window._plotManager.SetYRange(min, max, autoScale));
+            }
+
             public int AddDemoStream(int numberOfChannels, int sampleRate, string signalType)
             {
                 return _window.Dispatcher.Invoke(() =>

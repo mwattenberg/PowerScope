@@ -245,7 +245,26 @@ namespace PowerScope.Model
         private void OnTriggerSettingsChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
         {
             if (e.PropertyName == nameof(PlotSettings.TriggerSourceChannel))
+            {
                 UpdateTriggerLineColor();
+            }
+            else if (e.PropertyName == nameof(PlotSettings.TriggerLevel))
+            {
+                if (_triggerLevelLine != null)
+                {
+                    _triggerLevelLine.Y = Settings.TriggerLevel;
+                    _triggerLevelLine.Text = $"Trigger: {Settings.TriggerLevel:F1}";
+                    _plot.Refresh();
+                }
+            }
+            else if (e.PropertyName == nameof(PlotSettings.TriggerPosition))
+            {
+                if (_triggerPositionLine != null)
+                {
+                    _triggerPositionLine.X = Settings.TriggerPosition;
+                    _plot.Refresh();
+                }
+            }
         }
 
         /// <summary>

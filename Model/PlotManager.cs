@@ -313,6 +313,54 @@ namespace PowerScope.Model
 
         #region Initialization and Visuals
 
+        /// <summary>
+        /// Returns the live ScottPlot X axis limits (the current viewport, which may
+        /// differ from PlotSettings.Xmax if the user has zoomed or panned).
+        /// Must be called on the UI thread.
+        /// </summary>
+        public (double Min, double Max) GetXRange()
+        {
+            var range = _plot.Plot.Axes.GetXAxes().First().Range;
+            return (range.Min, range.Max);
+        }
+
+        /// <summary>
+        /// Sets the X axis viewport transiently without touching PlotSettings.
+        /// Equivalent to the user zooming/panning with the mouse.
+        /// Must be called on the UI thread.
+        /// </summary>
+        public void SetXRange(double min, double max)
+        {
+            _plot.Plot.Axes.SetLimitsX(min, max);
+            _plot.Refresh();
+        }
+
+        /// <summary>
+        /// Returns the live ScottPlot Y axis limits and the current YAutoScale state.
+        /// Must be called on the UI thread.
+        /// </summary>
+        public (double Min, double Max, bool AutoScale) GetYRange()
+        {
+            var range = _plot.Plot.Axes.GetYAxes().First().Range;
+            return (range.Min, range.Max, Settings.YAutoScale);
+        }
+
+        /// <summary>
+        /// Sets the Y axis viewport transiently. When autoScale is false, also disables
+        /// YAutoScale in PlotSettings so the next render frame does not override the limits.
+        /// When autoScale is true, re-enables YAutoScale (min/max are ignored).
+        /// Must be called on the UI thread.
+        /// </summary>
+        public void SetYRange(double min, double max, bool autoScale)
+        {
+            Settings.YAutoScale = autoScale;
+            if (!autoScale)
+            {
+                _plot.Plot.Axes.SetLimitsY(min, max);
+                _plot.Refresh();
+            }
+        }
+
         public void InitializePlot()
         {
             _plot.Plot.Clear();

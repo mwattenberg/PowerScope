@@ -55,6 +55,62 @@ namespace PowerScope.Tests
             return numberOfChannels;
         }
 
+        // Trigger state for test host
+        private bool _triggerEnabled = false;
+        private bool _triggerSingleShot = false;
+        private double _triggerLevel = 0.0;
+        private string _triggerEdge = "Rising";
+
+        private int _triggerPosition = 100;
+
+        public TriggerSnapshot GetTriggerInfo() => new TriggerSnapshot
+        {
+            Enabled = _triggerEnabled,
+            Mode = !_triggerEnabled ? "free_run" : _triggerSingleShot ? "single" : "normal",
+            Edge = _triggerEdge,
+            Level = _triggerLevel,
+            Position = _triggerPosition,
+            SourceChannelLabel = null,
+            SourceChannelIndex = null
+        };
+
+        public void SetTrigger(bool? enableEdgeTrigger, bool? singleShot, double? level,
+                               int? position, TriggerEdgeType? edge, bool channelSpecified, Channel channel)
+        {
+            if (enableEdgeTrigger.HasValue) _triggerEnabled = enableEdgeTrigger.Value;
+            if (singleShot.HasValue) _triggerSingleShot = singleShot.Value;
+            if (level.HasValue) _triggerLevel = level.Value;
+            if (position.HasValue) _triggerPosition = position.Value;
+            if (edge.HasValue) _triggerEdge = edge.Value.ToString();
+        }
+
+        public void SetChannelProperties(Channel channel, string label, bool? enabled, double? gain, double? offset)
+        {
+            if (label != null) channel.Settings.Label = label;
+            if (enabled.HasValue) channel.Settings.IsEnabled = enabled.Value;
+            if (gain.HasValue) channel.Settings.Gain = gain.Value;
+            if (offset.HasValue) channel.Settings.Offset = offset.Value;
+        }
+
+        // Viewport state for test host (no real plot)
+        private double _xMin = 0, _xMax = 10000;
+        private double _yMin = -100, _yMax = 100;
+        private bool _yAutoScale = false;
+
+        public AxisRangeSnapshot GetXRange() =>
+            new AxisRangeSnapshot { Min = _xMin, Max = _xMax, AutoScale = false };
+
+        public void SetXRange(double min, double max) { _xMin = min; _xMax = max; }
+
+        public AxisRangeSnapshot GetYRange() =>
+            new AxisRangeSnapshot { Min = _yMin, Max = _yMax, AutoScale = _yAutoScale };
+
+        public void SetYRange(double min, double max, bool autoScale)
+        {
+            _yAutoScale = autoScale;
+            if (!autoScale) { _yMin = min; _yMax = max; }
+        }
+
         public IReadOnlyList<string> LoadConfiguration(string filePath)
         {
             throw new NotSupportedException("load_config is not available in the test host");
