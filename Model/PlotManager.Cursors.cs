@@ -275,7 +275,7 @@ namespace PowerScope.Model
         private void Plot_MouseMove(object sender, MouseEventArgs e)
         {
             Point pos = e.GetPosition(_plot);
-            var rect = _plot.Plot.GetCoordinateRect((float)pos.X, (float)pos.Y, radius: 10);
+            var rect = _plot.Plot.GetCoordinateRect((float)(pos.X * _dpi.DpiScaleX), (float)(pos.Y * _dpi.DpiScaleY), radius: 10);
 
             if (_plottableBeingDragged == null)
             {
@@ -291,7 +291,7 @@ namespace PowerScope.Model
             {
                 if (_plottableBeingDragged is HorizontalLine horizontalLine)
                 {
-                    horizontalLine.Y = rect.VerticalCenter * _dpi.DpiScaleX;
+                    horizontalLine.Y = rect.VerticalCenter;
 
                     // Check if this is the trigger line - delegate to trigger partial class
                     if (IsTriggerLine(horizontalLine))
@@ -307,7 +307,7 @@ namespace PowerScope.Model
                 }
                 else if (_plottableBeingDragged is VerticalLine verticalLine)
                 {
-                    verticalLine.X = rect.HorizontalCenter * _dpi.DpiScaleY;
+                    verticalLine.X = rect.HorizontalCenter;
 
                     // Check if this is the trigger position line - delegate to trigger partial class
                     if (IsTriggerLine(verticalLine))
