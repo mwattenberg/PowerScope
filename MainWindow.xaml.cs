@@ -89,6 +89,27 @@ namespace PowerScope
                 ApplyMcpServerState();
         }
 
+        private static readonly GridLength DataStreamBarWidth = new GridLength(150);
+        private static readonly GridLength MeasurementBarWidth = new GridLength(160);
+
+        private void ToggleDataStreamBarButton_Click(object sender, RoutedEventArgs e)
+        {
+            bool collapse = DataStreamBar.Visibility == Visibility.Visible;
+            DataStreamBar.Visibility = collapse ? Visibility.Collapsed : Visibility.Visible;
+            DataStreamBarColumn.Width = collapse ? new GridLength(0) : DataStreamBarWidth;
+            DataStreamBarColumn.MinWidth = collapse ? 0 : 150;
+            ToggleDataStreamBarButton.Content = collapse ? "»" : "«";
+        }
+
+        private void ToggleMeasurementBarButton_Click(object sender, RoutedEventArgs e)
+        {
+            bool collapse = MeasurementBar.Visibility == Visibility.Visible;
+            MeasurementBar.Visibility = collapse ? Visibility.Collapsed : Visibility.Visible;
+            MeasurementBarColumn.Width = collapse ? new GridLength(0) : MeasurementBarWidth;
+            MeasurementBarColumn.MinWidth = collapse ? 0 : 160;
+            ToggleMeasurementBarButton.Content = collapse ? "«" : "»";
+        }
+
         private void ApplyMcpServerState()
         {
             if (_plotManager.Settings.McpServerEnabled)

@@ -34,9 +34,9 @@
         <!-- Main content area: 3 columns -->
         <Grid Grid.Row="1" VerticalAlignment="Stretch">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="150" MinWidth="150"/>
+                <ColumnDefinition x:Name="DataStreamBarColumn" Width="150" MinWidth="150"/>
                 <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="160" MinWidth="160"/>
+                <ColumnDefinition x:Name="MeasurementBarColumn" Width="160" MinWidth="160"/>
             </Grid.ColumnDefinitions>
             <!-- DataStreamBar (left) -->
             <UserControls:DataStreamBar Grid.Column="0" x:Name="DataStreamBar" VerticalAlignment="Stretch"/>
@@ -47,6 +47,15 @@
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
                 <ScottPlot:WpfPlotGL x:Name="WpfPlot1" Grid.Row="0" Margin="0" VerticalAlignment="Stretch"/>
+                <!-- Collapse/expand handles for the side bars -->
+                <Button x:Name="ToggleDataStreamBarButton" Grid.Row="0" Click="ToggleDataStreamBarButton_Click"
+                        Style="{StaticResource ButtonStyle}" Content="&#171;"
+                        Width="7" HorizontalAlignment="Left" VerticalAlignment="Stretch"
+                        Padding="0" Opacity="0.6" Cursor="Hand" ToolTip="Hide/show data stream panel"/>
+                <Button x:Name="ToggleMeasurementBarButton" Grid.Row="0" Click="ToggleMeasurementBarButton_Click"
+                        Style="{StaticResource ButtonStyle}" Content="&#187;"
+                        Width="7" HorizontalAlignment="Right" VerticalAlignment="Stretch"
+                        Padding="0" Opacity="0.6" Cursor="Hand" ToolTip="Hide/show measurement panel"/>
             </Grid>
             <!-- MeasurementBar (right) -->
             <UserControls:MeasurementBar Grid.Column="2" x:Name="MeasurementBar" VerticalAlignment="Stretch"/>
