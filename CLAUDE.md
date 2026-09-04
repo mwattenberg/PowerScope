@@ -118,19 +118,4 @@ PowerScope embeds an MCP server (`Model/Mcp/`, see `docs/MCP.md`) so AI agents c
 | NAudio 2.2.1 | Audio input capture |
 | Aelian.FFT 1.0.4 | FFT calculations |
 
-## Known Issues / Future Work
-
-## Known Issues / Future Work
-
-### GPU rendering (`WpfPlotGL`) — native memory leak workaround
-
-`WpfPlotGL` leaks **native** memory on every `Refresh()` (~2.5 GB/min at 30 Hz; managed heap stays flat). The leak is SkiaSharp creating a new `GRBackendRenderTarget` + `SKSurface` per frame whose native GPU memory is only reclaimed by GC finalizers. With an allocation-free hot path, GC barely runs and finalizers never fire.
-
-**Current mitigation:** `PlotManager.UpdatePlot` triggers a non-blocking gen0 `GC.Collect` every 150 frames (~5 s at 30 Hz). This keeps the finalizer queue drained and working set flat without visible pauses. Monitor with Task Manager: working set should remain stable under a high-rate Demo stream.
-
-**Original dependency-conflict blocker (resolved):** When the project targeted `windows10.0.17763`, NuGet fell back to `SkiaSharp.Views.WPF`'s `.NETFramework4.6.2` asset (the only one whose OS version was compatible) which references `OpenTK 3.3.1`. ScottPlot requires `OpenTK 4.9.4`. The two are binary-incompatible → `FileNotFoundException` at first GL render. Fixed by bumping the TFM to `net10.0-windows10.0.19041` so NuGet picks the `net8.0-windows10.0.19041` asset (OpenTK 4.3.0 → resolves to 4.9.4, same major, semver-compatible).
-
-### Latent (unrelated) cleanups noticed during the above
-
-- Resampler default factor is `1` (= 2× upsampling *enabled*) in `USBDataStream`, `SerialDataStream`, `DemoDataStream`; only `AudioDataStream` uses `0` (bypass). Currently masked because `StreamSettings.CreateDataStream` resets it to `0`, but any construction path that skips that reset silently enables the allocating resampler.
-- `StreamInfoPanel` subscribes to the stream's `PropertyChanged` but never unsubscribes (the `Unloaded` handler's unsubscribe is commented out), leaking a panel + stream (~8 MB/channel ring buffer + read thread) per stream remove/reconfigure.
+Note: `WpfPlotGL`'s native memory leak (a new `GRBackendRenderTarget`/`SKSurface` per frame whose GPU memory is only reclaimed by GC finalizers) is mitigated in `PlotManager.UpdatePlot` with a non-blocking gen0 `GC.Collect` every 150 frames (~5 s at 30 Hz), keeping the finalizer queue drained and working set flat.

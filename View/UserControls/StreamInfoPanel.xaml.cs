@@ -173,10 +173,10 @@ namespace PowerScope.View.UserControls
             _updateTimer?.Dispose();
             
             // Unsubscribe from property change events
-            //if (AssociatedDataStream is INotifyPropertyChanged notifyPropertyChanged)
-            //{
-            //    notifyPropertyChanged.PropertyChanged -= DataStream_PropertyChanged;
-            //}
+            if (AssociatedDataStream is INotifyPropertyChanged notifyPropertyChanged)
+            {
+                notifyPropertyChanged.PropertyChanged -= DataStream_PropertyChanged;
+            }
         }
 
         // Called only for non-USB streams (serial, audio, demo, file).
