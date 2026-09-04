@@ -367,3 +367,6 @@ FodyWeavers.xsd
 
 # Claude MCP session config (device-specific, not for version control)
 ClaudePowerScope.xml
+
+# Claude Code local settings (personal permission allowlist, machine-specific paths)
+.claude/settings.local.json

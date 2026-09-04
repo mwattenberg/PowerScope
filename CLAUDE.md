@@ -27,29 +27,7 @@ dotnet run
 dotnet test Tests\PowerScope.Tests.csproj
 ```
 
-Command line arguments: `--config <path>` (load a session XML instead of Settings.xml at startup). The MCP server (Streamable HTTP, `127.0.0.1:54321`) is enabled/disabled from the Plot Settings window (persisted in the session XML), not via a command line switch.
-
-## Companion Repositories
-
-These directories are part of the broader PowerScope ecosystem and are frequently relevant:
-
-- `C:\Users\Martin\mtw\PowerScope_FX2G3` — Cypress FX2G3 MCU-side firmware (C, MTB build system). The MCU counterpart to PowerScope's host app.
-- `C:\Users\Martin\mtw\USBHS_Device` — Cypress PSoC USBHS device reference/echo project used as a USB dev testbed.
-- `C:\Users\Martin\mtw\mtb_shared\usbfxstack\release-v1.3.3` — Infineon EZ-USB FXStack Middleware v1.3.3: USB stack, DMA manager, and LVDS driver for FX2G3 and other EZ-USB FX devices.
-
-### Building the FX2G3 Firmware
-
-The firmware uses ModusToolbox 3.8 with a make/ninja build system. The system environment has a stale `CY_TOOLS_PATHS` pointing to `tools_3.5`; always override it. Build must be invoked through the modus-shell's bash (not plain PowerShell) so Unix tools are available.
-
-```powershell
-# Run from PowerShell — override the stale CY_TOOLS_PATHS env var
-& "C:\Users\Martin\ModusToolbox\tools_3.8\modus-shell\bin\bash.exe" --login -c `
-  "export CY_TOOLS_PATHS='C:/Users/Martin/ModusToolbox/tools_3.8'; " + `
-  "cd /cygdrive/c/Users/Martin/mtw/PowerScope_FX2G3 && " + `
-  "make CY_MAKE_IDE=eclipse CY_IDE_TOOLS_DIR=C:/Users/Martin/ModusToolbox/tools_3.8 CY_IDE_BT_TOOLS_DIR= -j8 build_proj"
-```
-
-The built `.hex` file is at `build/APP_KIT_FX2G3_104LGA/Release/mtb-example-fx2g3-hello-world.hex`.
+Command line arguments: `--config <path>` loads the given session file instead of `Settings.xml` at startup. A bare file path (no `--config` flag) works the same way — this is how Explorer invokes PowerScope when a registered `.psp` session file is double-clicked or opened via "Open with" (see `Model/FileAssociation.cs`). The MCP server (Streamable HTTP, `127.0.0.1:54321`) is enabled/disabled from the Plot Settings window (persisted in the session file), not via a command line switch.
 
 ## Architecture
 
@@ -67,7 +45,7 @@ The built `.hex` file is at `build/APP_KIT_FX2G3_104LGA/Release/mtb-example-fx2g
 
 3. **RingBuffer\<T\>** (`Model/RingBuffer.cs`) — thread-safe circular buffer per channel. Fixed capacity; oldest samples silently discarded when full.
 
-4. **PlotManager** (`Model/PlotManager.cs` + `.Cursors.cs` + `.Triggers.cs`) — the rendering hub. A `DispatcherTimer` (default 30 Hz) calls `UpdatePlot()`, which calls `CopyLatestN()` on each visible channel and hands data to ScottPlot's `WpfPlot` (software/SkiaSharp CPU renderer). Also owns trigger logic and cursor math. See "Known Issues" below for why this is not the GPU (`WpfPlotGL`) control.
+4. **PlotManager** (`Model/PlotManager.cs` + `.Cursors.cs` + `.Triggers.cs`) — the rendering hub. A `DispatcherTimer` (default 30 Hz) calls `UpdatePlot()`, which calls `CopyLatestN()` on each visible channel and hands data to ScottPlot's `WpfPlot` (software/SkiaSharp CPU renderer). Also owns trigger logic and cursor math. See the `WpfPlotGL` note under Key Dependencies for why this is not the GPU control.
 
 ### Channel Model
 
