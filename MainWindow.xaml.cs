@@ -168,9 +168,9 @@ namespace PowerScope
             {
                 SaveFileDialog saveFileDialog = new SaveFileDialog
                 {
-                    Filter = "XML files (*.xml)|*.xml|All files (*.*)|*.*",
-                    DefaultExt = "xml",
-                    FileName = "Settings.xml"
+                    Filter = "PowerScope session (*.psp)|*.psp|XML files (*.xml)|*.xml|All files (*.*)|*.*",
+                    DefaultExt = "psp",
+                    FileName = "Settings.psp"
                 };
 
                 if (saveFileDialog.ShowDialog() == true)
@@ -191,8 +191,8 @@ namespace PowerScope
             {
                 OpenFileDialog openFileDialog = new OpenFileDialog
                 {
-                    Filter = "XML files (*.xml)|*.xml|All files (*.*)|*.*",
-                    DefaultExt = "xml"
+                    Filter = "PowerScope session (*.psp)|*.psp|XML files (*.xml)|*.xml|All files (*.*)|*.*",
+                    DefaultExt = "psp"
                 };
 
                 if (openFileDialog.ShowDialog() == true)

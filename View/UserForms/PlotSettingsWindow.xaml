@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:PowerScope.View.UserForms"
         mc:Ignorable="d"
-        Title="Plot Settings" Height="470" Width="401"
+        Title="Plot Settings" Height="620" Width="401"
         WindowStyle="None"
         AllowsTransparency="True"
         ResizeMode="NoResize" 
@@ -218,7 +218,7 @@
         <Border.Effect>
             <DropShadowEffect Color="{DynamicResource PlotSettings_ShadowColor}" BlurRadius="10" ShadowDepth="3" Opacity="0.5"/>
         </Border.Effect>
-        <Grid Margin="0,0,-1,110">
+        <Grid Margin="0,0,-1,0">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
@@ -248,7 +248,7 @@
                        Foreground="{DynamicResource PlotSettings_HeaderForegroundBrush}" 
                        Margin="14,10,14,3"/>
             <!-- Settings Content -->
-            <StackPanel Grid.Row="2" Margin="14,7,14,-99" Grid.RowSpan="2">
+            <StackPanel Grid.Row="2" Margin="14,7,14,14" Grid.RowSpan="2">
                 <!-- Plot Update Rate (FPS) -->
                 <Grid Margin="0,0,0,10">
                     <Grid.ColumnDefinitions>
@@ -325,6 +325,31 @@
                                Text="{Binding McpServerStatus}"
                                Foreground="{DynamicResource PlotSettings_HeaderForegroundBrush}"/>
                 </Grid>
+
+                <!-- MCP Server connection info -->
+                <Border Background="{DynamicResource PlotSettings_TextBoxBackgroundBrush}"
+                        BorderBrush="{DynamicResource PlotSettings_BorderBrush}"
+                        BorderThickness="1" CornerRadius="3" Padding="10" Margin="0,0,0,10">
+                    <StackPanel>
+                        <TextBlock Text="Lets an AI agent (e.g. Claude Desktop) read live waveform data and control PowerScope over HTTP."
+                                   Foreground="{DynamicResource PlotSettings_HeaderForegroundBrush}"
+                                   TextWrapping="Wrap" Margin="0,0,0,8"/>
+                        <TextBlock Foreground="{DynamicResource PlotSettings_LabelForegroundBrush}"
+                                   FontFamily="Consolas" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,8">
+                            <Run Text="Endpoint: "/>
+                            <Run Text="http://127.0.0.1:54321" FontWeight="Bold"/>
+                        </TextBlock>
+                        <TextBlock Text="Add this server entry to your MCP client config (claude_desktop_config.json, .mcp.json, .vscode/mcp.json):"
+                                   Foreground="{DynamicResource PlotSettings_HeaderForegroundBrush}"
+                                   TextWrapping="Wrap" Margin="0,0,0,4"/>
+                        <TextBox x:Name="TextBoxMcpConfigSnippet" IsReadOnly="True" IsReadOnlyCaretVisible="True"
+                                 TextWrapping="NoWrap" AcceptsReturn="True"
+                                 FontFamily="Consolas" FontSize="11" Height="90"
+                                 VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"/>
+                        <Button x:Name="ButtonCopyMcpConfig" Content="Copy Config JSON" HorizontalAlignment="Left"
+                                Margin="0,8,0,0" Click="ButtonCopyMcpConfig_Click"/>
+                    </StackPanel>
+                </Border>
             </StackPanel>
         </Grid>
     </Border>

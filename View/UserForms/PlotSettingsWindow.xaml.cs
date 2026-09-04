@@ -24,9 +24,19 @@ namespace PowerScope.View.UserForms
         public PlotSettingsWindow()
         {
             InitializeComponent();
-            
+
             // Populate the FPS ComboBox
             PopulateFpsComboBox();
+
+            TextBoxMcpConfigSnippet.Text =
+                "{\n" +
+                "  \"mcpServers\": {\n" +
+                "    \"powerscope\": {\n" +
+                "      \"type\": \"http\",\n" +
+                "      \"url\": \"http://127.0.0.1:54321\"\n" +
+                "    }\n" +
+                "  }\n" +
+                "}";
         }
 
         /// <summary>
@@ -101,6 +111,11 @@ namespace PowerScope.View.UserForms
         private void CloseButton_Click(object sender, RoutedEventArgs e)
         {
             Close();
+        }
+
+        private void ButtonCopyMcpConfig_Click(object sender, RoutedEventArgs e)
+        {
+            Clipboard.SetText(TextBoxMcpConfigSnippet.Text);
         }
 
         // Line Width Up/Down button handlers
