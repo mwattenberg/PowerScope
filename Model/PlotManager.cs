@@ -215,69 +215,12 @@ namespace PowerScope.Model
             if (_data[index] != null)
                 Array.Copy(_data[index], frozen, Settings.Xmax);
 
+            Color referenceColor = channel.Settings.ReferenceColor;
             _referenceSignals[index] = _plot.Plot.Add.Signal(frozen);
-            _referenceSignals[index].Color = DesaturateColor(channel.Color, 0.25);
+            _referenceSignals[index].Color = new ScottPlot.Color(referenceColor.R, referenceColor.G, referenceColor.B);
             _referenceSignals[index].LinePattern = ScottPlot.LinePattern.Dashed;
             _referenceSignals[index].LineWidth = (float)Settings.LineWidth;
             _referenceSignals[index].MarkerShape = ScottPlot.MarkerShape.None;
-        }
-
-        /// <summary>
-        /// Reduces a color's saturation by the given fraction (0-1) in HSL space, keeping hue
-        /// and lightness unchanged. Used to visually mute the reference overlay relative to the
-        /// live trace it shadows, in the same color.
-        /// </summary>
-        private static ScottPlot.Color DesaturateColor(Color color, double desaturateAmount)
-        {
-            double r = color.R / 255.0;
-            double g = color.G / 255.0;
-            double b = color.B / 255.0;
-
-            double max = Math.Max(r, Math.Max(g, b));
-            double min = Math.Min(r, Math.Min(g, b));
-            double l = (max + min) / 2.0;
-            double h = 0, s = 0;
-
-            if (max != min)
-            {
-                double d = max - min;
-                s = l > 0.5 ? d / (2.0 - max - min) : d / (max + min);
-                if (max == r)
-                    h = (g - b) / d + (g < b ? 6 : 0);
-                else if (max == g)
-                    h = (b - r) / d + 2;
-                else
-                    h = (r - g) / d + 4;
-                h /= 6.0;
-            }
-
-            s *= 1.0 - desaturateAmount;
-
-            double r2, g2, b2;
-            if (s == 0)
-            {
-                r2 = g2 = b2 = l;
-            }
-            else
-            {
-                double q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-                double p = 2 * l - q;
-                r2 = HueToRgb(p, q, h + 1.0 / 3.0);
-                g2 = HueToRgb(p, q, h);
-                b2 = HueToRgb(p, q, h - 1.0 / 3.0);
-            }
-
-            return new ScottPlot.Color((byte)Math.Round(r2 * 255), (byte)Math.Round(g2 * 255), (byte)Math.Round(b2 * 255));
-        }
-
-        private static double HueToRgb(double p, double q, double t)
-        {
-            if (t < 0) t += 1;
-            if (t > 1) t -= 1;
-            if (t < 1.0 / 6.0) return p + (q - p) * 6 * t;
-            if (t < 1.0 / 2.0) return q;
-            if (t < 2.0 / 3.0) return p + (q - p) * (2.0 / 3.0 - t) * 6;
-            return p;
         }
 
         private void ClearReferenceWaveform(int index)
@@ -553,7 +496,10 @@ namespace PowerScope.Model
                     _signals[i].Color = new ScottPlot.Color(channelColor.R, channelColor.G, channelColor.B);
 
                 if (_referenceSignals[i] != null)
-                    _referenceSignals[i].Color = DesaturateColor(channelColor, 0.25);
+                {
+                    Color referenceColor = _channels[i].Settings.ReferenceColor;
+                    _referenceSignals[i].Color = new ScottPlot.Color(referenceColor.R, referenceColor.G, referenceColor.B);
+                }
             }
 
             _plot.Refresh();

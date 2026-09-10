@@ -68,11 +68,13 @@
                 </Setter.Value>
             </Setter>
         </Style>
-        <!-- Reference waveform capture/clear toggle style - highlights green while a reference is captured -->
+        <!-- Reference waveform capture/clear toggle style - highlights with the same desaturated
+             color as the plotted reference overlay (ChannelSettings.ReferenceColor is the single
+             source of truth for that color) while a reference is captured -->
         <Style x:Key="ReferenceButtonStyle" TargetType="Button" BasedOn="{StaticResource PlayPauseButtonStyle}">
             <Style.Triggers>
                 <DataTrigger Binding="{Binding HasReferenceWaveform}" Value="True">
-                    <Setter Property="Background" Value="LimeGreen"/>
+                    <Setter Property="Background" Value="{Binding ReferenceColor, Converter={StaticResource ColorToBrushConverter}}"/>
                 </DataTrigger>
             </Style.Triggers>
         </Style>
@@ -172,7 +174,7 @@
                         Click="ReferenceButton_Click"
                         Margin="1"
                         ToolTip="Capture/clear reference waveform">
-                    <TextBlock Text="🗐" FontSize="9" FontWeight="Bold" Margin="0"/>
+                    <TextBlock Text="🗐" FontSize="12" FontWeight="Bold" Margin="0"/>
                 </Button>
                 <!-- Editable channel label -->
                 <TextBox x:Name="ChannelLabelTextBox" Grid.Column="2"
