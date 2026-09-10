@@ -68,6 +68,14 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        <!-- Reference waveform capture/clear toggle style - highlights green while a reference is captured -->
+        <Style x:Key="ReferenceButtonStyle" TargetType="Button" BasedOn="{StaticResource PlayPauseButtonStyle}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding HasReferenceWaveform}" Value="True">
+                    <Setter Property="Background" Value="LimeGreen"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
         <!-- Editable TextBox style for channel label -->
         <Style x:Key="ChannelLabelTextBoxStyle" TargetType="TextBox" BasedOn="{StaticResource ControlLabelTextBoxStyle}">
             <!-- Override IsReadOnly to make it editable -->
@@ -147,18 +155,27 @@
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="20"/>
+                    <ColumnDefinition Width="20"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
                 <!-- Play/Pause button -->
-                <Button x:Name="PlayPauseButton" Grid.Column="0" 
+                <Button x:Name="PlayPauseButton" Grid.Column="0"
                         Style="{StaticResource PlayPauseButtonStyle}"
                         Click="PlayPauseButton_Click"
                         Margin="1"
                         ToolTip="Enable/Disable channel">
                     <TextBlock x:Name="PlayPauseIcon" Text="▶" FontSize="8" Margin="0"/>
                 </Button>
+                <!-- Reference waveform capture/clear toggle -->
+                <Button x:Name="ReferenceButton" Grid.Column="1"
+                        Style="{StaticResource ReferenceButtonStyle}"
+                        Click="ReferenceButton_Click"
+                        Margin="1"
+                        ToolTip="Capture/clear reference waveform">
+                    <TextBlock Text="🗐" FontSize="9" FontWeight="Bold" Margin="0"/>
+                </Button>
                 <!-- Editable channel label -->
-                <TextBox x:Name="ChannelLabelTextBox" Grid.Column="1" 
+                <TextBox x:Name="ChannelLabelTextBox" Grid.Column="2"
                          Text="{Binding Label, UpdateSourceTrigger=LostFocus}" 
                          Style="{StaticResource ChannelLabelTextBoxStyle}" 
                          Margin="2,0,2,0" 

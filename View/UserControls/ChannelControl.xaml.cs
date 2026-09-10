@@ -86,6 +86,15 @@ namespace PowerScope.View.UserControls
             }
         }
 
+        private void ReferenceButton_Click(object sender, RoutedEventArgs e)
+        {
+            // Toggle the captured-reference state; PlotManager reacts to the property change
+            if (Settings != null)
+                Settings.HasReferenceWaveform = !Settings.HasReferenceWaveform;
+
+            e.Handled = true;
+        }
+
         private void ButtonGainUp_Click(object sender, RoutedEventArgs e)
         {
             if (Settings != null)

@@ -110,6 +110,27 @@ namespace PowerScope.Model
             get { return _filter != null; }
         }
 
+        private bool _hasReferenceWaveform = false;
+
+        /// <summary>
+        /// Whether a frozen reference waveform is currently captured for this channel.
+        /// Toggling this from the UI is what PlotManager listens for to capture/clear
+        /// the static overlay trace - the captured samples themselves live in PlotManager,
+        /// not here, since this class only carries display/interaction state.
+        /// </summary>
+        public bool HasReferenceWaveform
+        {
+            get { return _hasReferenceWaveform; }
+            set
+            {
+                if (_hasReferenceWaveform != value)
+                {
+                    _hasReferenceWaveform = value;
+                    OnPropertyChanged(nameof(HasReferenceWaveform));
+                }
+            }
+        }
+
         /// <summary>
         /// Gets whether this channel is backed by a VirtualDataStream.
         /// Computed property - automatically correct based on the underlying stream type.

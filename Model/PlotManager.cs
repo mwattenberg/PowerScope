@@ -28,6 +28,10 @@ namespace PowerScope.Model
         private bool _disposed;
         private readonly Signal[] _signals;
         private readonly double[][] _data;
+        // Frozen reference-waveform overlay: one static Signal per channel, captured on demand
+        // from ChannelControl and never touched by the per-frame update loop. The captured
+        // array itself only needs to live inside the Signal plottable, so it isn't tracked here.
+        private readonly Signal[] _referenceSignals;
         private readonly int _maxChannels;
         private ObservableCollection<Channel> _channels;
         // Frame counter for periodic gen0 GC to reclaim native SkiaSharp GL render surfaces.
@@ -100,6 +104,7 @@ namespace PowerScope.Model
             _maxChannels = maxChannels;
             _signals = new Signal[_maxChannels];
             _data = new double[_maxChannels][];
+            _referenceSignals = new Signal[_maxChannels];
 
             // Initialize cursor state (properties declared in Cursors partial)
             ActiveCursorMode = CursorMode.None;
@@ -173,6 +178,117 @@ namespace PowerScope.Model
             double sampleRate = _channels[0].OwnerStream.SampleRate;
             return new PlotSnapshot(data, _channels, sampleRate, DateTime.Now);
         }
+        #endregion
+
+        #region Reference Waveform
+
+        /// <summary>
+        /// Captures or clears a channel's frozen reference waveform in response to
+        /// ChannelSettings.HasReferenceWaveform being toggled from ChannelControl.
+        /// </summary>
+        private void UpdateReferenceWaveform(Channel channel)
+        {
+            if (channel == null || _channels == null)
+                return;
+
+            int index = _channels.IndexOf(channel);
+            if (index < 0 || index >= _maxChannels)
+                return;
+
+            if (channel.Settings.HasReferenceWaveform)
+                CaptureReferenceWaveform(index, channel);
+            else
+                ClearReferenceWaveform(index);
+
+            _plot.Refresh();
+        }
+
+        /// <summary>
+        /// Freezes the channel's currently displayed samples into a static, dashed overlay
+        /// signal. The captured array is never written to again by the update loop.
+        /// </summary>
+        private void CaptureReferenceWaveform(int index, Channel channel)
+        {
+            ClearReferenceWaveform(index);
+
+            double[] frozen = new double[Settings.Xmax];
+            if (_data[index] != null)
+                Array.Copy(_data[index], frozen, Settings.Xmax);
+
+            _referenceSignals[index] = _plot.Plot.Add.Signal(frozen);
+            _referenceSignals[index].Color = DesaturateColor(channel.Color, 0.25);
+            _referenceSignals[index].LinePattern = ScottPlot.LinePattern.Dashed;
+            _referenceSignals[index].LineWidth = (float)Settings.LineWidth;
+            _referenceSignals[index].MarkerShape = ScottPlot.MarkerShape.None;
+        }
+
+        /// <summary>
+        /// Reduces a color's saturation by the given fraction (0-1) in HSL space, keeping hue
+        /// and lightness unchanged. Used to visually mute the reference overlay relative to the
+        /// live trace it shadows, in the same color.
+        /// </summary>
+        private static ScottPlot.Color DesaturateColor(Color color, double desaturateAmount)
+        {
+            double r = color.R / 255.0;
+            double g = color.G / 255.0;
+            double b = color.B / 255.0;
+
+            double max = Math.Max(r, Math.Max(g, b));
+            double min = Math.Min(r, Math.Min(g, b));
+            double l = (max + min) / 2.0;
+            double h = 0, s = 0;
+
+            if (max != min)
+            {
+                double d = max - min;
+                s = l > 0.5 ? d / (2.0 - max - min) : d / (max + min);
+                if (max == r)
+                    h = (g - b) / d + (g < b ? 6 : 0);
+                else if (max == g)
+                    h = (b - r) / d + 2;
+                else
+                    h = (r - g) / d + 4;
+                h /= 6.0;
+            }
+
+            s *= 1.0 - desaturateAmount;
+
+            double r2, g2, b2;
+            if (s == 0)
+            {
+                r2 = g2 = b2 = l;
+            }
+            else
+            {
+                double q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+                double p = 2 * l - q;
+                r2 = HueToRgb(p, q, h + 1.0 / 3.0);
+                g2 = HueToRgb(p, q, h);
+                b2 = HueToRgb(p, q, h - 1.0 / 3.0);
+            }
+
+            return new ScottPlot.Color((byte)Math.Round(r2 * 255), (byte)Math.Round(g2 * 255), (byte)Math.Round(b2 * 255));
+        }
+
+        private static double HueToRgb(double p, double q, double t)
+        {
+            if (t < 0) t += 1;
+            if (t > 1) t -= 1;
+            if (t < 1.0 / 6.0) return p + (q - p) * 6 * t;
+            if (t < 1.0 / 2.0) return q;
+            if (t < 2.0 / 3.0) return p + (q - p) * (2.0 / 3.0 - t) * 6;
+            return p;
+        }
+
+        private void ClearReferenceWaveform(int index)
+        {
+            if (_referenceSignals[index] != null)
+            {
+                _plot.Plot.Remove(_referenceSignals[index]);
+                _referenceSignals[index] = null;
+            }
+        }
+
         #endregion
 
         #region Event Handlers
@@ -257,6 +373,12 @@ namespace PowerScope.Model
 
                     case nameof(Channel.Color):
                         ApplyChannelColors();
+                        break;
+
+                    // HasReferenceWaveform has no Channel-level passthrough (unlike IsEnabled/Color
+                    // above), so it only ever arrives as the qualified "Settings.<Name>" form.
+                    case "Settings.HasReferenceWaveform":
+                        UpdateReferenceWaveform(sender as Channel);
                         break;
                 }
             });
@@ -403,6 +525,12 @@ namespace PowerScope.Model
                     _signals[i].LineWidth = (float)Settings.LineWidth;
                     _signals[i].LineStyle.AntiAlias = Settings.AntiAliasing;
                 }
+
+                if (_referenceSignals[i] != null)
+                {
+                    _referenceSignals[i].LineWidth = (float)Settings.LineWidth;
+                    _referenceSignals[i].LineStyle.AntiAlias = Settings.AntiAliasing;
+                }
             }
 
             _plot.Plot.Benchmark.IsVisible = Settings.ShowRenderTime;
@@ -416,11 +544,16 @@ namespace PowerScope.Model
 
             for (int i = 0; i < NumberOfChannels && i < _maxChannels; i++)
             {
-                if (_signals[i] != null && i < _channels.Count)
-                {
-                    Color channelColor = _channels[i].Color;
+                if (i >= _channels.Count)
+                    continue;
+
+                Color channelColor = _channels[i].Color;
+
+                if (_signals[i] != null)
                     _signals[i].Color = new ScottPlot.Color(channelColor.R, channelColor.G, channelColor.B);
-                }
+
+                if (_referenceSignals[i] != null)
+                    _referenceSignals[i].Color = DesaturateColor(channelColor, 0.25);
             }
 
             _plot.Refresh();
@@ -435,6 +568,13 @@ namespace PowerScope.Model
             }
 
             NumberOfChannels = Math.Min(_channels.Count, _maxChannels);
+
+            // Drop reference waveforms whose channel position no longer exists
+            // (e.g. a stream was removed and the channel list shrank).
+            for (int i = NumberOfChannels; i < _maxChannels; i++)
+            {
+                ClearReferenceWaveform(i);
+            }
 
             // Remove existing signals
             for (int i = 0; i < _maxChannels; i++)
