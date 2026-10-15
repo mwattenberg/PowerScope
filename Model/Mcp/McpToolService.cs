@@ -9,7 +9,7 @@ namespace PowerScope.Model.Mcp
     /// (bad arguments, unknown channel, ...). The MCP server reports these as
     /// tool results with isError=true instead of JSON-RPC protocol errors.
     /// </summary>
-    public class McpToolException : Exception
+    public class McpToolException : ModelContextProtocol.McpException
     {
         public McpToolException(string message) : base(message) { }
     }

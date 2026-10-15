@@ -143,7 +143,7 @@ namespace PowerScope.Model.Mcp
         }
 
         [McpServerTool(Name = "load_config")]
-        [Description("Load a PowerScope session configuration XML file (saved via File > Save Settings). Creates and starts the configured streams — the standard way to connect to real hardware that was set up in the GUI.")]
+        [Description("Load a PowerScope session configuration XML file (saved via File > Save Settings). Creates and starts the configured streams — the standard way to connect to real hardware that was set up in the GUI. NOTE: this always ADDS new streams; it does not reconnect or replace existing ones, so repeated calls create duplicate streams. It is not a recovery tool for a disconnected stream.")]
         public string LoadConfig(
             [Description("Absolute path to the PowerScope settings XML file.")] string file_path)
         {
@@ -154,11 +154,11 @@ namespace PowerScope.Model.Mcp
         }
 
         [McpServerTool(Name = "remove_all_streams")]
-        [Description("Stop, disconnect and remove all active streams and their channels.")]
+        [Description("Stop, disconnect and remove all active streams and their channels. DESTRUCTIVE: cannot be undone via MCP (there is no tool to add hardware streams back).")]
         public string RemoveAllStreams() => _service.CallTool("remove_all_streams", new JsonObject()).ToJsonString();
 
         [McpServerTool(Name = "remove_stream")]
-        [Description("Stop, disconnect and remove a single stream and all of its channels, identified by any one of its channels. Other streams are left running. Use get_status first to find the channel index or label.")]
+        [Description("Stop, disconnect and remove a single stream and all of its channels, identified by any one of its channels. Other streams are left running. DESTRUCTIVE: cannot be undone via MCP. Use get_status first to find the channel index or label.")]
         public string RemoveStream(
             [Description("Any channel belonging to the stream to remove: global index integer or label string from get_status.")] string channel)
         {
