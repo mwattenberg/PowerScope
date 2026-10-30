@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   width="48"
+   height="48"
+   viewBox="0 0 48 48"
+   fill="none"
+   role="img"
+   aria-labelledby="title"
+   version="1.1"
+   id="svg4"
+   sodipodi:docname="CursorVertical.svg"
+   inkscape:version="1.3.2 (091e20e, 2023-11-25, custom)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <defs
+     id="defs4" />
+  <sodipodi:namedview
+     id="namedview4"
+     pagecolor="#505050"
+     bordercolor="#ffffff"
+     borderopacity="1"
+     inkscape:showpageshadow="0"
+     inkscape:pageopacity="0"
+     inkscape:pagecheckerboard="1"
+     inkscape:deskcolor="#505050"
+     showgrid="true"
+     inkscape:zoom="20.416667"
+     inkscape:cx="24"
+     inkscape:cy="23.97551"
+     inkscape:window-width="2110"
+     inkscape:window-height="1351"
+     inkscape:window-x="-9"
+     inkscape:window-y="-9"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg4">
+    <inkscape:grid
+       id="grid4"
+       units="px"
+       originx="0"
+       originy="0"
+       spacingx="1"
+       spacingy="1"
+       empcolor="#b2b2b2"
+       empopacity="0.49411765"
+       color="#6d7592"
+       opacity="0.50196078"
+       empspacing="5"
+       dotted="false"
+       gridanglex="30"
+       gridanglez="30"
+       visible="true" />
+  </sodipodi:namedview>
+  <title
+     id="title1">Median</title>
+  <!-- Trace (neutral) -->
+  <path
+     d="m 8,24 c 4,-8 7,-8 11,0 4,8 7,8 11,0 4,-8 6.861224,-7.804082 10,0"
+     stroke="#e6eaf2"
+     stroke-width="2"
+     stroke-linecap="round"
+     stroke-linejoin="round"
+     fill="none"
+     id="path1"
+     sodipodi:nodetypes="cssc" />
+  <!-- Vertical cursor lines (cyan) -->
+  <line
+     x1="6"
+     y1="12"
+     x2="6"
+     y2="36"
+     stroke="#22d3ee"
+     stroke-width="2"
+     stroke-linecap="round"
+     id="line1" />
+  <line
+     x1="42"
+     y1="12"
+     x2="42"
+     y2="36"
+     stroke="#22d3ee"
+     stroke-width="2"
+     stroke-linecap="round"
+     id="line2" />
+  <!-- Horizontal double-arrow indicating delta between cursors -->
+  <line
+     x1="9.9728184"
+     y1="31.999998"
+     x2="38.237755"
+     y2="31.999998"
+     stroke="#22d3ee"
+     stroke-width="2"
+     stroke-linecap="round"
+     id="line3"
+     style="stroke-width:1.5;stroke-dasharray:none" />
+  <path
+     d="m 10,30 -2,2 2,2"
+     stroke="#22d3ee"
+     stroke-width="2"
+     stroke-linecap="round"
+     stroke-linejoin="round"
+     fill="none"
+     id="path3"
+     style="stroke-width:1.5;stroke-dasharray:none" />
+  <path
+     d="m 38,30 2,2 -2,2"
+     stroke="#22d3ee"
+     stroke-width="2"
+     stroke-linecap="round"
+     stroke-linejoin="round"
+     fill="none"
+     id="path4"
+     style="stroke-width:1.5;stroke-dasharray:none" />
+  <metadata
+     id="metadata4">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:title>Vertical cursors (Δt)</dc:title>
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+</svg>

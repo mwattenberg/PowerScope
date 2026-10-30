@@ -1,0 +1,73 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.19041</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+	<PublishAot>false</PublishAot>
+	<Platforms>x64</Platforms>
+	<Configurations>Debug;Release;Performance</Configurations>
+	
+	<!-- Application Icon - using new multi-size logo.ico -->
+	<ApplicationIcon>Icons\logo.ico</ApplicationIcon>
+	
+	<!-- Single-file publishing settings -->
+	<PublishSingleFile>false</PublishSingleFile>
+	<SelfContained>true</SelfContained>
+	<RuntimeIdentifier>win-x64</RuntimeIdentifier>
+	<PublishTrimmed>false</PublishTrimmed>
+	<TrimMode>link</TrimMode>
+	<IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+	<ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <PublishReadyToRun>true</PublishReadyToRun>
+    <TieredPGO>true</TieredPGO>
+    <StartupObject>PowerScope.App</StartupObject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aelian.FFT" Version="1.0.4" />
+    <PackageReference Include="Extended.Wpf.Toolkit" Version="4.7.25104.5739" />
+    <PackageReference Include="ModelContextProtocol" Version="1.4.0" />
+    <PackageReference Include="ModelContextProtocol.AspNetCore" Version="1.4.0" />
+    <PackageReference Include="NAudio" Version="2.2.1" />
+    <PackageReference Include="RJCP.SerialPortStream" Version="3.0.3" />
+    <PackageReference Include="ScottPlot.WPF" Version="5.1.59" />
+    <PackageReference Include="SharpVectors.Wpf" Version="1.8.5" />
+    <PackageReference Include="System.IO.Ports" Version="11.0.0-preview.5.26302.115" />
+    <PackageReference Include="System.Management" Version="11.0.0-preview.5.26302.115" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Icons\*.svg" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="Model\CursorChannelViewModel.cs" />
+    <Compile Remove="Model\SerialDataStreamSinc.cs" />
+    <Compile Remove="View\UserControls\DraggableAxisLines.cs" />
+  </ItemGroup>
+
+  <!-- The test project lives in a subfolder; keep its sources out of the app build -->
+  <ItemGroup>
+    <Compile Remove="Tests\**" />
+    <None Remove="Tests\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="View\UserControls\xExpand.svg" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="View\UserControls\xExpand.svg" />
+  </ItemGroup>
+
+</Project>

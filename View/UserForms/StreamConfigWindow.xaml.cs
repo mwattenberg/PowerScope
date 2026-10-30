@@ -1,0 +1,1013 @@
+﻿using System.Windows;
+using System.Windows.Controls;
+using System.IO.Ports;
+using NAudio.Wave;
+using NAudio.CoreAudioApi;
+using System.Management;
+using System.Windows.Input;
+using System.Text.RegularExpressions;
+using PowerScope.Model;
+using Microsoft.Win32;
+
+namespace PowerScope.View.UserForms
+{
+    /// <summary>
+    /// Interaction logic for SerialConfigWindow.xaml
+    /// </summary>
+    public partial class SerialConfigWindow : Window
+    {
+        // Common fallback sample rates if device-specific rates can't be determined
+        private static readonly int[] FallbackAudioSampleRates = new int[] { 8000, 16000, 22050, 44100, 48000, 96000 };
+
+        readonly List<PortInfo> ports = new List<PortInfo>();
+        private List<AudioDeviceInfo> audioDevices = new List<AudioDeviceInfo>();
+        
+        public StreamSettings ViewModel { get; }
+
+        public SerialConfigWindow(StreamSettings viewModel)
+        {
+            InitializeComponent();
+            ViewModel = viewModel;
+            this.DataContext = ViewModel;
+            
+            // Apply the ViewModel values to the window controls
+            ViewModel.ApplyToWindow(this);
+            
+            Loaded += SerialConfigWindow_Loaded;
+            Loaded += SerialConfigWindow_Loaded_AudioDevices;
+            Loaded += SerialConfigWindow_Loaded_USBDevices;
+            ComboBox_DataFormat.SelectionChanged += DataFormatCombo_SelectionChanged;
+            ComboBox_AudioDevices.SelectionChanged += ComboBox_AudioDevices_SelectionChanged;
+            ComboBox_USBDataFormat.SelectionChanged += USBDataFormatCombo_SelectionChanged;
+            ComboBox_USBDevice.SelectionChanged += ComboBox_USBDevice_SelectionChanged;
+            ComboBox_USBInterface.SelectionChanged += ComboBox_USBInterface_SelectionChanged;
+            ComboBox_USBBufThreshold.SelectionChanged += ComboBox_USBBufThreshold_SelectionChanged;
+            SetRawBinaryPanelVisibility();
+            SetASCIIPanelVisibility();
+            SetUSBDataFormatPanelVisibility();
+            SetUSBUartPanelVisibility();
+            
+            // Wire up demo signal type selection change to update the info text
+            ComboBox_DemoSignalType.SelectionChanged += ComboBox_DemoSignalType_SelectionChanged;
+
+            // Initialize demo info text based on the currently selected demo signal type
+            UpdateDemoInfoText();
+            
+            // Automatically select the appropriate tab based on the configured StreamSource
+            SelectTabBasedOnStreamSource();
+
+            UpdateResamplerLabel();
+        }
+
+        private void Slider_Resampler_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            UpdateResamplerLabel();
+        }
+
+        private void UpdateResamplerLabel()
+        {
+            int factor = (int)Math.Round(Slider_Resampler.Value);
+            TextBlock_ResamplerValue.Text = Model.Resampler.FactorToLabel(factor);
+        }
+
+        public SerialConfigWindow() : this(new StreamSettings()) { }
+
+        /// <summary>
+        /// Automatically selects the appropriate tab based on the StreamSource in the ViewModel
+        /// This allows users to directly edit their previously configured stream type
+        /// </summary>
+        private void SelectTabBasedOnStreamSource()
+        {
+            if (TabControl_StreamTypes == null || ViewModel == null)
+                return;
+
+            // Map StreamSource enum to the corresponding tab
+            TabItem targetTab = ViewModel.StreamSource switch
+            {
+                StreamSource.SerialPort => TabItem_Serial,
+                StreamSource.AudioInput => TabItem_Audio,
+                StreamSource.Demo => TabItem_Demo,
+                StreamSource.File => TabItem_File,
+                StreamSource.USB => TabItem_USB,
+                _ => TabItem_Serial // Default fallback to Serial tab
+            };
+
+            // Select the target tab if it exists
+            if (targetTab != null)
+            {
+                TabControl_StreamTypes.SelectedItem = targetTab;
+            }
+        }
+
+        // Custom window event handlers
+        private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.ButtonState == MouseButtonState.Pressed)
+            {
+                this.DragMove();
+            }
+        }
+
+        private void CloseButton_Click(object sender, RoutedEventArgs e)
+        {
+            DialogResult = false;
+            Close();
+        }
+
+        private void SerialConfigWindow_Loaded(object sender, RoutedEventArgs e)
+        {
+            // Scan and populate available serial ports with description
+            ports.Clear();
+            using (var searcher = new ManagementObjectSearcher("SELECT * FROM Win32_PnPEntity WHERE Name LIKE '%(COM%'") )
+            {
+                foreach (var device in searcher.Get())
+                {
+                    string name = device["Name"]?.ToString();
+                    if (name != null)
+                    {
+                        int start = name.LastIndexOf("(COM");
+                        if (start >= 0)
+                        {
+                            int end = name.IndexOf(")", start);
+                            if (end > start)
+                            {
+                                string port = name.Substring(start + 1, end - start - 1); // e.g., COM3
+                                ports.Add(new PortInfo { Port = port, Description = name });
+                            }
+                        }
+                    }
+                }
+            }
+            ComboBox_Port.ItemsSource = ports;
+            ComboBox_Port.DisplayMemberPath = "Description";
+            ComboBox_Port.SelectedValuePath = "Port";
+        }
+
+        private void SerialConfigWindow_Loaded_AudioDevices(object sender, RoutedEventArgs e)
+        {
+            LoadAudioDevices();
+            UpdateSampleRatesForCurrentDevice();
+        }
+
+        private void SerialConfigWindow_Loaded_USBDevices(object sender, RoutedEventArgs e)
+        {
+            LoadUSBDevices();
+        }
+
+        private void LoadUSBDevices()
+        {
+            ComboBox_USBDevice.Items.Clear();
+
+            try
+            {
+                // Display names and device paths are index-aligned (same enumeration order).
+                // The path uniquely identifies a physical board; the display name is just a label.
+                string[] devices = PowerScope.Model.USBDataStream.GetAvailableDevices();
+                string[] paths = PowerScope.Model.USBDataStream.GetAvailableDevicePaths();
+
+                if (devices.Length > 0)
+                {
+                    for (int i = 0; i < devices.Length; i++)
+                    {
+                        string devicePath = i < paths.Length ? paths[i] : null;
+                        bool isPsc3m6 = PowerScope.Model.USBDataStream.ClassifyDevicePath(devicePath) == UsbDeviceType.PSC3M6;
+                        ComboBoxItem item = new ComboBoxItem
+                        {
+                            Content = devices[i],
+                            Tag = devicePath, // device path = stable selection key
+                            ToolTip = isPsc3m6
+                                ? "VID 04B4 / PID 0082 — PSC3M6 — native USB — WinUSB"
+                                : "VID 04B4 / PID 0081 — Infineon FX2G3 — WinUSB"
+                        };
+                        ComboBox_USBDevice.Items.Add(item);
+                    }
+
+                    // Restore the previously selected device by its path (stable across sessions);
+                    // fall back to display name, then to the first device.
+                    bool restored = false;
+                    if (!string.IsNullOrEmpty(ViewModel.UsbSelectedDevicePath))
+                    {
+                        for (int i = 0; i < paths.Length; i++)
+                        {
+                            if (string.Equals(paths[i], ViewModel.UsbSelectedDevicePath, StringComparison.OrdinalIgnoreCase))
+                            {
+                                ComboBox_USBDevice.SelectedIndex = i;
+                                restored = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (!restored && !string.IsNullOrEmpty(ViewModel.UsbSelectedDevice))
+                    {
+                        for (int i = 0; i < devices.Length; i++)
+                        {
+                            if (devices[i] == ViewModel.UsbSelectedDevice)
+                            {
+                                ComboBox_USBDevice.SelectedIndex = i;
+                                restored = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (!restored)
+                    {
+                        // Prefer a connected device of the type the session was configured for.
+                        int pick = 0;
+                        for (int i = 0; i < paths.Length; i++)
+                        {
+                            UsbDeviceType type = PowerScope.Model.USBDataStream.ClassifyDevicePath(paths[i]) ?? UsbDeviceType.FX2G3;
+                            if (type == ViewModel.UsbDeviceType)
+                            {
+                                pick = i;
+                                break;
+                            }
+                        }
+                        ComboBox_USBDevice.SelectedIndex = pick;
+                        ViewModel.UsbSelectedDevice = devices[pick];
+                        ViewModel.UsbSelectedDevicePath = paths.Length > pick ? paths[pick] : null;
+                        ViewModel.UsbDeviceType = PowerScope.Model.USBDataStream.ClassifyDevicePath(ViewModel.UsbSelectedDevicePath) ?? UsbDeviceType.FX2G3;
+                    }
+                }
+                else
+                {
+                    ComboBoxItem noDeviceItem = new ComboBoxItem
+                    {
+                        Content = "No PowerScope USB device found",
+                        IsEnabled = false,
+                        ToolTip = "Make sure the FX2G3 device is connected and the WinUSB driver is installed."
+                    };
+                    ComboBox_USBDevice.Items.Add(noDeviceItem);
+                    ComboBox_USBDevice.SelectedIndex = 0;
+                    ViewModel.UsbSelectedDevice = null;
+                    ViewModel.UsbSelectedDevicePath = null;
+                }
+            }
+            catch (Exception ex)
+            {
+                ComboBoxItem errorItem = new ComboBoxItem
+                {
+                    Content = $"Error scanning USB: {ex.Message}",
+                    IsEnabled = false
+                };
+                ComboBox_USBDevice.Items.Add(errorItem);
+                ComboBox_USBDevice.SelectedIndex = 0;
+                System.Diagnostics.Debug.WriteLine($"USB device scan failed: {ex}");
+            }
+
+            // Restore or default Interface selection (and show/hide the bridge-only controls)
+            ApplyUsbDeviceTypeToUi();
+
+            // Restore or default buffer threshold selection
+            bool thresholdRestored = false;
+            foreach (object obj in ComboBox_USBBufThreshold.Items)
+            {
+                if (obj is ComboBoxItem threshItem &&
+                    threshItem.Tag is string ts &&
+                    int.TryParse(ts, out int tv) &&
+                    tv == ViewModel.UsbBufThreshold)
+                {
+                    ComboBox_USBBufThreshold.SelectedItem = threshItem;
+                    thresholdRestored = true;
+                    break;
+                }
+            }
+            if (!thresholdRestored)
+                ComboBox_USBBufThreshold.SelectedIndex = 1; // default Medium (128 B)
+        }
+
+        private void ComboBox_USBDevice_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (ViewModel == null)
+                return;
+
+            if (ComboBox_USBDevice.SelectedItem is ComboBoxItem selectedItem && selectedItem.IsEnabled)
+            {
+                ViewModel.UsbSelectedDevice = selectedItem.Content?.ToString();
+                ViewModel.UsbSelectedDevicePath = selectedItem.Tag as string; // device path key
+                ViewModel.UsbDeviceType = PowerScope.Model.USBDataStream.ClassifyDevicePath(ViewModel.UsbSelectedDevicePath) ?? UsbDeviceType.FX2G3;
+                ApplyUsbDeviceTypeToUi();
+            }
+        }
+
+        /// <summary>
+        /// Adapts the USB tab to the selected device. The PSC3M6 is native USB: the interface reads
+        /// "Native" (locked), and baud rate / packet size are hidden because they do not apply.
+        /// </summary>
+        private void ApplyUsbDeviceTypeToUi()
+        {
+            if (ComboBox_USBInterface == null || ViewModel == null)
+                return;
+
+            bool native = ViewModel.UsbDeviceType == UsbDeviceType.PSC3M6;
+
+            Visibility bridgeItems = native ? Visibility.Collapsed : Visibility.Visible;
+            Item_USBIfSPI.Visibility = bridgeItems;
+            Item_USBIfUART.Visibility = bridgeItems;
+            Item_USBIfI2C.Visibility = bridgeItems;
+            Item_USBIfNative.Visibility = native ? Visibility.Visible : Visibility.Collapsed;
+
+            foreach (object obj in ComboBox_USBInterface.Items)
+            {
+                if (obj is ComboBoxItem ifItem && ifItem.Tag is string tagStr &&
+                    tagStr == ViewModel.UsbInterface.ToString())
+                {
+                    ComboBox_USBInterface.SelectedItem = ifItem;
+                    break;
+                }
+            }
+
+            ComboBox_USBInterface.IsEnabled = !native;
+            if (Panel_USBPacketSize != null)
+                Panel_USBPacketSize.Visibility = native ? Visibility.Collapsed : Visibility.Visible;
+
+            SetUSBUartPanelVisibility();
+        }
+
+        private void ComboBox_USBInterface_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (ViewModel == null)
+                return;
+
+            if (ComboBox_USBInterface.SelectedItem is ComboBoxItem selectedItem &&
+                selectedItem.Tag is string tagStr &&
+                Enum.TryParse<UsbInterfaceType>(tagStr, out UsbInterfaceType iface))
+            {
+                ViewModel.UsbInterface = iface;
+            }
+
+            SetUSBUartPanelVisibility();
+        }
+
+        private void SetUSBUartPanelVisibility()
+        {
+            if (Panel_USBUartSettings != null)
+                Panel_USBUartSettings.Visibility =
+                    ViewModel?.UsbInterface == UsbInterfaceType.UART
+                        ? Visibility.Visible
+                        : Visibility.Collapsed;
+        }
+
+        private void ComboBox_USBBufThreshold_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (ViewModel == null) return;
+            if (ComboBox_USBBufThreshold.SelectedItem is ComboBoxItem item &&
+                item.Tag is string tagStr &&
+                int.TryParse(tagStr, out int threshold))
+            {
+                ViewModel.UsbBufThreshold = threshold;
+            }
+        }
+
+        private void LoadAudioDevices()
+        {
+            audioDevices.Clear();
+            ComboBox_AudioDevices.Items.Clear();
+            
+            try
+            {
+                // Use both WaveIn and WASAPI to get comprehensive device list
+                for (int i = 0; i < WaveIn.DeviceCount; i++)
+                {
+                    var deviceInfo = WaveIn.GetCapabilities(i);
+                    var audioDeviceInfo = new AudioDeviceInfo
+                    {
+                        Index = i,
+                        Name = deviceInfo.ProductName,
+                        WaveInCapabilities = deviceInfo
+                    };
+                    
+                    // Try to get WASAPI device for more detailed capabilities
+                    try
+                    {
+                        using (var deviceEnumerator = new MMDeviceEnumerator())
+                        {
+                            var devices = deviceEnumerator.EnumerateAudioEndPoints(DataFlow.Capture, DeviceState.Active);
+                            var wasapiDevice = devices.FirstOrDefault(d => d.FriendlyName.Contains(deviceInfo.ProductName) || 
+                                                                          deviceInfo.ProductName.Contains(d.FriendlyName));
+                            if (wasapiDevice != null)
+                            {
+                                audioDeviceInfo.WasapiDevice = wasapiDevice;
+                            }
+                        }
+                    }
+                    catch
+                    {
+                        // WASAPI device enumeration failed, continue with WaveIn only
+                    }
+                    
+                    audioDevices.Add(audioDeviceInfo);
+                    ComboBox_AudioDevices.Items.Add(audioDeviceInfo.Name);
+                }
+                
+                if (ComboBox_AudioDevices.Items.Count > 0)
+                    ComboBox_AudioDevices.SelectedIndex = 0;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error loading audio devices: {ex.Message}", "Audio Device Error", 
+                              MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+
+        private void ComboBox_AudioDevices_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            UpdateSampleRatesForCurrentDevice();
+        }
+
+        private void UpdateSampleRatesForCurrentDevice()
+        {
+            ComboBox_SampleRates.Items.Clear();
+            
+            if (ComboBox_AudioDevices.SelectedIndex < 0 || ComboBox_AudioDevices.SelectedIndex >= audioDevices.Count)
+            {
+                // No device selected, use fallback rates
+                PopulateFallbackSampleRates();
+                return;
+            }
+
+            var selectedDevice = audioDevices[ComboBox_AudioDevices.SelectedIndex];
+            var supportedRates = GetSupportedSampleRates(selectedDevice);
+            
+            if (supportedRates.Any())
+            {
+                foreach (var rate in supportedRates.OrderBy(r => r))
+                {
+                    ComboBox_SampleRates.Items.Add(rate.ToString());
+                }
+                
+                // Select a reasonable default (prefer 44100 or 48000)
+                var preferredRates = new[] { 44100, 48000, 22050, 16000 };
+                string selectedRate = null;
+                foreach (var preferred in preferredRates)
+                {
+                    if (supportedRates.Contains(preferred))
+                    {
+                        selectedRate = preferred.ToString();
+                        break;
+                    }
+                }
+                
+                // If no preferred rate found, select the middle one
+                if (selectedRate == null && supportedRates.Any())
+                {
+                    var sortedRates = supportedRates.OrderBy(r => r).ToList();
+                    selectedRate = sortedRates[sortedRates.Count / 2].ToString();
+                }
+                
+                ComboBox_SampleRates.SelectedItem = selectedRate ?? "44100";
+            }
+            else
+            {
+                // Couldn't determine supported rates, use fallback
+                PopulateFallbackSampleRates();
+            }
+        }
+
+        private void PopulateFallbackSampleRates()
+        {
+            foreach (var rate in FallbackAudioSampleRates)
+            {
+                ComboBox_SampleRates.Items.Add(rate.ToString());
+            }
+            ComboBox_SampleRates.SelectedItem = "44100";
+        }
+
+        private HashSet<int> GetSupportedSampleRates(AudioDeviceInfo deviceInfo)
+        {
+            var supportedRates = new HashSet<int>();
+            
+            try
+            {
+                // Test common sample rates to see what the device supports
+                var testRates = new int[] { 8000, 11025, 16000, 22050, 32000, 44100, 48000, 88200, 96000, 176400, 192000 };
+                
+                if (deviceInfo.WasapiDevice != null)
+                {
+                    // Use WASAPI to test supported formats
+                    try
+                    {
+                        using (var audioClient = deviceInfo.WasapiDevice.AudioClient)
+                        {
+                            var mixFormat = audioClient.MixFormat;
+                            
+                            foreach (var rate in testRates)
+                            {
+                                try
+                                {
+                                    var testFormat = new WaveFormat(rate, mixFormat.BitsPerSample, mixFormat.Channels);
+                                    
+                                    // Test if this format is supported
+                                    if (audioClient.IsFormatSupported(AudioClientShareMode.Shared, testFormat))
+                                    {
+                                        supportedRates.Add(rate);
+                                    }
+                                }
+                                catch
+                                {
+                                    // Format not supported, continue
+                                }
+                            }
+                        }
+                    }
+                    catch
+                    {
+                        // WASAPI testing failed, continue with fallback
+                    }
+                }
+                
+                // If WASAPI didn't yield results or we don't have WASAPI device, add common rates
+                if (!supportedRates.Any())
+                {
+                    // Add standard rates that most audio devices support
+                    supportedRates.UnionWith(new[] { 8000, 16000, 22050, 44100, 48000 });
+                    
+                    // If we have WaveIn capabilities, we can at least verify the device exists
+                    if (deviceInfo.WaveInCapabilities.HasValue)
+                    {
+                        // Device exists via WaveIn, so these rates are likely supported
+                        supportedRates.UnionWith(new[] { 11025, 32000, 96000 });
+                    }
+                }
+                
+                // If still no rates found, assume device supports common rates
+                if (!supportedRates.Any())
+                {
+                    supportedRates.UnionWith(FallbackAudioSampleRates);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error getting supported sample rates: {ex.Message}");
+                // Return common rates as fallback
+                supportedRates.UnionWith(FallbackAudioSampleRates);
+            }
+            
+            return supportedRates;
+        }
+
+        public string SelectedPort
+        {
+            get => ComboBox_Port.SelectedValue as string;
+            set { ComboBox_Port.SelectedValue = value; }
+        }
+
+        public int SelectedBaud
+        {
+            get
+            {
+                var textBox = this.FindName("TextBox_Baud") as TextBox;
+                if (textBox != null && int.TryParse(textBox.Text, out int baud))
+                    return baud;
+                return 0;
+            }
+            set 
+            { 
+                var textBox = this.FindName("TextBox_Baud") as TextBox;
+                if (textBox != null)
+                    textBox.Text = value.ToString(); 
+            }
+        }
+
+        public int SelectedDataBits
+        {
+            get
+            {
+                if (ComboBox_Databits.SelectedItem is ComboBoxItem item && int.TryParse(item.Content.ToString(), out int bits))
+                    return bits;
+                if (ComboBox_Databits.SelectedItem is string str && int.TryParse(str, out bits))
+                    return bits;
+                return 8; // Default
+            }
+            set
+            {
+                foreach (var obj in ComboBox_Databits.Items)
+                {
+                    if (obj is ComboBoxItem item && int.TryParse(item.Content.ToString(), out int bits) && bits == value)
+                    {
+                        ComboBox_Databits.SelectedItem = item;
+                        return;
+                    }
+                    if (obj is string str && int.TryParse(str, out bits) && bits == value)
+                    {
+                        ComboBox_Databits.SelectedItem = obj;
+                        return;
+                    }
+                }
+            }
+        }
+
+        public int SelectedStopBits
+        {
+            get
+            {
+                if (ComboBox_Stopbits.SelectedItem is ComboBoxItem item && int.TryParse(item.Content.ToString(), out int bits))
+                    return bits;
+                if (ComboBox_Stopbits.SelectedItem is string str && int.TryParse(str, out bits))
+                    return bits;
+                return 1; // Default
+            }
+            set
+            {
+                foreach (var obj in ComboBox_Stopbits.Items)
+                {
+                    if (obj is ComboBoxItem item && int.TryParse(item.Content.ToString(), out int bits) && bits == value)
+                    {
+                        ComboBox_Stopbits.SelectedItem = item;
+                        return;
+                    }
+                    if (obj is string str && int.TryParse(str, out bits) && bits == value)
+                    {
+                        ComboBox_Stopbits.SelectedItem = obj;
+                        return;
+                    }
+                }
+            }
+        }
+
+        public Parity SelectedParity
+        {
+            get
+            {
+                string parityStr = null;
+                if (ComboBox_Parity.SelectedItem is ComboBoxItem item)
+                    parityStr = item.Content.ToString();
+                else if (ComboBox_Parity.SelectedItem is string str)
+                    parityStr = str;
+                    
+                if (parityStr == "None")
+                    return Parity.None;
+                else if (parityStr == "Odd")
+                    return Parity.Odd;
+                else if (parityStr == "Even")
+                    return Parity.Even;
+                else
+                    return Parity.None;
+            }
+            set
+            {
+                string parityStr;
+                if (value == Parity.None)
+                    parityStr = "None";
+                else if (value == Parity.Odd)
+                    parityStr = "Odd";
+                else if (value == Parity.Even)
+                    parityStr = "Even";
+                else
+                    parityStr = "None";
+                    
+                foreach (object obj in ComboBox_Parity.Items)
+                {
+                    if (obj is ComboBoxItem item && item.Content.ToString() == parityStr)
+                    {
+                        ComboBox_Parity.SelectedItem = item;
+                        return;
+                    }
+                    if (obj is string str && str == parityStr)
+                    {
+                        ComboBox_Parity.SelectedItem = obj;
+                        return;
+                    }
+                }
+            }
+        }
+
+        public string SelectedAudioDevice
+        {
+            get => ComboBox_AudioDevices.SelectedItem as string;
+            set { ComboBox_AudioDevices.SelectedItem = value; }
+        }
+
+        public int SelectedAudioDeviceIndex
+        {
+            get => ComboBox_AudioDevices.SelectedIndex;
+            set { ComboBox_AudioDevices.SelectedIndex = value; }
+        }
+
+        public int SelectedSampleRate
+        {
+            get
+            {
+                if (ComboBox_SampleRates.SelectedItem is string selected &&
+                    int.TryParse(selected, out int rate))
+                {
+                    return rate;
+                }
+                return 44100; // Default fallback
+            }
+            set { ComboBox_SampleRates.SelectedItem = value.ToString(); }
+        }
+
+        private void Button_Connect_Click(object sender, RoutedEventArgs e)
+        {
+            // Validate based on the selected stream source
+            switch (ViewModel.StreamSource)
+            {
+                case StreamSource.SerialPort:
+                    // Only validate serial port settings for serial streams
+                    if (string.IsNullOrWhiteSpace(SelectedPort) || SelectedBaud == 0)
+                    {
+                        MessageBox.Show("Please select a valid port and baud rate.", "Invalid Input", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        return;
+                    }
+                    break;
+                    
+                case StreamSource.AudioInput:
+                    // Validate audio settings
+                    if (string.IsNullOrWhiteSpace(SelectedAudioDevice))
+                    {
+                        MessageBox.Show("Please select a valid audio device.", "Invalid Input", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        return;
+                    }
+                    break;
+                    
+                case StreamSource.Demo:
+                    // Demo mode requires minimal validation
+                    if (ViewModel.NumberOfChannels <= 0)
+                    {
+                        MessageBox.Show("Please specify a valid number of channels.", "Invalid Input", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        return;
+                    }
+                    if (ViewModel.DemoSampleRate <= 0)
+                    {
+                        MessageBox.Show("Please specify a valid sample rate.", "Invalid Input", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        return;
+                    }
+                    break;
+                    
+                case StreamSource.File:
+                    // Validate file settings
+                    if (string.IsNullOrWhiteSpace(ViewModel.FilePath))
+                    {
+                        MessageBox.Show("Please select a data file.", "Invalid Input", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        return;
+                    }
+                    if (!System.IO.File.Exists(ViewModel.FilePath))
+                    {
+                        MessageBox.Show("The selected file does not exist.", "Invalid Input", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        return;
+                    }
+                    if (ViewModel.NumberOfChannels <= 0)
+                    {
+                        MessageBox.Show("The file appears to have no valid channels. Please check the file format.", "Invalid Input", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        return;
+                    }
+                    break;
+                    
+                case StreamSource.USB:
+                    // Validate USB settings (number of channels must be positive)
+                    if (ViewModel.NumberOfChannels <= 0)
+                    {
+                        MessageBox.Show("Please specify a valid number of channels.", "Invalid Input", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        return;
+                    }
+                    break;
+
+                default:
+                    MessageBox.Show("Please select a valid stream type.", "Invalid Input", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+            }
+            
+            DialogResult = true;
+            
+            // Set up callback to apply settings to data streams when they are created
+            ViewModel.DataStreamConfigurationCallback = (dataStream) =>
+            {
+                if (dataStream is IResamplable resamplableStream)
+                {
+                    resamplableStream.ResamplingFactor = ViewModel.Resampling;
+                }
+            };
+            
+            Close();
+        }
+
+        private void Button_Cancel_Click(object sender, RoutedEventArgs e)
+        {
+            DialogResult = false;
+            Close();
+        }
+
+        private void Button_BrowseFile_Click(object sender, RoutedEventArgs e)
+        {
+            OpenFileDialog openDialog = new OpenFileDialog
+            {
+                Filter = "CSV files (*.csv)|*.csv|Text files (*.txt)|*.txt|All files (*.*)|*.*",
+                DefaultExt = "csv",
+                Title = "Select Data File"
+            };
+
+            if (openDialog.ShowDialog() == true)
+            {
+                ViewModel.FilePath = openDialog.FileName;
+                
+                // Parse the file header automatically
+                if (ViewModel.ParseFileHeader(openDialog.FileName))
+                {
+                    // File parsed successfully - UI will update automatically via data binding
+                }
+                else
+                {
+                    MessageBox.Show($"Failed to parse file: {ViewModel.FileParseStatus}", 
+                        "File Parse Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+            }
+        }
+
+        private void DataFormatCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            SetRawBinaryPanelVisibility();
+            SetASCIIPanelVisibility();
+        }
+
+        private void SetRawBinaryPanelVisibility()
+        {
+            if (Panel_RawBinary != null)
+                Panel_RawBinary.Visibility = ViewModel.DataFormat == DataFormatType.RawBinary ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private void SetASCIIPanelVisibility()
+        {
+            if (Panel_ASCII != null)
+                Panel_ASCII.Visibility = ViewModel.DataFormat == DataFormatType.ASCII ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private void USBDataFormatCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            SetUSBDataFormatPanelVisibility();
+        }
+
+        private void SetUSBDataFormatPanelVisibility()
+        {
+            if (ComboBox_USBDataFormat == null)
+                return;
+
+            DataFormatType format = DataFormatType.RawBinary;
+
+            if (ComboBox_USBDataFormat.SelectedItem is ComboBoxItem item &&
+                Enum.TryParse<DataFormatType>(item.Tag?.ToString(), out DataFormatType parsed))
+            {
+                format = parsed;
+            }
+
+            if (Panel_USBRawBinary != null)
+                Panel_USBRawBinary.Visibility = format == DataFormatType.RawBinary ? Visibility.Visible : Visibility.Collapsed;
+
+            if (Panel_USBAscii != null)
+                Panel_USBAscii.Visibility = format == DataFormatType.ASCII ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private void TabControl_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (ViewModel == null || !(sender is TabControl tabControl))
+                return;
+
+            if (tabControl.SelectedItem is TabItem selectedTab)
+            {
+                // Update StreamSource based on selected tab
+                if (selectedTab.Name == "TabItem_Serial")
+                {
+                    ViewModel.StreamSource = StreamSource.SerialPort;
+                }
+                else if (selectedTab.Name == "TabItem_Audio")
+                {
+                    ViewModel.StreamSource = StreamSource.AudioInput;
+                }
+                else if (selectedTab.Name == "TabItem_USB")
+                {
+                    ViewModel.StreamSource = StreamSource.USB;
+                }
+                else if (selectedTab.Name == "TabItem_Demo")
+                {
+                    ViewModel.StreamSource = StreamSource.Demo;
+                }
+                else if (selectedTab.Name == "TabItem_File")
+                {
+                    ViewModel.StreamSource = StreamSource.File;
+                }
+                // USB tab would set StreamSource.USB when implemented
+            }
+        }
+
+        // Input validation methods
+        private void NumbersOnly_PreviewTextInput(object sender, TextCompositionEventArgs e)
+        {
+            // Allow only digits
+            e.Handled = !IsNumeric(e.Text);
+        }
+
+        private void BaudOnly_PreviewTextInput(object sender, TextCompositionEventArgs e)
+        {
+            var textBox = sender as TextBox;
+            var newText = textBox.Text.Insert(textBox.SelectionStart, e.Text);
+            // Allow numbers and 'e' for scientific notation (e.g., 1e6 for 1000000)
+            e.Handled = !IsBaudRate(newText);
+        }
+
+        private static bool IsNumeric(string text)
+        {
+            return Regex.IsMatch(text, @"^[0-9]+$");
+        }
+
+        private static bool IsBaudRate(string text)
+        {
+            // Allow empty string (for typing)
+            if (string.IsNullOrEmpty(text))
+                return true;
+                
+            // Allow numbers and one 'e' or 'E' for scientific notation
+            // Examples: 115200, 1e6, 2e5, 1E6
+            
+            // Basic pattern: digits, optional decimal point, more digits, optional e/E, optional digits
+            if (!Regex.IsMatch(text, @"^[0-9]*\.?[0-9]*[eE]?[0-9]*$"))
+                return false;
+                
+            // Additional validations
+            if (text == "." || text == "e" || text == "E" || text.EndsWith(".."))
+                return false;
+                
+            // Check for multiple 'e' or 'E'
+            var lowerText = text.ToLower();
+            if (lowerText.Count(c => c == 'e') > 1)
+                return false;
+                
+            // Don't allow 'e' at the beginning
+            if (text.StartsWith("e") || text.StartsWith("E"))
+                return false;
+                
+            return true;
+        }
+
+        // New: update demo info text based on selected demo signal type
+        private void ComboBox_DemoSignalType_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            UpdateDemoInfoText();
+        }
+
+        private void UpdateDemoInfoText()
+        {
+            if (InfoTextBlock == null || ComboBox_DemoSignalType == null)
+                return;
+
+            string selected = null;
+            // SelectedValuePath is set to "Content" in XAML, so SelectedValue should be the display string
+            if (ComboBox_DemoSignalType.SelectedValue != null)
+                selected = ComboBox_DemoSignalType.SelectedValue.ToString();
+            else if (ComboBox_DemoSignalType.SelectedItem is ComboBoxItem cbi && cbi.Content != null)
+                selected = cbi.Content.ToString();
+
+            if (string.IsNullOrEmpty(selected))
+            {
+                InfoTextBlock.Text = string.Empty;
+                return;
+            }
+
+            switch (selected.Trim().ToLowerInvariant())
+            {
+                case "sine wave":
+                    InfoTextBlock.Text = "Generates a 1Hz sine wave for the first channel.\nFrequency will increase successively on other channels.";
+                    break;
+                case "square wave":
+                    InfoTextBlock.Text = "Generates a 1Hz square wave on CH1.\nFrequency will increase successively on other channels.";
+                    break;
+                case "triangle wave":
+                    InfoTextBlock.Text = "Generates a 1Hz triangle wave on CH1.\nFrequency will increase successively on other channels.";
+                    break;
+                case "random noise":
+                    InfoTextBlock.Text = "Generates white noise.";
+                    break;
+                case "mixed signals":
+                    InfoTextBlock.Text = "Generates a combination of sine, square, triangle nosie.";
+                    break;
+                case "chirp signal":
+                case "chirp":
+                    InfoTextBlock.Text = "Sweeps a sine wave from 100Hz to 10kHz.\nA sample rate of 20kHz or higher is recommended.";
+                    break;
+                case "tones":
+                    InfoTextBlock.Text = "Generates a 1kHz main sine wave with secondary sine waves at 750 and 1250Hz.\nA sample rate of 10kHz or higher is recommended.\nSecondary waves will successively move closer to 1kHz.";
+                    break;
+                case "sin(x)/x":
+                    InfoTextBlock.Text = "Generates a 400Hz sine wave for testing sin(x)/x interpolation.\nFrequency is just below Nyquist for 1000Hz sampling.\nEach channel gets a slight frequency offset (+5Hz per channel).";
+                    break;
+                default:
+                    InfoTextBlock.Text = string.Empty;
+                    break;
+            }
+        }
+    
+        public class PortInfo
+        {
+            public string Port { get; set; }
+            public string Description { get; set; }
+            public override string ToString() => Description; // For display in ComboBox
+        }
+
+        public class AudioDeviceInfo
+        {
+            public int Index { get; set; }
+            public string Name { get; set; }
+            public WaveInCapabilities? WaveInCapabilities { get; set; }
+            public MMDevice WasapiDevice { get; set; }
+        }
+    }
+}

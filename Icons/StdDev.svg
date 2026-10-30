@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title">
+  <title>Standard Deviation</title>
+  <!-- Bell curve (normal distribution) -->
+  <path d="M6 36 Q24 8 42 36"
+        stroke="#E6EAF2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <!-- Vertical lines showing standard deviations -->
+  <line x1="15" y1="32" x2="15" y2="36"
+        stroke="#22D3EE" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <line x1="24" y1="8" x2="24" y2="36"
+        stroke="#22D3EE" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <line x1="33" y1="32" x2="33" y2="36"
+        stroke="#22D3EE" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Greek sigma (?) symbol -->
+  <text x="24" y="44" text-anchor="middle" fill="#22D3EE" font-family="serif" font-size="6">?</text>
+</svg>

@@ -1,0 +1,89 @@
+﻿<Application x:Class="PowerScope.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ScottPlot="clr-namespace:ScottPlot.WPF;assembly=ScottPlot.WPF"
+             xmlns:local="clr-namespace:PowerScope"
+             StartupUri="MainWindow.xaml">
+    <Application.Resources>
+        <!-- General color resources for PlotSettingsWindow -->
+        <Color x:Key="PlotSettings_BackgroundColor">#FF1E1E1E</Color>
+        <Color x:Key="PlotSettings_TitleBarColor">#FF2D2D30</Color>
+        <Color x:Key="PlotSettings_ButtonHoverColor">#FF3E3E40</Color>
+        <Color x:Key="PlotSettings_ButtonPressedColor">#FF4E4E50</Color>
+        <Color x:Key="PlotSettings_TextBoxBackgroundColor">#FF2D2D30</Color>
+        <Color x:Key="PlotSettings_BorderColor">#FF3F3F46</Color>
+        <Color x:Key="PlotSettings_LabelForegroundColor">#FFA0ACB5</Color>
+        <Color x:Key="PlotSettings_ButtonForegroundColor">#FFA0ACB5</Color>
+        <Color x:Key="PlotSettings_CloseButtonForegroundColor">White</Color>
+        <Color x:Key="PlotSettings_HeaderForegroundColor">#FF888888</Color>
+        <Color x:Key="PlotSettings_CloseButtonHoverColor">#FFFF4444</Color>
+        <Color x:Key="PlotSettings_CloseButtonPressedColor">#FFCC3333</Color>
+        <Color x:Key="PlotSettings_ShadowColor">Black</Color>
+
+        <!-- Highlight colors for cursors -->
+        <Color x:Key="Highlight_Normal">#22D3EE</Color>
+        <Color x:Key="Highlight_Complementary">#EE6922</Color>
+
+        <!-- Brushes for convenience -->
+        <SolidColorBrush x:Key="PlotSettings_BackgroundBrush" Color="{StaticResource PlotSettings_BackgroundColor}"/>
+        <SolidColorBrush x:Key="PlotSettings_TitleBarBrush" Color="{StaticResource PlotSettings_TitleBarColor}"/>
+        <SolidColorBrush x:Key="PlotSettings_ButtonHoverBrush" Color="{StaticResource PlotSettings_ButtonHoverColor}"/>
+        <SolidColorBrush x:Key="PlotSettings_ButtonPressedBrush" Color="{StaticResource PlotSettings_ButtonPressedColor}"/>
+        <SolidColorBrush x:Key="PlotSettings_TextBoxBackgroundBrush" Color="{StaticResource PlotSettings_TextBoxBackgroundColor}"/>
+        <SolidColorBrush x:Key="PlotSettings_BorderBrush" Color="{StaticResource PlotSettings_BorderColor}"/>
+        <SolidColorBrush x:Key="PlotSettings_LabelForegroundBrush" Color="{StaticResource PlotSettings_LabelForegroundColor}"/>
+        <SolidColorBrush x:Key="PlotSettings_ButtonForegroundBrush" Color="{StaticResource PlotSettings_ButtonForegroundColor}"/>
+        <SolidColorBrush x:Key="PlotSettings_CloseButtonForegroundBrush" Color="{StaticResource PlotSettings_CloseButtonForegroundColor}"/>
+        <SolidColorBrush x:Key="PlotSettings_HeaderForegroundBrush" Color="{StaticResource PlotSettings_HeaderForegroundColor}"/>
+        <SolidColorBrush x:Key="PlotSettings_CloseButtonHoverBrush" Color="{StaticResource PlotSettings_CloseButtonHoverColor}"/>
+        <SolidColorBrush x:Key="PlotSettings_CloseButtonPressedBrush" Color="{StaticResource PlotSettings_CloseButtonPressedColor}"/>
+        <SolidColorBrush x:Key="PlotSettings_ShadowBrush" Color="{StaticResource PlotSettings_ShadowColor}"/>
+
+        <!-- Highlight brushes for cursors -->
+        <SolidColorBrush x:Key="Highlight_NormalBrush" Color="{StaticResource Highlight_Normal}"/>
+        <SolidColorBrush x:Key="Highlight_ComplementaryBrush" Color="{StaticResource Highlight_Complementary}"/>
+
+        <!-- Add system font styles -->
+        <Style x:Key="SystemFontStyle" TargetType="Control">
+            <Setter Property="FontFamily" Value="{DynamicResource {x:Static SystemFonts.MessageFontFamily}}"/>
+            <Setter Property="FontSize" Value="{DynamicResource {x:Static SystemFonts.MessageFontSize}}"/>
+        </Style>
+        
+        <!-- Specific text element styles -->
+        <Style x:Key="LabelStyle" TargetType="Label" BasedOn="{StaticResource SystemFontStyle}">
+            <Setter Property="Foreground" Value="{StaticResource PlotSettings_LabelForegroundBrush}"/>
+        </Style>
+        
+        <Style x:Key="TextBoxStyle" TargetType="TextBox" BasedOn="{StaticResource SystemFontStyle}">
+            <Setter Property="Background" Value="{StaticResource PlotSettings_TextBoxBackgroundBrush}"/>
+            <Setter Property="Foreground" Value="{StaticResource PlotSettings_LabelForegroundBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource PlotSettings_BorderBrush}"/>
+        </Style>
+        
+        <Style x:Key="ButtonStyle" TargetType="Button" BasedOn="{StaticResource SystemFontStyle}">
+            <Setter Property="Background" Value="{StaticResource PlotSettings_TitleBarBrush}"/>
+            <Setter Property="Foreground" Value="{StaticResource PlotSettings_ButtonForegroundBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource PlotSettings_BorderBrush}"/>
+        </Style>
+        
+        <!-- Unified Control Label Style for ChannelControl, HorizontalControl, and VerticalControl -->
+        <Style x:Key="ControlLabelTextBoxStyle" TargetType="TextBox" BasedOn="{StaticResource TextBoxStyle}">
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="TextAlignment" Value="Center"/>
+            <Setter Property="IsReadOnly" Value="True"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+        
+        <!-- Non-Bold Control Label Style for secondary labels -->
+        <Style x:Key="ControlTextStyle" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="{DynamicResource {x:Static SystemFonts.MessageFontFamily}}"/>
+            <Setter Property="FontSize" Value="{DynamicResource {x:Static SystemFonts.MessageFontSize}}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontWeight" Value="Normal"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+    </Application.Resources>
+</Application>

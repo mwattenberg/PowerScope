@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title">
+  <title>Min</title>
+  <g stroke="#E6EAF2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M6 20 L12 24 L18 30 L24 36 L30 26 L36 28 L42 22"/>
+  </g>
+  <g stroke="#22D3EE" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M22 30 L24 32 L26 30"/>
+  </g>
+  <circle cx="24" cy="36" r="2.5" fill="#22D3EE"/>
+</svg>

@@ -1,0 +1,835 @@
+using System.Collections.ObjectModel;
+using System.Collections.Specialized;
+using System.ComponentModel;
+using System.Windows;
+using System.Windows.Media;
+using System.Windows.Threading;
+using ScottPlot;
+using ScottPlot.WPF;
+using ScottPlot.Plottables;
+using Color = System.Windows.Media.Color;
+
+namespace PowerScope.Model
+{
+    /// <summary>
+    /// Manager class for ScottPlot integration in WPF
+    /// Migrated to Channel-centric architecture - works directly with Channel objects
+    /// that encapsulate both data streams and settings
+    /// Split into partial classes for better organization:
+    /// - PlotManager.cs: Core functionality (this file)
+    /// - PlotManager.Cursors.cs: Cursor management
+    /// - PlotManager.Triggers.cs: Trigger functionality
+    /// </summary>
+    public partial class PlotManager : INotifyPropertyChanged, IDisposable
+    {
+        // Core fields
+        private readonly WpfPlotGL _plot;
+        private readonly DispatcherTimer _updateTimer;
+        private bool _disposed;
+        private readonly Signal[] _signals;
+        private readonly double[][] _data;
+        // Frozen reference-waveform overlay: one static Signal per channel, captured on demand
+        // from ChannelControl and never touched by the per-frame update loop. The captured
+        // array itself only needs to live inside the Signal plottable, so it isn't tracked here.
+        private readonly Signal[] _referenceSignals;
+        private readonly int _maxChannels;
+        private ObservableCollection<Channel> _channels;
+        // Frame counter for periodic gen0 GC to reclaim native SkiaSharp GL render surfaces.
+        // WpfPlotGL creates a new GRBackendRenderTarget + SKSurface each frame; the native memory
+        // is only freed when GC runs finalizers.  With an allocation-free hot path GC rarely fires,
+        // so we nudge it every ~5 s (150 frames @ 30 Hz) with a cheap non-blocking gen0 collect.
+        private int _gcCollectFrameCounter;
+
+        // Recording functionality. Exposed directly so callers (e.g. RunControl via MainWindow)
+        // start/stop recording and check IsRecording on the recorder itself, instead of PlotManager
+        // re-exposing a parallel set of recording methods it would just forward.
+        private readonly PlotFileWriter _recorder;
+
+        public PlotFileWriter Recorder
+        {
+            get { return _recorder; }
+        }
+
+        // DPI scaling for mouse handling
+        private DpiScale _dpi;
+
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        public PlotSettings Settings { get; private set; }
+
+        public WpfPlotGL Plot
+        {
+            get { return _plot; }
+        }
+
+        public int NumberOfChannels { get; private set; }
+
+        /// <summary>
+        /// Global function to get color from the same palette
+        /// </summary>
+        public static Color GetColor(int index)
+        {
+            //Color 3 of Tsitsulin is not nice, replace with accent color lime green
+            if (index == 3)
+            {
+                return System.Windows.Media.Colors.LimeGreen;
+            }
+
+            IPalette palette = new ScottPlot.Palettes.Tsitsulin();
+            ScottPlot.Color scottPlotColor = palette.GetColor(index);
+            return Color.FromArgb(scottPlotColor.A, scottPlotColor.R, scottPlotColor.G, scottPlotColor.B);
+        }
+
+        /// <summary>
+        /// Whether plot updates are currently running
+        /// </summary>
+        public bool IsRunning { get; private set; }
+
+        public PlotManager(WpfPlotGL wpfPlot, int maxChannels = 16)
+        {
+            _plot = wpfPlot;
+            Settings = new PlotSettings();
+            _channels = new ObservableCollection<Channel>();
+
+            // Initialize cursor (field declared in Cursors partial)
+            _cursor = new Cursor();
+
+            // Initialize update timer
+            _updateTimer = new DispatcherTimer(DispatcherPriority.Render);
+            _updateTimer.Interval = TimeSpan.FromMilliseconds(Settings.TimerInterval);
+            _updateTimer.Tick += UpdatePlot;
+
+            Settings.PropertyChanged += OnSettingsChanged;
+
+            _maxChannels = maxChannels;
+            _signals = new Signal[_maxChannels];
+            _data = new double[_maxChannels][];
+            _referenceSignals = new Signal[_maxChannels];
+
+            // Initialize cursor state (properties declared in Cursors partial)
+            ActiveCursorMode = CursorMode.None;
+            HasActiveCursors = false;
+
+            _dpi = VisualTreeHelper.GetDpi(Plot);
+
+            // Initialize recorder
+            _recorder = new PlotFileWriter();
+            _recorder.Channels = _channels;
+        }
+
+        /// <summary>
+        /// Sets the channels collection for the plot manager
+        /// Also updates the cursor channel data automatically
+        /// </summary>
+        public void SetChannels(ObservableCollection<Channel> channels)
+        {
+            // Unsubscribe from old channels
+            if (_channels != null)
+            {
+                _channels.CollectionChanged -= OnChannelsCollectionChanged;
+                foreach (Channel channel in _channels)
+                {
+                    channel.PropertyChanged -= OnChannelPropertyChanged;
+                }
+            }
+
+            _channels = channels ?? new ObservableCollection<Channel>();
+
+            // Subscribe to new channels
+            _channels.CollectionChanged += OnChannelsCollectionChanged;
+            foreach (Channel channel in _channels)
+            {
+                channel.PropertyChanged += OnChannelPropertyChanged;
+            }
+
+            // Update cursor channel data automatically
+            _cursor.UpdateChannelData(_channels);
+
+            // Keep the recorder in sync with whatever channels are currently selected
+            _recorder.Channels = _channels;
+            if (_channels.Count > 0)
+                _recorder.SampleRate = _channels[0].OwnerStream.SampleRate;
+
+            // Update the display
+            UpdateChannelDisplay();
+        }
+
+        #region Recording
+
+        /// <summary>
+        /// Returns a snapshot of the data currently visible on the plot.
+        /// Returns null if no channels are available.
+        /// </summary>
+        public PlotSnapshot GetSnapshot()
+        {
+            if (_channels == null || _channels.Count == 0)
+                return null;
+
+            int count = Math.Min(_channels.Count, _maxChannels);
+            double[][] data = new double[count][];
+
+            for (int i = 0; i < count; i++)
+            {
+                data[i] = new double[Settings.Xmax];
+                if (_channels[i].IsEnabled && _data[i] != null)
+                    Array.Copy(_data[i], data[i], Settings.Xmax);
+            }
+
+            double sampleRate = _channels[0].OwnerStream.SampleRate;
+            return new PlotSnapshot(data, _channels, sampleRate, DateTime.Now);
+        }
+        #endregion
+
+        #region Reference Waveform
+
+        /// <summary>
+        /// Captures or clears a channel's frozen reference waveform in response to
+        /// ChannelSettings.HasReferenceWaveform being toggled from ChannelControl.
+        /// </summary>
+        private void UpdateReferenceWaveform(Channel channel)
+        {
+            if (channel == null || _channels == null)
+                return;
+
+            int index = _channels.IndexOf(channel);
+            if (index < 0 || index >= _maxChannels)
+                return;
+
+            if (channel.Settings.HasReferenceWaveform)
+                CaptureReferenceWaveform(index, channel);
+            else
+                ClearReferenceWaveform(index);
+
+            _plot.Refresh();
+        }
+
+        /// <summary>
+        /// Freezes the channel's currently displayed samples into a static, dashed overlay
+        /// signal. The captured array is never written to again by the update loop.
+        /// </summary>
+        private void CaptureReferenceWaveform(int index, Channel channel)
+        {
+            ClearReferenceWaveform(index);
+
+            double[] frozen = new double[Settings.Xmax];
+            if (_data[index] != null)
+                Array.Copy(_data[index], frozen, Settings.Xmax);
+
+            Color referenceColor = channel.Settings.ReferenceColor;
+            _referenceSignals[index] = _plot.Plot.Add.Signal(frozen);
+            _referenceSignals[index].Color = new ScottPlot.Color(referenceColor.R, referenceColor.G, referenceColor.B);
+            _referenceSignals[index].LinePattern = ScottPlot.LinePattern.Dashed;
+            _referenceSignals[index].LineWidth = (float)Settings.LineWidth;
+            _referenceSignals[index].MarkerShape = ScottPlot.MarkerShape.None;
+        }
+
+        private void ClearReferenceWaveform(int index)
+        {
+            if (_referenceSignals[index] != null)
+            {
+                _plot.Plot.Remove(_referenceSignals[index]);
+                _referenceSignals[index] = null;
+            }
+        }
+
+        #endregion
+
+        #region Event Handlers
+
+        private void OnSettingsChanged(object sender, PropertyChangedEventArgs e)
+        {
+            Application.Current.Dispatcher.BeginInvoke(() =>
+            {
+                switch (e.PropertyName)
+                {
+                    case nameof(PlotSettings.Ymin):
+                    case nameof(PlotSettings.Ymax):
+                        _plot.Plot.Axes.SetLimitsY(Settings.Ymin, Settings.Ymax);
+                        _plot.Refresh();
+                        break;
+
+                    case nameof(PlotSettings.Xmax):
+                        HandleXmaxChangeForTrigger();
+                        RebuildSignalsForNewXRange();
+                        UpdateMeasurementWindowLength();
+                        break;
+
+                    case nameof(PlotSettings.LineWidth):
+                    case nameof(PlotSettings.AntiAliasing):
+                    case nameof(PlotSettings.ShowRenderTime):
+                        ApplyVisualSettings();
+                        break;
+
+                    case nameof(PlotSettings.PlotUpdateRateFPS):
+                    case nameof(PlotSettings.PlotUpdateRateFpsOption):
+                        if (IsRunning)
+                        {
+                            _updateTimer.Interval = TimeSpan.FromMilliseconds(Settings.TimerInterval);
+                        }
+                        break;
+
+                    case nameof(PlotSettings.BufferSize):
+                        UpdateDataStreamBufferSizes();
+                        break;
+
+                    case nameof(PlotSettings.EnableEdgeTrigger):
+                        HandleTriggerModeChange();
+                        break;
+                }
+            });
+        }
+
+        private void OnChannelsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+        {
+            if (e.NewItems != null)
+            {
+                foreach (Channel channel in e.NewItems)
+                {
+                    channel.PropertyChanged += OnChannelPropertyChanged;
+                }
+            }
+
+            if (e.OldItems != null)
+            {
+                foreach (Channel channel in e.OldItems)
+                {
+                    channel.PropertyChanged -= OnChannelPropertyChanged;
+                }
+            }
+
+            _cursor.UpdateChannelData(_channels);
+            UpdateChannelDisplay();
+        }
+
+        private void OnChannelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            Application.Current.Dispatcher.BeginInvoke(() =>
+            {
+                // Channel forwards each ChannelSettings change twice: once as "Settings.<Name>"
+                // and once as the bare property name (e.g. "IsEnabled"). Only handle the bare
+                // name here, otherwise UpdateChannelDisplay/ApplyChannelColors run twice per change.
+                switch (e.PropertyName)
+                {
+                    case nameof(Channel.IsEnabled):
+                        UpdateChannelDisplay();
+                        break;
+
+                    case nameof(Channel.Color):
+                        ApplyChannelColors();
+                        break;
+
+                    // HasReferenceWaveform has no Channel-level passthrough (unlike IsEnabled/Color
+                    // above), so it only ever arrives as the qualified "Settings.<Name>" form.
+                    case "Settings.HasReferenceWaveform":
+                        UpdateReferenceWaveform(sender as Channel);
+                        break;
+                }
+            });
+        }
+
+        private void RebuildSignalsForNewXRange()
+        {
+            for (int i = 0; i < _maxChannels; i++)
+            {
+                _data[i] = new double[Settings.Xmax];
+
+                if (_signals[i] != null)
+                {
+                    ScottPlot.Color colorOld = _signals[i].Color;
+                    _plot.Plot.Remove(_signals[i]);
+                    _signals[i] = _plot.Plot.Add.Signal(_data[i]);
+                    _signals[i].Color = colorOld;
+                    _signals[i].LineWidth = (float)Settings.LineWidth;
+                    _signals[i].MarkerShape = ScottPlot.MarkerShape.None;
+                    _signals[i].LineStyle.AntiAlias = Settings.AntiAliasing;
+                }
+            }
+
+            CopyChannelDataToPlot();
+            _plot.Plot.Axes.SetLimitsX(0, Settings.Xmax);
+            _plot.Refresh();
+        }
+
+        private void UpdateMeasurementWindowLength()
+        {
+            if (_channels == null)
+                return;
+
+            foreach (Channel channel in _channels)
+            {
+                if (channel.Measurements != null)
+                {
+                    foreach (Measurement measurement in channel.Measurements)
+                    {
+                        try
+                        {
+                            measurement.MeasurementWindowLength = Settings.Xmax;
+                        }
+                        catch (Exception ex)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"Failed to update buffer size for measurement {measurement.TypeDisplayName} on channel {channel.Label}: {ex.Message}");
+                        }
+                    }
+                }
+            }
+        }
+
+        #endregion
+
+        #region Initialization and Visuals
+
+        /// <summary>
+        /// Returns the live ScottPlot X axis limits (the current viewport, which may
+        /// differ from PlotSettings.Xmax if the user has zoomed or panned).
+        /// Must be called on the UI thread.
+        /// </summary>
+        public (double Min, double Max) GetXRange()
+        {
+            var range = _plot.Plot.Axes.GetXAxes().First().Range;
+            return (range.Min, range.Max);
+        }
+
+        /// <summary>
+        /// Sets the X axis viewport transiently without touching PlotSettings.
+        /// Equivalent to the user zooming/panning with the mouse.
+        /// Must be called on the UI thread.
+        /// </summary>
+        public void SetXRange(double min, double max)
+        {
+            _plot.Plot.Axes.SetLimitsX(min, max);
+            _plot.Refresh();
+        }
+
+        /// <summary>
+        /// Returns the live ScottPlot Y axis limits and the current YAutoScale state.
+        /// Must be called on the UI thread.
+        /// </summary>
+        public (double Min, double Max, bool AutoScale) GetYRange()
+        {
+            var range = _plot.Plot.Axes.GetYAxes().First().Range;
+            return (range.Min, range.Max, Settings.YAutoScale);
+        }
+
+        /// <summary>
+        /// Sets the Y axis viewport transiently. When autoScale is false, also disables
+        /// YAutoScale in PlotSettings so the next render frame does not override the limits.
+        /// When autoScale is true, re-enables YAutoScale (min/max are ignored).
+        /// Must be called on the UI thread.
+        /// </summary>
+        public void SetYRange(double min, double max, bool autoScale)
+        {
+            Settings.YAutoScale = autoScale;
+            if (!autoScale)
+            {
+                _plot.Plot.Axes.SetLimitsY(min, max);
+                _plot.Refresh();
+            }
+        }
+
+        public void InitializePlot()
+        {
+            _plot.Plot.Clear();
+            _plot.Plot.Axes.Hairline(true);
+            _plot.Plot.Add.Palette = new ScottPlot.Palettes.Tsitsulin();
+
+            for (int i = 0; i < _maxChannels; i++)
+            {
+                _data[i] = new double[Settings.Xmax];
+            }
+
+            ApplyDarkTheme();
+        }
+
+        private void ApplyDarkTheme()
+        {
+            _plot.Plot.FigureBackground.Color = ScottPlot.Color.FromHex("#1f1f1f");
+            _plot.Plot.DataBackground.Color = ScottPlot.Color.FromHex("#1f1f1f");
+            _plot.Plot.Axes.Color(ScottPlot.Color.FromHex("#d7d7d7"));
+            _plot.Plot.Grid.LineWidth = (float)Settings.LineWidth;
+            _plot.Plot.Grid.MajorLineColor = ScottPlot.Color.FromHex("#404040");
+            _plot.Plot.Legend.BackgroundColor = ScottPlot.Color.FromHex("#404040");
+            _plot.Plot.Legend.FontColor = ScottPlot.Color.FromHex("#d7d7d7");
+            _plot.Plot.Legend.OutlineColor = ScottPlot.Color.FromHex("#d7d7d7");
+            _plot.Plot.Axes.ContinuouslyAutoscale = false;
+            _plot.Plot.RenderManager.ClearCanvasBeforeEachRender = true;
+            _plot.Plot.Axes.SetLimitsX(Settings.Xmin, Settings.Xmax);
+            _plot.Plot.Axes.SetLimitsY(Settings.Ymin, Settings.Ymax);
+            _plot.Plot.Axes.Bottom.IsVisible = true;
+        }
+
+        private void ApplyVisualSettings()
+        {
+            _plot.Plot.Grid.LineWidth = (float)Settings.LineWidth;
+
+            for (int i = 0; i < _signals.Length; i++)
+            {
+                if (_signals[i] != null)
+                {
+                    _signals[i].LineWidth = (float)Settings.LineWidth;
+                    _signals[i].LineStyle.AntiAlias = Settings.AntiAliasing;
+                }
+
+                if (_referenceSignals[i] != null)
+                {
+                    _referenceSignals[i].LineWidth = (float)Settings.LineWidth;
+                    _referenceSignals[i].LineStyle.AntiAlias = Settings.AntiAliasing;
+                }
+            }
+
+            _plot.Plot.Benchmark.IsVisible = Settings.ShowRenderTime;
+            _plot.Refresh();
+        }
+
+        private void ApplyChannelColors()
+        {
+            if (_channels == null)
+                return;
+
+            for (int i = 0; i < NumberOfChannels && i < _maxChannels; i++)
+            {
+                if (i >= _channels.Count)
+                    continue;
+
+                Color channelColor = _channels[i].Color;
+
+                if (_signals[i] != null)
+                    _signals[i].Color = new ScottPlot.Color(channelColor.R, channelColor.G, channelColor.B);
+
+                if (_referenceSignals[i] != null)
+                {
+                    Color referenceColor = _channels[i].Settings.ReferenceColor;
+                    _referenceSignals[i].Color = new ScottPlot.Color(referenceColor.R, referenceColor.G, referenceColor.B);
+                }
+            }
+
+            _plot.Refresh();
+        }
+
+        private void UpdateChannelDisplay()
+        {
+            if (_channels == null)
+            {
+                NumberOfChannels = 0;
+                return;
+            }
+
+            NumberOfChannels = Math.Min(_channels.Count, _maxChannels);
+
+            // Drop reference waveforms whose channel position no longer exists
+            // (e.g. a stream was removed and the channel list shrank).
+            for (int i = NumberOfChannels; i < _maxChannels; i++)
+            {
+                ClearReferenceWaveform(i);
+            }
+
+            // Remove existing signals
+            for (int i = 0; i < _maxChannels; i++)
+            {
+                if (_signals[i] != null)
+                {
+                    _plot.Plot.Remove(_signals[i]);
+                    _signals[i] = null;
+                }
+            }
+
+            // Add signals only for enabled channels
+            for (int i = 0; i < NumberOfChannels; i++)
+            {
+                Channel channel = _channels[i];
+
+                if (channel.IsEnabled)
+                {
+                    _signals[i] = _plot.Plot.Add.Signal(_data[i]);
+
+                    Color channelColor = channel.Color;
+                    _signals[i].Color = new ScottPlot.Color(channelColor.R, channelColor.G, channelColor.B);
+                    _signals[i].MarkerShape = ScottPlot.MarkerShape.None;
+                    _signals[i].LineWidth = (float)Settings.LineWidth;
+                    _signals[i].LineStyle.AntiAlias = Settings.AntiAliasing;
+                }
+            }
+
+            _plot.Refresh();
+        }
+
+        public void SetupPlotUserInput()
+        {
+            _plot.UserInputProcessor.UserActionResponses.Clear();
+            _plot.UserInputProcessor.IsEnabled = true;
+
+            var panButton = ScottPlot.Interactivity.StandardMouseButtons.Left;
+            var panResponse = new ScottPlot.Interactivity.UserActionResponses.MouseDragPan(panButton);
+            _plot.UserInputProcessor.UserActionResponses.Add(panResponse);
+
+            var zoomRectangleButton = ScottPlot.Interactivity.StandardMouseButtons.Middle;
+            var zoomRectangleResponse = new ScottPlot.Interactivity.UserActionResponses.MouseDragZoomRectangle(zoomRectangleButton);
+            _plot.UserInputProcessor.UserActionResponses.Add(zoomRectangleResponse);
+
+            var autoscaleButton = ScottPlot.Interactivity.StandardMouseButtons.Right;
+            var autoscaleResponse = new ScottPlot.Interactivity.UserActionResponses.SingleClickAutoscale(autoscaleButton);
+            _plot.UserInputProcessor.UserActionResponses.Add(autoscaleResponse);
+
+            ScottPlot.Interactivity.UserActionResponses.MouseWheelZoom wheelZoomResponse = new ScottPlot.Interactivity.UserActionResponses.MouseWheelZoom(ScottPlot.Interactivity.StandardKeys.Shift, ScottPlot.Interactivity.StandardKeys.Control);
+            _plot.UserInputProcessor.UserActionResponses.Add(wheelZoomResponse);
+        }
+
+        #endregion
+
+        #region Core Update Loop
+
+        public void StartUpdates()
+        {
+            if (!IsRunning && !_disposed)
+            {
+                _updateTimer.Interval = TimeSpan.FromMilliseconds(Settings.TimerInterval);
+                _updateTimer.Start();
+                IsRunning = true;
+                OnPropertyChanged(nameof(IsRunning));
+            }
+        }
+
+        public void StopUpdates()
+        {
+            if (IsRunning)
+            {
+                _updateTimer.Stop();
+                IsRunning = false;
+                OnPropertyChanged(nameof(IsRunning));
+            }
+        }
+
+        private void UpdatePlot(object? sender, EventArgs e)
+        {
+            if (Application.Current == null)
+                return;
+
+            _plot.Plot.RenderManager.EnableRendering = false;
+
+            bool shouldUpdatePlot;
+
+            if (Settings.EnableEdgeTrigger)
+            {
+                shouldUpdatePlot = CheckTriggerCondition();
+            }
+            else
+            {
+                shouldUpdatePlot = true;
+            }
+
+            if (shouldUpdatePlot)
+            {
+                CopyChannelDataToPlot();
+
+                if (_recorder.IsRecording)
+                {
+                    _recorder.WritePendingSamples();
+                }
+
+                if (Settings.YAutoScale)
+                    _plot.Plot.Axes.AutoScaleY();
+
+                _plot.Plot.RenderManager.EnableRendering = true;
+                _plot.Refresh();
+            }
+            else
+            {
+                _plot.Plot.RenderManager.EnableRendering = true;
+            }
+
+            // Periodically collect gen0 to flush the finalizer queue so the SkiaSharp GL
+            // render surfaces created by WpfPlotGL.Refresh() are reclaimed promptly.
+            // Without this, native GPU memory grows ~2.5 GB/min when GC is otherwise idle.
+            _gcCollectFrameCounter++;
+            if (_gcCollectFrameCounter >= 150)
+            {
+                _gcCollectFrameCounter = 0;
+                GC.Collect(0, GCCollectionMode.Optimized, false, false);
+            }
+        }
+
+        private void CopyChannelDataToPlot()
+        {
+            if (_channels == null)
+                return;
+
+            if (Settings.EnableEdgeTrigger && _triggerSampleIndex >= 0)
+            {
+                // Use the new over-fetch and shift approach for trigger alignment
+                // This works with ALL stream types using only CopyLatestTo()
+                CopyChannelDataWithTriggerAlignment();
+            }
+            else
+            {
+                // Normal mode: just copy latest data
+                for (int i = 0; i < _channels.Count && i < _maxChannels; i++)
+                {
+                    Channel channel = _channels[i];
+
+                    if (channel.IsEnabled)
+                    {
+                        channel.CopyLatestDataTo(_data[i], Settings.Xmax);
+                    }
+                }
+            }
+            //Not sure about this. I think Claude misunderstanded the logic here.
+            //_triggerSampleIndex = -1;
+        }
+
+        #endregion
+
+        #region Utilities
+
+        private void UpdateDataStreamBufferSizes()
+        {
+            var uniqueStreams = new HashSet<IDataStream>();
+            foreach (Channel channel in _channels)
+            {
+                uniqueStreams.Add(channel.OwnerStream);
+            }
+
+            foreach (IDataStream stream in uniqueStreams)
+            {
+                if (stream is IBufferResizable resizableStream)
+                {
+                    resizableStream.BufferSize = Settings.BufferSize;
+                }
+            }
+        }
+
+        protected virtual void OnPropertyChanged(string propertyName)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+
+        public double? GetPlotDataAt(Channel channel, int sampleIndex)
+        {
+            if (channel == null || _channels == null)
+                return null;
+
+            int channelIndex = -1;
+            for (int i = 0; i < _channels.Count && i < _maxChannels; i++)
+            {
+                if (_channels[i] == channel)
+                {
+                    channelIndex = i;
+                    break;
+                }
+            }
+
+            if (channelIndex < 0)
+                return null;
+
+            if (!channel.IsEnabled || _data[channelIndex] == null)
+                return null;
+
+            if (sampleIndex >= 0 && sampleIndex < _data[channelIndex].Length)
+                return _data[channelIndex][sampleIndex];
+
+            return null;
+        }
+
+        #endregion
+
+        #region Legend
+
+        /// <summary>
+        /// Sets legend text on every active signal and shows the legend overlay.
+        /// Pair with <see cref="RemoveLegend"/> after the export completes.
+        /// </summary>
+        public void ApplyLegend()
+        {
+            if (_channels == null)
+                return;
+
+            for (int i = 0; i < NumberOfChannels && i < _maxChannels; i++)
+            {
+                if (_signals[i] != null && _channels[i].IsEnabled)
+                    _signals[i].LegendText = _channels[i].Settings.Label;
+            }
+
+            _plot.Plot.ShowLegend();
+        }
+
+        /// <summary>
+        /// Clears all signal legend text and hides the legend overlay.
+        /// </summary>
+        public void RemoveLegend()
+        {
+            for (int i = 0; i < _maxChannels; i++)
+            {
+                if (_signals[i] != null)
+                    _signals[i].LegendText = string.Empty;
+            }
+
+            _plot.Plot.HideLegend();
+        }
+
+        #endregion
+
+        #region Cleanup
+
+        public void Dispose()
+        {
+            if (!_disposed)
+            {
+                _disposed = true;
+
+                DisableCursors();
+                _cursor?.Dispose();
+                StopUpdates();
+
+                if (_channels != null)
+                {
+                    _channels.CollectionChanged -= OnChannelsCollectionChanged;
+                    foreach (Channel channel in _channels)
+                    {
+                        channel.PropertyChanged -= OnChannelPropertyChanged;
+                    }
+                }
+
+                if (Settings != null)
+                {
+                    Settings.PropertyChanged -= OnSettingsChanged;
+                }
+
+                _recorder.Dispose();
+            }
+        }
+
+        public void Clear()
+        {
+            if (_channels == null)
+                return;
+
+            var uniqueStreams = new HashSet<IDataStream>();
+            foreach (Channel channel in _channels)
+            {
+                uniqueStreams.Add(channel.OwnerStream);
+            }
+
+            foreach (IDataStream stream in uniqueStreams)
+            {
+                try
+                {
+                    stream.clearData();
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Failed to clear data for {stream.StreamType}: {ex.Message}");
+                }
+            }
+
+            for (int i = 0; i < _maxChannels; i++)
+            {
+                if (_data[i] != null)
+                {
+                    Array.Clear(_data[i], 0, _data[i].Length);
+                }
+            }
+
+            _plot.Refresh();
+        }
+
+        #endregion
+    }
+}

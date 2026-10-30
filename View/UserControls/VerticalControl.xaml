@@ -1,0 +1,207 @@
+﻿<UserControl x:Class="PowerScope.View.UserControls.VerticalControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:PowerScope.View.UserControls"
+             xmlns:svgc="http://sharpvectors.codeplex.com/svgc/"
+             mc:Ignorable="d" 
+             MinHeight="180"
+             FontFamily="{DynamicResource {x:Static SystemFonts.MessageFontFamily}}"
+             FontSize="{DynamicResource {x:Static SystemFonts.MessageFontSize}}">
+    <UserControl.Resources>
+        <!-- Button style using global styles -->
+        <Style TargetType="Button" BasedOn="{StaticResource ButtonStyle}">
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="{DynamicResource PlotSettings_ButtonHoverBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter Property="Background" Value="{DynamicResource PlotSettings_ButtonPressedBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        
+        <!-- TextBox style for vertical label -->
+        <Style x:Key="VerticalLabelTextBoxStyle" TargetType="TextBox" BasedOn="{StaticResource ControlLabelTextBoxStyle}">
+            <!-- Inherits all properties from the unified ControlLabelTextBoxStyle in App.xaml -->
+        </Style>
+        
+        <!-- TextBox style for input fields -->
+        <Style x:Key="InputTextBoxStyle" TargetType="TextBox" BasedOn="{StaticResource TextBoxStyle}">
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="TextAlignment" Value="Right"/>
+            <Setter Property="Padding" Value="2"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+        
+        <!-- Label style -->
+        <Style x:Key="LabelTextStyle" TargetType="TextBlock" BasedOn="{StaticResource ControlTextStyle}">
+            <Setter Property="Margin" Value="5,0,5,0"/>
+        </Style>
+        
+        <!-- CheckBox style -->
+        <Style x:Key="VerticalCheckBoxStyle" TargetType="CheckBox">
+            <Setter Property="FontFamily" Value="{DynamicResource {x:Static SystemFonts.MessageFontFamily}}"/>
+            <Setter Property="FontSize" Value="{DynamicResource {x:Static SystemFonts.MessageFontSize}}"/>
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
+        
+        <!-- Style for vertical control buttons -->
+        <Style x:Key="VerticalButtonStyle" TargetType="Button" BasedOn="{StaticResource ButtonStyle}">
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="{DynamicResource PlotSettings_ButtonHoverBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter Property="Background" Value="{DynamicResource PlotSettings_ButtonPressedBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        
+        <!-- Style for smaller vertical button -->
+        <Style x:Key="SmallVerticalButtonStyle" TargetType="Button" BasedOn="{StaticResource ButtonStyle}">
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="{DynamicResource PlotSettings_ButtonHoverBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter Property="Background" Value="{DynamicResource PlotSettings_ButtonPressedBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+    
+    <Border Height="Auto" Background="{DynamicResource PlotSettings_BackgroundBrush}" CornerRadius="2">
+        <Grid x:Name="RootGrid" Background="{DynamicResource PlotSettings_BackgroundBrush}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="24"/>
+                <!-- Top color bar -->
+                <RowDefinition Height="65"/>
+                <!-- Buttons -->
+                <RowDefinition Height="*"/>
+                <!-- Max row -->
+                <RowDefinition Height="*"/>
+                <!-- Min row -->
+                <RowDefinition Height="*"/>
+                <!-- Auto Scale row -->
+            </Grid.RowDefinitions>
+            
+            <!-- Top color bar with "Vertical" label -->
+            <Border x:Name="TopColorBar" Grid.Row="0" Background="Gray" CornerRadius="2" Height="20" Margin="2">
+                <TextBox x:Name="VerticalLabelTextBox" Text="Vertical" Style="{StaticResource VerticalLabelTextBoxStyle}"/>
+            </Border>
+            
+            <!-- Two buttons below the label -->
+            <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="2">
+                <Button x:Name="ButtonGrow" VerticalAlignment="Center" MinWidth="50" Height="50" Margin="2,0,5,0" 
+                        Style="{StaticResource VerticalButtonStyle}" Click="ButtonGrow_Click"
+                        ToolTip="Expand vertical scale">
+                    <svgc:SvgViewbox Source="/Icons/yExpand.svg" Width="42" Height="42" />
+                </Button>
+                <Button x:Name="ButtonShrink" VerticalAlignment="Center" MinWidth="50" Height="50" Margin="5,0,2,0" 
+                        Style="{StaticResource SmallVerticalButtonStyle}" Click="ButtonShrink_Click"
+                        ToolTip="Shrink vertical scale">
+                    <svgc:SvgViewbox Source="/Icons/yShrink.svg" Width="42" Height="42" />
+                </Button>
+            </StackPanel>
+            
+            <!-- Max row -->
+            <Grid Grid.Row="2" Margin="5,2,5,2">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="Max:" Style="{StaticResource LabelTextStyle}" VerticalAlignment="Center"/>
+                <TextBox Grid.Column="1" x:Name="MaxTextBox" 
+                         Style="{StaticResource InputTextBoxStyle}" 
+                         MinWidth="60" 
+                         HorizontalAlignment="Right" 
+                         Text="{Binding Ymax, UpdateSourceTrigger=PropertyChanged}"
+                         TextChanged="MaxTextBox_TextChanged"/>
+            </Grid>
+            
+            <!-- Min row -->
+            <Grid Grid.Row="3" Margin="5,2,5,2">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="Min:" Style="{StaticResource LabelTextStyle}" VerticalAlignment="Center"/>
+                <TextBox Grid.Column="1" x:Name="MinTextBox" 
+                         Style="{StaticResource InputTextBoxStyle}" 
+                         MinWidth="60" 
+                         HorizontalAlignment="Right" 
+                         Text="{Binding Ymin, UpdateSourceTrigger=PropertyChanged}"
+                         TextChanged="MinTextBox_TextChanged"/>
+            </Grid>
+            
+            <!-- Auto Scale row with two buttons -->
+            <Grid Grid.Row="4" Margin="5,2,5,2">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                
+                <Button x:Name="AutoScaleButton" Grid.Column="0" 
+                        Style="{StaticResource SmallVerticalButtonStyle}"
+                        Height="28"
+                        Margin="0,0,2,0"
+                        Click="AutoScaleButton_Click"
+                        ToolTip="Toggles between auto scaling and fixed scaling">
+                    <TextBlock Text="Auto" FontSize="12" FontWeight="Bold"/>
+                </Button>
+                
+                <Button x:Name="RefreshButton" Grid.Column="1"
+                        Style="{StaticResource SmallVerticalButtonStyle}"
+                        Height="28"
+                        Margin="2,0,0,0"
+                        Click="RefreshButton_Click"
+                        ToolTip="Resets the Y axis to the given defaults">
+                    <TextBlock Text="Reset" FontSize="12" FontWeight="Bold"/>
+                </Button>
+            </Grid>
+        </Grid>
+    </Border>
+</UserControl>

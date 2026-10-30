@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="420" viewBox="0 0 900 420">
+<defs>
+<marker id="arrow-red" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+<path d="M0,0 L8,4 L0,8 Z" fill="#d22"/>
+</marker>
+<marker id="arrow-blue" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+<path d="M0,0 L8,4 L0,8 Z" fill="#2456a8"/>
+</marker>
+</defs>
+
+<style>
+.box { fill:#fff; stroke:#000; stroke-width:2; vector-effect:non-scaling-stroke; }
+.box-group { fill:none; stroke:#777; stroke-width:2; stroke-dasharray:6 6; }
+.label { font:14px Arial, Helvetica, sans-serif; fill:#000; }
+.small { font:12px Arial, Helvetica, sans-serif; fill:#000; }
+.wireP { fill:none; stroke:#d22; stroke-width:3; vector-effect:non-scaling-stroke; }
+.wireN { fill:none; stroke:#2456a8; stroke-width:3; vector-effect:non-scaling-stroke; }
+.node { fill:#fff; stroke:#000; stroke-width:1.5; }
+</style>
+
+<!-- Group boundary around the series pair -->
+<rect class="box-group" x="500" y="60" width="260" height="320" rx="6"/>
+
+<!-- Converters -->
+<rect class="box" x="70" y="140" width="220" height="160" rx="6"/>
+<!-- DC/DC 2 is conceptually flipped: inputs on the right, outputs on the left -->
+<rect class="box" x="520" y="80" width="220" height="120" rx="6"/>
+<rect class="box" x="520" y="240" width="220" height="120" rx="6"/>
+
+<!-- Labels -->
+<text class="label" x="180" y="165" text-anchor="middle">DC/DC 1</text>
+<text class="small" x="180" y="185" text-anchor="middle">(source / pre-reg)</text>
+
+<text class="label" x="630" y="105" text-anchor="middle">DC/DC 2</text>
+<text class="small" x="630" y="125" text-anchor="middle">(flipped; series stage 2)</text>
+
+<text class="label" x="630" y="265" text-anchor="middle">DC/DC 3</text>
+<text class="small" x="630" y="285" text-anchor="middle">(series stage 1)</text>
+
+<!-- Pin markers -->
+<!-- DC/DC 1 outputs -->
+<text class="small" x="288" y="184" text-anchor="start">+</text>
+<text class="small" x="288" y="244" text-anchor="start">−</text>
+
+<!-- DC/DC 2 (flipped): outputs on left, inputs on right -->
+<text class="small" x="523" y="124" text-anchor="start">+</text>
+<text class="small" x="523" y="164" text-anchor="start">−</text>
+<text class="small" x="742" y="124" text-anchor="end">+</text>
+<text class="small" x="742" y="164" text-anchor="end">−</text>
+
+<!-- DC/DC 3: inputs left, outputs right -->
+<text class="small" x="523" y="284" text-anchor="start">+</text>
+<text class="small" x="523" y="324" text-anchor="start">−</text>
+<text class="small" x="742" y="284" text-anchor="end">+</text>
+<text class="small" x="742" y="324" text-anchor="end">−</text>
+
+<!-- Nodes -->
+<!-- DC/DC 1 -->
+<circle class="node" cx="290" cy="180" r="3.5"/>
+<circle class="node" cx="290" cy="240" r="3.5"/>
+<!-- Feedback entry points on DC/DC 1 -->
+<circle class="node" cx="70" cy="170" r="3.5"/>
+<text class="small" x="78" y="174">FB+</text>
+<circle class="node" cx="70" cy="230" r="3.5"/>
+<text class="small" x="78" y="234">FB−</text>
+
+<!-- DC/DC 2 (flipped) nodes -->
+<circle class="node" cx="520" cy="120" r="3.5"/> <!-- top output + (left side) -->
+<circle class="node" cx="520" cy="160" r="3.5"/> <!-- top output - (left side) -->
+<circle class="node" cx="740" cy="120" r="3.5"/> <!-- top input + (right side) -->
+<circle class="node" cx="740" cy="160" r="3.5"/> <!-- top input - (right side) -->
+
+<!-- DC/DC 3 nodes -->
+<circle class="node" cx="520" cy="280" r="3.5"/>
+<circle class="node" cx="520" cy="320" r="3.5"/>
+<circle class="node" cx="740" cy="280" r="3.5"/>
+<circle class="node" cx="740" cy="320" r="3.5"/>
+
+<!-- Wiring -->
+<!-- DC/DC 1 -> DC/DC 3 (inputs on left) -->
+<path class="wireP" marker-end="url(#arrow-red)" d="M290,180 H480 V280 H520"/>
+<path class="wireN" marker-end="url(#arrow-blue)" d="M290,240 H460 V320 H520"/>
+
+<!-- DC/DC 3 outputs (right) -> DC/DC 2 inputs (right), staggered to avoid overlap -->
+<path class="wireP" marker-end="url(#arrow-red)" d="M740,280 V120"/>
+<path class="wireN" marker-end="url(#arrow-blue)" d="M740,320 H760 V160 H740"/>
+
+<!-- DC/DC 2 outputs (left) -> back to DC/DC 1 (feedback), kept outside and non-overlapping -->
+<path class="wireP" marker-end="url(#arrow-red)" d="M520,120 H310 V170 H70"/>
+<path class="wireN" marker-end="url(#arrow-blue)" d="M520,160 H300 V230 H70"/>
+</svg>

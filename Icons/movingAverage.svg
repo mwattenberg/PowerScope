@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title">
+  <title>Moving average (with axes)</title>
+  <!-- Axes -->
+  <line x1="8" y1="36" x2="40" y2="36" stroke="#E6EAF2" stroke-width="2" stroke-linecap="round"/>
+  <line x1="8" y1="36" x2="8" y2="12" stroke="#E6EAF2" stroke-width="2" stroke-linecap="round"/>
+  <!-- Noisy signal (raw) -->
+  <path d="M8 30 L12 26 L16 32 L20 20 L24 28 L28 18 L32 26 L36 22 L40 24"
+        stroke="#E6EAF2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <!-- Smoothed (moving average) overlay -->
+  <path d="M8 28 C12 26 16 26 20 24 S28 22 32 24 S38 26 40 25"
+        stroke="#22D3EE" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>

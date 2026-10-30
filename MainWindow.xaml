@@ -1,0 +1,79 @@
+﻿<Window x:Class="PowerScope.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:ScottPlot="clr-namespace:ScottPlot.WPF;assembly=ScottPlot.WPF"
+        xmlns:UserControls="clr-namespace:PowerScope.View.UserControls"
+        xmlns:UserForms="clr-namespace:PowerScope.View.UserForms"
+        xmlns:local="clr-namespace:PowerScope"
+        mc:Ignorable="d"
+        Title="PowerScope" Height="850" Width="1600"
+        FontFamily="{DynamicResource {x:Static SystemFonts.MessageFontFamily}}"
+        FontSize="{DynamicResource {x:Static SystemFonts.MessageFontSize}}"
+        Background="{DynamicResource PlotSettings_BackgroundBrush}">
+    
+    <Window.InputBindings>
+        <KeyBinding Command="{Binding SaveSettingsCommand}" Key="S" Modifiers="Ctrl"/>
+        <KeyBinding Command="{Binding LoadSettingsCommand}" Key="L" Modifiers="Ctrl"/>
+        <KeyBinding Command="{Binding OpenWaveformCommand}" Key="O" Modifiers="Ctrl"/>
+        <KeyBinding Command="{Binding PreferencesCommand}" Key="P" Modifiers="Ctrl"/>
+    </Window.InputBindings>
+
+    <Grid Background="{DynamicResource PlotSettings_BackgroundBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="25"/>
+            <!-- Toolbar -->
+            <RowDefinition Height="*"/>
+            <!-- Main content -->
+            <RowDefinition Height="Auto"/>
+            <!-- Bottom controls -->
+        </Grid.RowDefinitions>
+        <!-- Toolbar at the top -->
+        <UserControls:MenuBar Grid.Row="0" x:Name="MainMenuBar" Height="Auto"/>
+        <!-- Main content area: 3 columns -->
+        <Grid Grid.Row="1" VerticalAlignment="Stretch">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition x:Name="DataStreamBarColumn" Width="150" MinWidth="150"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition x:Name="MeasurementBarColumn" Width="160" MinWidth="160"/>
+            </Grid.ColumnDefinitions>
+            <!-- DataStreamBar (left) -->
+            <UserControls:DataStreamBar Grid.Column="0" x:Name="DataStreamBar" VerticalAlignment="Stretch"/>
+            <!-- Plot area (center) -->
+            <Grid Grid.Column="1" Background="{DynamicResource PlotSettings_BackgroundBrush}" VerticalAlignment="Stretch">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <ScottPlot:WpfPlotGL x:Name="WpfPlot1" Grid.Row="0" Margin="0" VerticalAlignment="Stretch"/>
+                <!-- Collapse/expand handles for the side bars -->
+                <Button x:Name="ToggleDataStreamBarButton" Grid.Row="0" Click="ToggleDataStreamBarButton_Click"
+                        Style="{StaticResource ButtonStyle}" Content="&#171;"
+                        Width="7" HorizontalAlignment="Left" VerticalAlignment="Stretch"
+                        Padding="0" Opacity="0.6" Cursor="Hand" ToolTip="Hide/show data stream panel"/>
+                <Button x:Name="ToggleMeasurementBarButton" Grid.Row="0" Click="ToggleMeasurementBarButton_Click"
+                        Style="{StaticResource ButtonStyle}" Content="&#187;"
+                        Width="7" HorizontalAlignment="Right" VerticalAlignment="Stretch"
+                        Padding="0" Opacity="0.6" Cursor="Hand" ToolTip="Hide/show measurement panel"/>
+            </Grid>
+            <!-- MeasurementBar (right) -->
+            <UserControls:MeasurementBar Grid.Column="2" x:Name="MeasurementBar" VerticalAlignment="Stretch"/>
+        </Grid>
+        <!-- Bottom controls: 4 columns for each control -->
+        <Grid Grid.Row="2" Margin="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="150"/>
+                <ColumnDefinition Width="150"/>
+                <ColumnDefinition Width="150"/>
+                <ColumnDefinition Width="auto"/>
+            </Grid.ColumnDefinitions>
+            <UserControls:ChannelControlBar Grid.Column="0" x:Name="ChannelControlBar" VerticalAlignment="Top" Margin="2,0,2,0"/>
+            <UserControls:HorizontalControl Grid.Column="1" x:Name="HorizontalControl" VerticalAlignment="Top" Margin="2,0,2,0"/>
+            <UserControls:TriggerControl Grid.Column="2" x:Name="TriggerControl" VerticalAlignment="Top" Margin="2,0,2,0"/>
+            <UserControls:VerticalControl Grid.Column="3" x:Name="VerticalControl" VerticalAlignment="Top" Margin="2,0,2,0"/>
+            <UserControls:RunControl Grid.Column="4" x:Name="RunControl" VerticalAlignment="Top" HorizontalAlignment="Center" Margin="2,0,4,0"/>
+        </Grid>
+    </Grid>
+</Window>

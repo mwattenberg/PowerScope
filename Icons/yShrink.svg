@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   width="48"
+   height="48"
+   viewBox="0 0 48 48"
+   fill="none"
+   role="img"
+   aria-labelledby="title"
+   version="1.1"
+   id="svg3"
+   sodipodi:docname="yShrink.svg"
+   inkscape:version="1.3.2 (091e20e, 2023-11-25, custom)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs3" />
+  <sodipodi:namedview
+     id="namedview3"
+     pagecolor="#505050"
+     bordercolor="#ffffff"
+     borderopacity="1"
+     inkscape:showpageshadow="0"
+     inkscape:pageopacity="0"
+     inkscape:pagecheckerboard="1"
+     inkscape:deskcolor="#505050"
+     inkscape:zoom="23.6875"
+     inkscape:cx="23.978892"
+     inkscape:cy="24"
+     inkscape:window-width="2560"
+     inkscape:window-height="1351"
+     inkscape:window-x="-9"
+     inkscape:window-y="-9"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg3" />
+  <title
+     id="title1">Scale Y — contract (smaller amplitude)</title>
+  <!-- Sine: smaller amplitude -->
+  <path
+     d="M8 24 C14 20,18 20,24 24 S34 28,40 24"
+     stroke="#E6EAF2"
+     stroke-width="2"
+     stroke-linecap="round"
+     stroke-linejoin="round"
+     fill="none"
+     id="path1" />
+  <!-- Inward vertical arrows -->
+  <line
+     x1="42"
+     y1="20"
+     x2="42"
+     y2="30"
+     stroke="#22d3ee"
+     stroke-width="2"
+     stroke-linecap="round"
+     id="line1" />
+  <path
+     d="m 40,18 2,2 2,-2"
+     stroke="#22d3ee"
+     stroke-width="2"
+     stroke-linecap="round"
+     stroke-linejoin="round"
+     fill="none"
+     id="path2" />
+  <path
+     d="m 40,32 2,-2 2,2"
+     stroke="#22d3ee"
+     stroke-width="2"
+     stroke-linecap="round"
+     stroke-linejoin="round"
+     fill="none"
+     id="path3" />
+</svg>
